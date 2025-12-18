@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Engaging Portfolio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.cdnfonts.com/css/satoshi" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --card: #111821;
+      --muted: #9ca3af;
+      --accent: #22c55e;
+      --accent-soft: rgba(34, 197, 94, 0.12);
+      --accent-strong: rgba(34, 197, 94, 0.18);
+      --border: #1f2937;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Satoshi', 'Inter', system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(34, 197, 94, 0.12), transparent 30%),
+                  radial-gradient(circle at 80% 0%, rgba(34, 197, 94, 0.08), transparent 25%),
+                  var(--bg);
+      color: #e5e7eb;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    a { color: inherit; text-decoration: none; }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(12px);
+      background: rgba(11, 15, 20, 0.75);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.25rem 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .logo .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 6px var(--accent-soft);
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-weight: 600;
+      color: #cfd5df;
+    }
+    .nav-links a:hover { color: #fff; }
+    .hamburger {
+      display: none;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 0.5rem 0.75rem;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .mobile-menu {
+      display: none;
+      flex-direction: column;
+      gap: 1rem;
+      padding: 1rem 3rem 1.5rem;
+      background: rgba(11, 15, 20, 0.95);
+      border-bottom: 1px solid var(--border);
+    }
+    .section {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 4.5rem 3rem;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.8rem;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+    }
+    .hero {
+      position: relative;
+      padding-top: 6rem;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 2.5rem;
+      align-items: center;
+    }
+    .hero-title {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 3.75rem;
+      line-height: 1.1;
+      margin: 0.75rem 0;
+      letter-spacing: -0.02em;
+      background: linear-gradient(120deg, #fff, #22c55e, #d1d5db);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 6s ease-in-out infinite;
+      background-size: 200% 200%;
+    }
+    @keyframes shimmer {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .hero p {
+      color: #cfd5df;
+      font-size: 1.05rem;
+      margin-bottom: 1.5rem;
+    }
+    .tagline {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent);
+      letter-spacing: 0.04em;
+    }
+    .button-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .btn {
+      padding: 0.9rem 1.4rem;
+      border-radius: 12px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: #fff;
+      transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+    }
+    .btn.primary {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      border: none;
+      color: #0b0f14;
+      box-shadow: 0 15px 45px rgba(34, 197, 94, 0.2);
+    }
+    .btn:hover { transform: translateY(-2px); border-color: #374151; }
+    .btn.primary:hover { box-shadow: 0 20px 55px rgba(34, 197, 94, 0.28); }
+    .hero-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 1rem;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.35);
+    }
+    .stat {
+      padding: 1rem;
+      border-radius: 12px;
+      background: #0f141c;
+      border: 1px solid var(--border);
+    }
+    .stat .label { color: var(--muted); font-size: 0.9rem; }
+    .stat .value { font-size: 1.6rem; font-weight: 800; margin-top: 0.25rem; color: #fff; }
+    .scroll-indicator {
+      position: absolute;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+      color: #cfd5df;
+      font-size: 0.85rem;
+      opacity: 0.8;
+      animation: float 2.8s ease-in-out infinite;
+    }
+    .chevron { border: solid #cfd5df; border-width: 0 2px 2px 0; padding: 6px; transform: rotate(45deg); }
+    @keyframes float { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 8px); }}
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .section-title h2 {
+      margin: 0;
+      font-size: 2rem;
+      letter-spacing: -0.01em;
+      color: #f3f4f6;
+    }
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 1.5rem;
+    }
+    .project {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .project::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(34,197,94,0.08), transparent 60%);
+      opacity: 0;
+      transition: opacity 200ms ease;
+    }
+    .project:hover { transform: translateY(-4px); border-color: #2a3647; box-shadow: 0 15px 40px rgba(0,0,0,0.3); }
+    .project:hover::after { opacity: 1; }
+    .project h3 { margin: 0; font-size: 1.25rem; }
+    .project p { margin: 0; color: #cfd5df; font-size: 0.95rem; }
+    .project .tags { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+    .tag { padding: 0.35rem 0.65rem; border-radius: 10px; background: #0f141c; color: var(--accent); border: 1px solid var(--border); font-size: 0.85rem; }
+
+    .blog {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+    .featured {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 1.25rem;
+      padding: 1.5rem;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.04));
+      border: 1px solid rgba(34,197,94,0.25);
+    }
+    .featured h3 { margin-top: 0.35rem; margin-bottom: 0.5rem; font-size: 1.5rem; }
+    .featured p { margin: 0; color: #d1d5db; }
+    .post-list { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1rem; }
+    .post {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1rem;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      transition: border-color 200ms ease, transform 200ms ease;
+    }
+    .post:hover { border-color: #2a3647; transform: translateY(-3px); }
+    .post .meta { display: flex; align-items: center; gap: 0.4rem; color: #9ca3af; font-size: 0.9rem; }
+    .pill { padding: 0.3rem 0.65rem; border-radius: 999px; font-weight: 700; font-size: 0.8rem; border: 1px solid var(--border); }
+    .pill.ai { background: rgba(34,197,94,0.16); color: #d1fae5; border-color: rgba(34,197,94,0.35); }
+    .pill.career { background: rgba(125, 211, 252, 0.12); color: #e0f2fe; border-color: rgba(125, 211, 252, 0.35); }
+    .pill.dev { background: rgba(244, 114, 182, 0.12); color: #fbcfe8; border-color: rgba(244, 114, 182, 0.35); }
+    .excerpt {
+      position: absolute;
+      top: 0; right: -50%; bottom: 0;
+      width: 50%;
+      background: linear-gradient(90deg, transparent, rgba(34,197,94,0.08));
+      color: #e5e7eb;
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      font-size: 0.95rem;
+      opacity: 0;
+      transition: all 220ms ease;
+      backdrop-filter: blur(4px);
+    }
+    .post:hover .excerpt {
+      right: 0;
+      opacity: 1;
+    }
+
+    .about-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 2rem;
+      align-items: center;
+    }
+    .about-text { color: #d1d5db; font-size: 1rem; }
+    .about-stats { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; }
+    .stat-card {
+      padding: 1.1rem;
+      border-radius: 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+    }
+    .stat-card h4 { margin: 0; color: #f3f4f6; }
+    .stat-card p { margin: 0.4rem 0 0; color: #9ca3af; }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    .contact-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 15px 45px rgba(0,0,0,0.28);
+    }
+    .contact-card h3 { margin-top: 0; margin-bottom: 0.5rem; }
+    form { display: grid; gap: 0.9rem; }
+    label { font-weight: 700; color: #e5e7eb; }
+    input, textarea {
+      width: 100%;
+      padding: 0.85rem 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #0f141c;
+      color: #fff;
+      font-family: inherit;
+      transition: border-color 200ms ease, box-shadow 200ms ease;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(34,197,94,0.2);
+    }
+    textarea { min-height: 140px; resize: vertical; }
+    .email-box {
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #0f141c;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .email-address { font-size: 1.1rem; font-weight: 800; }
+    .copy-btn {
+      border: 1px solid var(--border);
+      background: var(--accent);
+      color: #0b0f14;
+      padding: 0.5rem 0.75rem;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .socials { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+    .social {
+      position: relative;
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #0f141c;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      transition: transform 180ms ease, border-color 180ms ease;
+      overflow: hidden;
+    }
+    .social:hover { transform: translateY(-3px); border-color: var(--accent); }
+    .social::after {
+      content: attr(data-label);
+      position: absolute;
+      bottom: -120%; left: 0; right: 0;
+      background: rgba(34,197,94,0.15);
+      color: #e5e7eb;
+      text-align: center;
+      padding: 0.35rem;
+      font-weight: 700;
+      transition: bottom 200ms ease;
+      font-size: 0.8rem;
+    }
+    .social:hover::after { bottom: -10%; }
+    .availability {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.55rem 0.9rem;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 800;
+      margin-top: 0.5rem;
+    }
+    .book-call {
+      margin-top: 1rem;
+      padding: 0.95rem 1.2rem;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(34,197,94,0.18), rgba(34,197,94,0.08));
+      border: 1px solid rgba(34,197,94,0.45);
+      color: #e5e7eb;
+      font-weight: 800;
+      text-align: center;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    footer { text-align: center; color: #9ca3af; padding: 2rem 1rem 3rem; font-size: 0.95rem; }
+
+    /* Media Queries */
+    @media (max-width: 1024px) {
+      .projects-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .post-list { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media (max-width: 768px) {
+      .nav { padding: 1.1rem 2rem; }
+      .section { padding: 3.5rem 2rem; }
+      .hero-grid, .about-grid, .contact-grid { grid-template-columns: 1fr; }
+      .projects-grid { grid-template-columns: 1fr; }
+      .featured { grid-template-columns: 1fr; }
+      .post-list { grid-template-columns: 1fr; }
+      .hero-title { font-size: 3rem; }
+      .hero-card { grid-template-columns: 1fr; }
+      .hamburger { display: inline-flex; }
+      .nav-links { display: none; }
+      .mobile-menu.show { display: flex; }
+      .section-title { flex-direction: column; align-items: flex-start; }
+    }
+    @media (max-width: 480px) {
+      .nav { padding: 1rem 1.5rem; }
+      .section { padding: 3rem 1.5rem; }
+      .hero { padding-top: 4.5rem; }
+      .hero-grid { gap: 1.5rem; }
+      .hero-title { font-size: 2.45rem; }
+      .hero p { font-size: 0.98rem; }
+      .projects-grid { grid-template-columns: 1fr; }
+      .post-list { grid-template-columns: 1fr; }
+      .featured { padding: 1.2rem; }
+      .about-stats { grid-template-columns: 1fr; }
+      .email-address { font-size: 1rem; }
+      .section, .nav, .mobile-menu { padding-left: 1.5rem; padding-right: 1.5rem; }
+      .mobile-menu { padding-top: 0.5rem; }
+      .blog .post { flex-direction: column; }
+      .post .meta { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <nav class="nav">
+      <div class="logo">
+        <div class="dot"></div>
+        <span>Retro Builder</span>
+      </div>
+      <div class="nav-links">
+        <a href="#about">About</a>
+        <a href="#projects">Projects</a>
+        <a href="#blog">Blog</a>
+        <a href="#contact">Contact</a>
+      </div>
+      <button class="hamburger" aria-label="Toggle menu">☰</button>
+    </nav>
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="#about">About</a>
+      <a href="#projects">Projects</a>
+      <a href="#blog">Blog</a>
+      <a href="#contact">Contact</a>
+    </div>
+  </header>
+
+  <section class="section hero" id="hero">
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow">Designing better human + AI teams</div>
+        <h1 class="hero-title">Crafting experiences that feel effortless and alive.</h1>
+        <p class="tagline">Building with curiosity, precision, and a love for clean execution.</p>
+        <p>I pair systems thinking with playful experimentation to ship interfaces that feel intentional. From AI copilots to developer tooling, I help teams move from idea to polished product quickly.</p>
+        <div class="button-row">
+          <a class="btn primary" href="#projects">View Projects</a>
+          <a class="btn" href="#contact">Book a call</a>
+        </div>
+      </div>
+      <div class="hero-card">
+        <div class="stat">
+          <div class="label">AI Integrations</div>
+          <div class="value">+32</div>
+          <div class="label">Launched across tools & workflows</div>
+        </div>
+        <div class="stat">
+          <div class="label">Avg. Delivery</div>
+          <div class="value">6 wks</div>
+          <div class="label">From idea to production-ready</div>
+        </div>
+        <div class="stat">
+          <div class="label">Clients</div>
+          <div class="value">15</div>
+          <div class="label">From seed-stage to enterprise</div>
+        </div>
+        <div class="stat">
+          <div class="label">Stack</div>
+          <div class="value">TS / Next / Py</div>
+          <div class="label">Plus design systems & motion</div>
+        </div>
+      </div>
+    </div>
+    <div class="scroll-indicator">
+      <span>Scroll</span>
+      <i class="chevron"></i>
+    </div>
+  </section>
+
+  <section class="section" id="projects">
+    <div class="section-title">
+      <h2>Projects</h2>
+      <span class="eyebrow">Selected builds</span>
+    </div>
+    <div class="projects-grid">
+      <div class="project">
+        <h3>Neon Copilot</h3>
+        <p>Conversational data agent that rewrites queries into optimized SQL and visualizes results in real time.</p>
+        <div class="tags">
+          <span class="tag">AI</span>
+          <span class="tag">TypeScript</span>
+          <span class="tag">Edge</span>
+        </div>
+      </div>
+      <div class="project">
+        <h3>Pulse Dash</h3>
+        <p>Operational analytics cockpit with anomaly detection and alert tuning for distributed teams.</p>
+        <div class="tags">
+          <span class="tag">Next.js</span>
+          <span class="tag">Charts</span>
+          <span class="tag">Realtime</span>
+        </div>
+      </div>
+      <div class="project">
+        <h3>Workshop OS</h3>
+        <p>Modular platform for running live cohort-based courses with interactive labs and feedback loops.</p>
+        <div class="tags">
+          <span class="tag">React</span>
+          <span class="tag">Design Systems</span>
+          <span class="tag">CMS</span>
+        </div>
+      </div>
+      <div class="project">
+        <h3>Signal Studio</h3>
+        <p>Marketing orchestration tool that turns performance data into creative briefs with AI suggestions.</p>
+        <div class="tags">
+          <span class="tag">AI</span>
+          <span class="tag">Automation</span>
+        </div>
+      </div>
+      <div class="project">
+        <h3>Kernel Docs</h3>
+        <p>Developer documentation hub with code search, sandboxes, and guided task flows.</p>
+        <div class="tags">
+          <span class="tag">DX</span>
+          <span class="tag">Search</span>
+          <span class="tag">Rust</span>
+        </div>
+      </div>
+      <div class="project">
+        <h3>Verve Studio</h3>
+        <p>Motion-led marketing site with micro-interactions and layered parallax storytelling.</p>
+        <div class="tags">
+          <span class="tag">Motion</span>
+          <span class="tag">Parallax</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="blog">
+    <div class="section-title">
+      <h2>Blog</h2>
+      <span class="eyebrow">Thinking aloud</span>
+    </div>
+    <div class="blog">
+      <div class="featured">
+        <div>
+          <div class="pill ai">AI Engineering</div>
+          <h3>Designing copilots that people actually trust</h3>
+          <p>How to choreograph intent, feedback, and agency so your AI feels like a partner—not a black box.</p>
+        </div>
+        <div>
+          <div class="meta"><span>Aug 2024</span> • <span>7 min read</span></div>
+          <p style="color:#cfd5df">I share a blueprint for mapping user mental models, setting guardrails, and layering motion to create legible and reliable AI experiences.</p>
+        </div>
+      </div>
+      <div class="post-list">
+        <div class="post">
+          <div class="meta"><span>Jul 2024</span> • <span>5 min read</span> <span class="pill ai">AI Engineering</span></div>
+          <h4>Prompts are product surface area</h4>
+          <p>How prompt UX shapes user trust and retention.</p>
+          <div class="excerpt">Treat prompts like product copy: crisp, contextual, and measurable.</div>
+        </div>
+        <div class="post">
+          <div class="meta"><span>Jun 2024</span> • <span>6 min read</span> <span class="pill career">Career</span></div>
+          <h4>Designing a career moat</h4>
+          <p>Building leverage with systems, mentors, and experiments.</p>
+          <div class="excerpt">A simple loop for skill stacking and staying in motion.</div>
+        </div>
+        <div class="post">
+          <div class="meta"><span>May 2024</span> • <span>4 min read</span> <span class="pill dev">Dev Tools</span></div>
+          <h4>Faster DX with guardrails</h4>
+          <p>Opinionated tooling that keeps teams aligned.</p>
+          <div class="excerpt">Ship safer with templates, linting rituals, and reusable snippets.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="about">
+    <div class="section-title">
+      <h2>About</h2>
+      <span class="eyebrow">Why work together</span>
+    </div>
+    <div class="about-grid">
+      <div class="about-text">
+        <p>I blend strategy, product, and engineering to help teams launch ambitious experiences without the usual friction. Whether leading squads or working hands-on, I set crisp interfaces, automate the boring parts, and keep the energy playful.</p>
+        <p>Expect narrative-led storytelling, accessible design, and systems you can scale.</p>
+      </div>
+      <div class="about-stats">
+        <div class="stat-card">
+          <h4>Design Systems</h4>
+          <p>Reusable tokens, patterns, and motion specs that accelerate delivery.</p>
+        </div>
+        <div class="stat-card">
+          <h4>AI Ops</h4>
+          <p>Evaluation harnesses, safety guardrails, and prompt libraries tuned to your stack.</p>
+        </div>
+        <div class="stat-card">
+          <h4>Product Narrative</h4>
+          <p>Story-first launches that connect the dots between user, business, and brand.</p>
+        </div>
+        <div class="stat-card">
+          <h4>Workflows</h4>
+          <p>Automation that frees teams to focus on the interesting parts.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="contact">
+    <div class="section-title">
+      <h2>Contact</h2>
+      <span class="eyebrow">Let’s build</span>
+    </div>
+    <div class="contact-grid">
+      <div class="contact-card">
+        <div class="availability">🟢 Available for contracts</div>
+        <h3>Tell me about your project</h3>
+        <form>
+          <div>
+            <label for="name">Name</label>
+            <input id="name" type="text" placeholder="How should I address you?">
+          </div>
+          <div>
+            <label for="email">Email</label>
+            <input id="email" type="email" placeholder="you@example.com">
+          </div>
+          <div>
+            <label for="message">Project details</label>
+            <textarea id="message" placeholder="Timeline, goals, budget..."></textarea>
+          </div>
+          <button type="submit" class="btn primary">Send message</button>
+        </form>
+      </div>
+      <div class="contact-card">
+        <h3>Prefer async?</h3>
+        <div class="email-box">
+          <div class="email-address">work@retro.build</div>
+          <button class="copy-btn" id="copyEmail">Copy</button>
+        </div>
+        <a class="book-call" href="#">➜ Book a call (placeholder)</a>
+        <div class="socials">
+          <a class="social" href="#" data-label="LinkedIn" aria-label="LinkedIn">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M7 9v10M7 5v.01M12 9v10M17 9v6.5a3.5 3.5 0 0 1-3.5 3.5M12 9h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a class="social" href="#" data-label="GitHub" aria-label="GitHub">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 19c-4 1.5-4-2.5-6-3m12 5v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 17.5 2 5.07 5.07 0 0 0 17.09 2s-1.18-.13-3.09 1.18a10.65 10.65 0 0 0-5 0C7.09 1.87 5.91 2 5.91 2A5.07 5.07 0 0 0 5.5 2a5.44 5.44 0 0 0-3 4.73c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 8 16.13V20" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a class="social" href="#" data-label="Dribbble" aria-label="Dribbble">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.1 5.1a12.6 12.6 0 0 0 6.8 3.6c2.3.4 4.7.3 7-.2M9.2 3.5a18 18 0 0 1 4.6 12M4 12a15.7 15.7 0 0 1 15.7-1.1M7.5 19.2a15 15 0 0 1 7.9-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    © 2024 Retro Builder · Crafting resilient products with character.
+  </footer>
+
+  <script>
+    const hamburger = document.querySelector('.hamburger');
+    const mobileMenu = document.getElementById('mobileMenu');
+    hamburger.addEventListener('click', () => {
+      mobileMenu.classList.toggle('show');
+    });
+    document.querySelectorAll('.mobile-menu a').forEach(link => link.addEventListener('click', () => mobileMenu.classList.remove('show')));
+
+    const copyBtn = document.getElementById('copyEmail');
+    const emailText = document.querySelector('.email-address').textContent;
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(emailText);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => copyBtn.textContent = 'Copy', 2000);
+      } catch (err) {
+        copyBtn.textContent = 'Use Ctrl+C';
+      }
+    });
+  </script>
+</body>
+</html>
