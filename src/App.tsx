@@ -1,111 +1,298 @@
 import React from "react";
+import { ArrowUpRightIcon } from "@heroicons/react/24/outline";
+
+const projects = [
+  {
+    number: "001",
+    title: "Foxreach",
+    description:
+      "AI-powered outreach platform that helps founders connect with investors using intelligent matching and personalized messaging.",
+    tags: ["AI/ML", "LLM", "Next.js", "Python"],
+    link: "#",
+  },
+  {
+    number: "002",
+    title: "create-mvpkit",
+    description:
+      "CLI tool to scaffold production-ready MVP projects with AI integrations, authentication, and database setup in minutes.",
+    tags: ["CLI", "TypeScript", "Templates"],
+    link: "#",
+  },
+  {
+    number: "003",
+    title: "Tabsense",
+    description:
+      "Chrome extension using AI to intelligently organize, group, and manage browser tabs based on content and context.",
+    tags: ["Chrome Extension", "AI", "React"],
+    link: "#",
+  },
+  {
+    number: "004",
+    title: "YC Startup Work",
+    description:
+      "Built core backend systems and AI features for multiple Y Combinator-backed startups across fintech and edtech.",
+    tags: ["Backend", "AI", "Startups"],
+    link: "#",
+  },
+];
+
+const nowItems = [
+  {
+    title: "Building AI Agents",
+    description:
+      "Developing autonomous agents that can reason, plan, and execute complex tasks using LLMs and tool orchestration.",
+  },
+  {
+    title: "LLM Integration Patterns",
+    description:
+      "Exploring best practices for integrating large language models into production applications reliably.",
+  },
+  {
+    title: "Open Source Tools",
+    description:
+      "Contributing to and building open source developer tools that make AI more accessible to engineers.",
+  },
+];
+
+const writings = [
+  {
+    title: "Building Production-Ready AI Agents",
+    date: "2024",
+    link: "#",
+  },
+  {
+    title: "The Art of Prompt Engineering",
+    date: "2024",
+    link: "#",
+  },
+  {
+    title: "From Backend to AI: A Developer's Journey",
+    date: "2023",
+    link: "#",
+  },
+];
+
+const stats = [
+  { number: "5+", label: "Years Experience" },
+  { number: "3", label: "YC Startups" },
+  { number: "YC", label: "Backed Companies" },
+  { number: "∞", label: "Curiosity" },
+];
 
 function App() {
   return (
-    <div className="min-h-screen bg-zinc-900 text-white">
-      <main className="retro-container p-8">
-        <div className="max-w-4xl mx-auto space-y-16 py-16">
-          {/* Hero Section */}
-          <section className="text-center space-y-6">
-            <h1 className="text-6xl font-bold retro-glow">Anisur Rahman</h1>
-            <p className="text-2xl gradient-text">Backend Engineer</p>
-          </section>
+    <div className="min-h-screen">
+      {/* Navigation */}
+      <nav className="nav">
+        <a href="#" className="nav-logo">
+          SHAKIL.
+        </a>
+        <ul className="nav-links">
+          <li>
+            <a href="#now" className="nav-link">
+              Now
+            </a>
+          </li>
+          <li>
+            <a href="#projects" className="nav-link">
+              Projects
+            </a>
+          </li>
+          <li>
+            <a href="#writing" className="nav-link">
+              Writing
+            </a>
+          </li>
+          <li>
+            <a href="#about" className="nav-link">
+              About
+            </a>
+          </li>
+          <li>
+            <a href="#contact" className="nav-link">
+              Contact
+            </a>
+          </li>
+        </ul>
+      </nav>
 
-          {/* About Section */}
-          <section className="retro-border p-8 rounded-lg bg-zinc-900/50">
-            <h2 className="text-3xl font-bold mb-6 gradient-text">About Me</h2>
-            <div className="space-y-4 text-lg">
-              <p>
-                Since 2015, I've been on an exciting journey in the world of
-                coding, turning professional in 2017. Over the past 4.5 years,
-                I've had the privilege of working with four Y Combinator-backed
-                startups, a major venture supported by Duracell, and a
-                U.S.-based software agency.
-              </p>
-              <p>My expertise spans across:</p>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  "Python",
-                  "JavaScript/TypeScript",
-                  "ReactJs",
-                  "NextJs",
-                  "NodeJs",
-                  "NestJs",
-                ].map((tech) => (
-                  <div
-                    key={tech}
-                    className="retro-border p-2 text-center rounded"
-                  >
-                    {tech}
-                  </div>
+      {/* Hero Section */}
+      <section className="hero">
+        <div className="hero-content">
+          <div>
+            <div className="hero-label">AI Engineer</div>
+            <h1 className="hero-title">
+              I'm Shakil, an <span className="accent">AI Engineer</span>
+              <br />& Builder
+            </h1>
+            <p className="hero-description">
+              I build intelligent systems and AI-powered products. Currently
+              focused on LLM integrations, agent development, and helping
+              startups ship AI features that users love.
+            </p>
+            <div className="hero-buttons">
+              <a href="#projects" className="btn btn-primary">
+                View Projects
+              </a>
+              <a href="#contact" className="btn">
+                Get in Touch
+              </a>
+            </div>
+          </div>
+          <div className="status">
+            <div className="status-indicator">
+              <span className="status-dot"></span>
+              Available for work
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Now Section */}
+      <section id="now" className="section">
+        <div className="section-header">
+          <span className="section-badge">Now</span>
+          <h2 className="section-title">What I'm Building</h2>
+          <div className="section-line"></div>
+        </div>
+        <div className="now-grid">
+          {nowItems.map((item, index) => (
+            <div key={index} className="now-card">
+              <h3 className="now-card-title">{item.title}</h3>
+              <p className="now-card-description">{item.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Projects Section */}
+      <section id="projects" className="section">
+        <div className="section-header">
+          <span className="section-badge">Work</span>
+          <h2 className="section-title">Selected Projects</h2>
+          <div className="section-line"></div>
+        </div>
+        <div className="projects-grid">
+          {projects.map((project) => (
+            <a
+              key={project.number}
+              href={project.link}
+              className="project-card"
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              <span className="project-number">{project.number}</span>
+              <h3 className="project-title">{project.title}</h3>
+              <p className="project-description">{project.description}</p>
+              <div className="project-tags">
+                {project.tags.map((tag) => (
+                  <span key={tag} className="project-tag">
+                    {tag}
+                  </span>
                 ))}
               </div>
-              <p>
-                I thrive on embracing challenges beyond my routine
-                responsibilities and am always eager to master new technologies.
-                Currently seeking opportunities to explore innovative tech
-                landscapes and contribute meaningfully to the future of software
-                development.
-              </p>
-            </div>
-          </section>
-
-          {/* Experience Section */}
-          <section className="retro-border p-8 rounded-lg bg-zinc-900/50">
-            <h2 className="text-3xl font-bold mb-6 gradient-text">
-              Experience
-            </h2>
-            <div className="space-y-4 text-lg">
-              <ul className="list-disc pl-5">
-                <li>
-                  Gerald (YC W21) - Backend Software Engineer (Aug 2022 -
-                  Present)
-                </li>
-                <li>re:cruit - Software Engineer (May 2021 - Present)</li>
-                <li>
-                  Alpine DeFi - Backend Software Engineer (Jan 2022 - Jul 2022)
-                </li>
-                <li>
-                  FIRST Delivery - Software Engineer (Apr 2022 - Jun 2022)
-                </li>
-                <li>
-                  Edlyft - Backend Software Engineer (Feb 2021 - Dec 2021)
-                </li>
-                <li>
-                  SJ Innovation LLC - Fullstack Software Engineer (Dec 2019 -
-                  Feb 2021)
-                </li>
-                <li>
-                  Social Energy - Full Stack Engineer (Dec 2017 - Dec 2019)
-                </li>
-                <li>
-                  KWS3 Media Ltd. - Full Stack Engineer (Dec 2017 - Dec 2019)
-                </li>
-              </ul>
-            </div>
-          </section>
-
-          {/* Education Section */}
-          <section className="retro-border p-8 rounded-lg bg-zinc-900/50">
-            <h2 className="text-3xl font-bold mb-6 gradient-text">Education</h2>
-            <div className="space-y-4 text-lg">
-              <p>Metropolitan University, Sylhet, Bangladesh</p>
-              <p>Bachelor's degree in Computer Science (Apr 2015 - Apr 2019)</p>
-            </div>
-          </section>
-
-          {/* Contact Section */}
-          <section className="text-center space-y-6">
-            <h2 className="text-3xl font-bold gradient-text">Get in Touch</h2>
-            <a
-              href="mailto:pshakilwizard@gmail.com"
-              className="inline-block retro-border px-6 py-3 rounded hover:scale-105 transition-transform"
-            >
-              pshakilwizard@gmail.com
+              <ArrowUpRightIcon className="project-arrow" width={20} />
             </a>
-          </section>
+          ))}
         </div>
-      </main>
+      </section>
+
+      {/* Writing Section */}
+      <section id="writing" className="section">
+        <div className="section-header">
+          <span className="section-badge">Blog</span>
+          <h2 className="section-title">Writing</h2>
+          <div className="section-line"></div>
+        </div>
+        <div className="writing-list">
+          {writings.map((post, index) => (
+            <a key={index} href={post.link} className="writing-item">
+              <span className="writing-title">{post.title}</span>
+              <span className="writing-date">{post.date}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      {/* About Section */}
+      <section id="about" className="section">
+        <div className="section-header">
+          <span className="section-badge">About</span>
+          <h2 className="section-title">Background</h2>
+          <div className="section-line"></div>
+        </div>
+        <div className="about-grid">
+          <div className="about-text">
+            <p>
+              Since 2015, I've been on an exciting journey in the world of
+              coding, turning professional in 2017. Over the years, I've had
+              the privilege of working with multiple Y Combinator-backed
+              startups, building everything from fintech platforms to
+              AI-powered educational tools.
+            </p>
+            <p>
+              My expertise spans backend development, AI/ML integration, and
+              building production systems that scale. I'm particularly
+              passionate about LLM applications, agent development, and
+              creating tools that make AI accessible to developers.
+            </p>
+            <p>
+              I thrive on embracing challenges beyond routine responsibilities
+              and am always eager to master new technologies. Currently seeking
+              opportunities to push the boundaries of what's possible with AI.
+            </p>
+          </div>
+          <div className="stats-grid">
+            {stats.map((stat, index) => (
+              <div key={index} className="stat">
+                <div className="stat-number">{stat.number}</div>
+                <div className="stat-label">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Contact Section */}
+      <section id="contact" className="contact">
+        <h2 className="contact-title">Let's Work Together</h2>
+        <p className="contact-description">
+          Have an interesting project or opportunity? I'd love to hear from you.
+        </p>
+        <a href="mailto:hello@arshakil.com" className="contact-email">
+          hello@arshakil.com
+        </a>
+        <div className="social-links">
+          <a
+            href="https://github.com/arshakil"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="social-link"
+          >
+            GitHub
+          </a>
+          <a
+            href="https://twitter.com/arshakil"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="social-link"
+          >
+            Twitter
+          </a>
+          <a
+            href="https://linkedin.com/in/arshakil"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="social-link"
+          >
+            LinkedIn
+          </a>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="footer">
+        <p>&copy; {new Date().getFullYear()} Shakil. All rights reserved.</p>
+      </footer>
     </div>
   );
 }
