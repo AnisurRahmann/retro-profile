@@ -477,7 +477,7 @@ export function getPostBySlug(slug: string): BlogPost | undefined {
 
 // Get all categories
 export function getCategories(): string[] {
-  return ['All', ...new Set(blogPosts.map(post => post.category))];
+  return ['All', ...Array.from(new Set(blogPosts.map(post => post.category)))];
 }
 
 // Format date
