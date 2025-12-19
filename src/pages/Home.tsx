@@ -5,6 +5,14 @@ import { ArrowUpRightIcon } from "@heroicons/react/24/outline";
 const projects = [
   {
     number: "001",
+    title: "AI Workflow Agents",
+    description:
+      "LangChain + Amazon Bedrock agents automating internal processes at Gerald. Streamlined repetitive tasks with real-time data handling.",
+    tags: ["LangChain", "Amazon Bedrock", "AI Agents"],
+    link: "#",
+  },
+  {
+    number: "002",
     title: "Foxreach",
     description:
       "AI-powered outreach platform that helps founders connect with investors using intelligent matching and personalized messaging.",
@@ -12,7 +20,15 @@ const projects = [
     link: "#",
   },
   {
-    number: "002",
+    number: "003",
+    title: "Tea Leaf Recognition",
+    description:
+      "React Native app with ML model for tea-leaf classification. Achieved ~95% accuracy and 80% reduction in manual labor.",
+    tags: ["React Native", "Machine Learning", "Computer Vision"],
+    link: "#",
+  },
+  {
+    number: "004",
     title: "create-mvpkit",
     description:
       "CLI tool to scaffold production-ready MVP projects with AI integrations, authentication, and database setup in minutes.",
@@ -20,7 +36,23 @@ const projects = [
     link: "#",
   },
   {
-    number: "003",
+    number: "005",
+    title: "Falls Prevention Monitor",
+    description:
+      "Real-time monitoring app for older adults integrating sensor data. Built at SJ Innovation for healthcare clients.",
+    tags: ["React Native", "Healthcare", "Real-time Data"],
+    link: "#",
+  },
+  {
+    number: "006",
+    title: "Energy Monitor PWA",
+    description:
+      "Progressive Web App for solar panel and battery monitoring at Social Energy (UK). Achieved 100% data accuracy.",
+    tags: ["PWA", "Chart.js", "Energy Tech"],
+    link: "#",
+  },
+  {
+    number: "007",
     title: "Tabsense",
     description:
       "Chrome extension using AI to intelligently organize, group, and manage browser tabs based on content and context.",
@@ -28,7 +60,7 @@ const projects = [
     link: "#",
   },
   {
-    number: "004",
+    number: "008",
     title: "YC Startup Work",
     description:
       "Built core backend systems and AI features for multiple Y Combinator-backed startups across fintech and edtech.",
@@ -95,11 +127,23 @@ const writings = [
 ];
 
 const stats = [
-  { number: "5+", label: "Years Experience" },
-  { number: "3", label: "YC Startups" },
-  { number: "YC", label: "Backed Companies" },
-  { number: "∞", label: "Curiosity" },
+  { number: "6+", label: "Years Experience" },
+  { number: "90%", label: "Repayment Rate ↑" },
+  { number: "50%", label: "Cost Reduction" },
+  { number: "30%", label: "Revenue ↑" },
 ];
+
+const companies = [
+  { name: "Gerald", badge: "YC W21", location: "USA", current: true },
+  { name: "re:cruit", location: "USA", clients: ["Replo", "First Delivery", "Edlyft", "Osmind", "Virtually"] },
+  { name: "SJ Innovation LLC", location: "Bangladesh" },
+  { name: "Social Energy Ltd.", location: "UK" },
+];
+
+const skills = {
+  primary: ["LangChain", "Amazon Bedrock", "Claude API", "Python", "FastAPI", "Flask", "Node.js", "React", "Next.js"],
+  secondary: ["AWS Serverless", "GCP", "Docker", "MongoDB", "MySQL", "Chart.js", "TradingView.js"],
+};
 
 // Typing animation phrases
 const typingPhrases = ["AI Engineer", "Builder", "Problem Solver"];
@@ -292,6 +336,37 @@ const Home: React.FC = () => {
         </div>
       </section>
 
+      {/* Shipped For Section */}
+      <section className="section">
+        <div className="section-header">
+          <span className="section-badge">Experience</span>
+          <h2 className="section-title">Shipped For</h2>
+          <div className="section-line"></div>
+        </div>
+        <div className="companies-grid">
+          {companies.map((company, index) => (
+            <div key={index} className="company-card">
+              <div className="company-header">
+                <h3 className="company-name">{company.name}</h3>
+                {company.badge && <span className="company-badge">{company.badge}</span>}
+                {company.current && <span className="company-current">Current</span>}
+              </div>
+              <span className="company-location">{company.location}</span>
+              {company.clients && (
+                <div className="company-clients">
+                  <span className="clients-label">Clients:</span>
+                  <div className="clients-list">
+                    {company.clients.map((client, i) => (
+                      <span key={i} className="client-tag">{client}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Writing Section */}
       <section id="writing" className="section">
         <div className="section-header">
@@ -344,22 +419,23 @@ const Home: React.FC = () => {
         <div className="about-grid">
           <div className="about-text">
             <p>
-              Since 2015, I've been on an exciting journey in the world of
-              coding, turning professional in 2017. Over the years, I've had
-              the privilege of working with multiple Y Combinator-backed
-              startups, building everything from fintech platforms to
-              AI-powered educational tools.
+              My journey started in 2018 at Social Energy (UK), where I built
+              energy monitoring systems. Since then, I've worked across the
+              UK → Bangladesh → USA, building products for Y Combinator-backed
+              startups and enterprise clients in fintech, healthcare, and edtech.
             </p>
             <p>
-              My expertise spans backend development, AI/ML integration, and
-              building production systems that scale. I'm particularly
-              passionate about LLM applications, agent development, and
-              creating tools that make AI accessible to developers.
+              I hold a B.E. in Computer Science from Metropolitan University (2021).
+              My expertise spans AI/ML integration with LangChain, Amazon Bedrock,
+              and Claude API, plus full-stack development with Python, Node.js,
+              React, and Next.js. I'm passionate about LLM applications, agent
+              development, and building tools that make AI accessible.
             </p>
             <p>
-              I thrive on embracing challenges beyond routine responsibilities
-              and am always eager to master new technologies. Currently seeking
-              opportunities to push the boundaries of what's possible with AI.
+              Currently at Gerald (YC W21), I've helped increase repayment rates
+              by 90% through bank transaction analysis, reduced integration costs
+              by 50%, and boosted revenue by 30% with recommender systems.
+              Planning UK relocation in 2025.
             </p>
           </div>
           <div className="stats-grid">
@@ -369,6 +445,27 @@ const Home: React.FC = () => {
                 <div className="stat-label">{stat.label}</div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Skills */}
+        <div className="skills-section">
+          <h3 className="skills-title">Tech Stack</h3>
+          <div className="skills-group">
+            <span className="skills-label">Primary</span>
+            <div className="skills-list">
+              {skills.primary.map((skill, i) => (
+                <span key={i} className="skill-tag skill-tag-primary">{skill}</span>
+              ))}
+            </div>
+          </div>
+          <div className="skills-group">
+            <span className="skills-label">Secondary</span>
+            <div className="skills-list">
+              {skills.secondary.map((skill, i) => (
+                <span key={i} className="skill-tag">{skill}</span>
+              ))}
+            </div>
           </div>
         </div>
       </section>
