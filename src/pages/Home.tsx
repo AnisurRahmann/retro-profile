@@ -5,6 +5,14 @@ import { ArrowUpRightIcon } from "@heroicons/react/24/outline";
 const projects = [
   {
     number: "001",
+    title: "AI Workflow Agents",
+    description:
+      "LangChain + Amazon Bedrock agents automating internal processes at Gerald. Streamlined repetitive tasks with real-time data handling.",
+    tags: ["LangChain", "Amazon Bedrock", "AI Agents"],
+    link: "#",
+  },
+  {
+    number: "002",
     title: "Foxreach",
     description:
       "AI-powered outreach platform that helps founders connect with investors using intelligent matching and personalized messaging.",
@@ -12,7 +20,15 @@ const projects = [
     link: "#",
   },
   {
-    number: "002",
+    number: "003",
+    title: "Tea Leaf Recognition",
+    description:
+      "React Native app with ML model for tea-leaf classification. Achieved ~95% accuracy and 80% reduction in manual labor.",
+    tags: ["React Native", "Machine Learning", "Computer Vision"],
+    link: "#",
+  },
+  {
+    number: "004",
     title: "create-mvpkit",
     description:
       "CLI tool to scaffold production-ready MVP projects with AI integrations, authentication, and database setup in minutes.",
@@ -20,7 +36,23 @@ const projects = [
     link: "#",
   },
   {
-    number: "003",
+    number: "005",
+    title: "Falls Prevention Monitor",
+    description:
+      "Real-time monitoring app for older adults integrating sensor data. Built at SJ Innovation for healthcare clients.",
+    tags: ["React Native", "Healthcare", "Real-time Data"],
+    link: "#",
+  },
+  {
+    number: "006",
+    title: "Energy Monitor PWA",
+    description:
+      "Progressive Web App for solar panel and battery monitoring at Social Energy (UK). Achieved 100% data accuracy.",
+    tags: ["PWA", "Chart.js", "Energy Tech"],
+    link: "#",
+  },
+  {
+    number: "007",
     title: "Tabsense",
     description:
       "Chrome extension using AI to intelligently organize, group, and manage browser tabs based on content and context.",
@@ -28,7 +60,7 @@ const projects = [
     link: "#",
   },
   {
-    number: "004",
+    number: "008",
     title: "YC Startup Work",
     description:
       "Built core backend systems and AI features for multiple Y Combinator-backed startups across fintech and edtech.",
@@ -62,7 +94,8 @@ const writings = [
     link: "/blog/building-ai-agents-that-actually-ship",
     readTime: "8 min read",
     category: "ai-engineering",
-    excerpt: "A deep dive into architecting autonomous agents that can reason, plan, and execute complex tasks reliably in production environments.",
+    excerpt:
+      "A deep dive into architecting autonomous agents that can reason, plan, and execute complex tasks reliably in production environments.",
     featured: true,
   },
   {
@@ -71,7 +104,8 @@ const writings = [
     link: "/blog/prompt-engineering-tips",
     readTime: "5 min read",
     category: "ai-engineering",
-    excerpt: "Techniques and patterns for crafting effective prompts that consistently produce high-quality outputs from large language models.",
+    excerpt:
+      "Techniques and patterns for crafting effective prompts that consistently produce high-quality outputs from large language models.",
     featured: false,
   },
   {
@@ -80,7 +114,8 @@ const writings = [
     link: "/blog/from-backend-to-ai-engineering",
     readTime: "6 min read",
     category: "career",
-    excerpt: "How I transitioned from traditional backend development to becoming an AI engineer, and lessons learned along the way.",
+    excerpt:
+      "How I transitioned from traditional backend development to becoming an AI engineer, and lessons learned along the way.",
     featured: false,
   },
   {
@@ -89,17 +124,52 @@ const writings = [
     link: "/blog/vector-databases-compared",
     readTime: "4 min read",
     category: "dev-tools",
-    excerpt: "A curated list of development tools and frameworks that every AI engineer should have in their toolkit.",
+    excerpt:
+      "A curated list of development tools and frameworks that every AI engineer should have in their toolkit.",
     featured: false,
   },
 ];
 
 const stats = [
-  { number: "5+", label: "Years Experience" },
-  { number: "3", label: "YC Startups" },
-  { number: "YC", label: "Backed Companies" },
-  { number: "∞", label: "Curiosity" },
+  { number: "6+", label: "Years Experience" },
+  { number: "90%", label: "Repayment Rate ↑" },
+  { number: "50%", label: "Cost Reduction" },
+  { number: "30%", label: "Revenue ↑" },
 ];
+
+const companies = [
+  { name: "Gerald", badge: "YC W21", location: "USA", current: true },
+  {
+    name: "re:cruit",
+    location: "USA",
+    clients: ["Replo", "First Delivery", "Edlyft", "Osmind", "Virtually"],
+  },
+  { name: "SJ Innovation LLC", location: "Bangladesh" },
+  { name: "Social Energy Ltd.", location: "UK" },
+];
+
+const skills = {
+  primary: [
+    "LangChain",
+    "Amazon Bedrock",
+    "Claude API",
+    "Python",
+    "FastAPI",
+    "Flask",
+    "Node.js",
+    "React",
+    "Next.js",
+  ],
+  secondary: [
+    "AWS Serverless",
+    "GCP",
+    "Docker",
+    "MongoDB",
+    "MySQL",
+    "Chart.js",
+    "TradingView.js",
+  ],
+};
 
 // Typing animation phrases
 const typingPhrases = ["AI Engineer", "Builder", "Problem Solver"];
@@ -130,9 +200,7 @@ const Home: React.FC = () => {
 
     const timeout = setTimeout(() => {
       setDisplayText((prev) =>
-        isDeleting
-          ? prev.slice(0, -1)
-          : currentPhrase.slice(0, prev.length + 1)
+        isDeleting ? prev.slice(0, -1) : currentPhrase.slice(0, prev.length + 1)
       );
     }, typeSpeed);
 
@@ -141,7 +209,7 @@ const Home: React.FC = () => {
 
   const copyEmail = async () => {
     try {
-      await navigator.clipboard.writeText("hello@arshakil.com");
+      await navigator.clipboard.writeText("pshakilwizard@gmail.com");
       setEmailCopied(true);
       setTimeout(() => setEmailCopied(false), 2000);
     } catch (err) {
@@ -237,8 +305,15 @@ const Home: React.FC = () => {
         <div className="scroll-indicator">
           <span className="scroll-text">Scroll</span>
           <div className="scroll-chevron">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M7 13l5 5 5-5M7 6l5 5 5-5" />
             </svg>
           </div>
         </div>
@@ -292,6 +367,43 @@ const Home: React.FC = () => {
         </div>
       </section>
 
+      {/* Shipped For Section */}
+      <section className="section">
+        <div className="section-header">
+          <span className="section-badge">Experience</span>
+          <h2 className="section-title">Shipped For</h2>
+          <div className="section-line"></div>
+        </div>
+        <div className="companies-grid">
+          {companies.map((company, index) => (
+            <div key={index} className="company-card">
+              <div className="company-header">
+                <h3 className="company-name">{company.name}</h3>
+                {company.badge && (
+                  <span className="company-badge">{company.badge}</span>
+                )}
+                {company.current && (
+                  <span className="company-current">Current</span>
+                )}
+              </div>
+              <span className="company-location">{company.location}</span>
+              {company.clients && (
+                <div className="company-clients">
+                  <span className="clients-label">Clients:</span>
+                  <div className="clients-list">
+                    {company.clients.map((client, i) => (
+                      <span key={i} className="client-tag">
+                        {client}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Writing Section */}
       <section id="writing" className="section">
         <div className="section-header">
@@ -304,18 +416,24 @@ const Home: React.FC = () => {
             <Link
               key={index}
               to={post.link}
-              className={`writing-item ${post.featured ? "writing-item-featured" : ""}`}
+              className={`writing-item ${
+                post.featured ? "writing-item-featured" : ""
+              }`}
             >
               <div className="writing-main">
                 <div className="writing-header">
-                  <span className={`writing-category writing-category-${post.category}`}>
+                  <span
+                    className={`writing-category writing-category-${post.category}`}
+                  >
                     {post.category === "ai-engineering"
                       ? "AI Engineering"
                       : post.category === "career"
                       ? "Career"
                       : "Dev Tools"}
                   </span>
-                  {post.featured && <span className="writing-featured-badge">Featured</span>}
+                  {post.featured && (
+                    <span className="writing-featured-badge">Featured</span>
+                  )}
                 </div>
                 <span className="writing-title">{post.title}</span>
                 <span className="writing-excerpt">{post.excerpt}</span>
@@ -327,7 +445,7 @@ const Home: React.FC = () => {
             </Link>
           ))}
         </div>
-        <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+        <div style={{ textAlign: "center", marginTop: "2rem" }}>
           <Link to="/blog" className="btn">
             View All Posts
           </Link>
@@ -344,22 +462,25 @@ const Home: React.FC = () => {
         <div className="about-grid">
           <div className="about-text">
             <p>
-              Since 2015, I've been on an exciting journey in the world of
-              coding, turning professional in 2017. Over the years, I've had
-              the privilege of working with multiple Y Combinator-backed
-              startups, building everything from fintech platforms to
-              AI-powered educational tools.
+              My journey started in 2018 at Social Energy (UK), where I built
+              energy monitoring systems. Since then, I've worked across the UK →
+              Bangladesh → USA, building products for Y Combinator-backed
+              startups and enterprise clients in fintech, healthcare, and
+              edtech.
             </p>
             <p>
-              My expertise spans backend development, AI/ML integration, and
-              building production systems that scale. I'm particularly
-              passionate about LLM applications, agent development, and
-              creating tools that make AI accessible to developers.
+              I hold a B.E. in Computer Science from Metropolitan University
+              (2021). My expertise spans AI/ML integration with LangChain,
+              Amazon Bedrock, and Claude API, plus full-stack development with
+              Python, Node.js, React, and Next.js. I'm passionate about LLM
+              applications, agent development, and building tools that make AI
+              accessible.
             </p>
             <p>
-              I thrive on embracing challenges beyond routine responsibilities
-              and am always eager to master new technologies. Currently seeking
-              opportunities to push the boundaries of what's possible with AI.
+              Currently at Gerald (YC W21), I've helped increase repayment rates
+              by 90% through bank transaction analysis, reduced integration
+              costs by 50%, and boosted revenue by 30% with recommender systems.
+              Planning UK relocation in 2025.
             </p>
           </div>
           <div className="stats-grid">
@@ -369,6 +490,31 @@ const Home: React.FC = () => {
                 <div className="stat-label">{stat.label}</div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Skills */}
+        <div className="skills-section">
+          <h3 className="skills-title">Tech Stack</h3>
+          <div className="skills-group">
+            <span className="skills-label">Primary</span>
+            <div className="skills-list">
+              {skills.primary.map((skill, i) => (
+                <span key={i} className="skill-tag skill-tag-primary">
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="skills-group">
+            <span className="skills-label">Secondary</span>
+            <div className="skills-list">
+              {skills.secondary.map((skill, i) => (
+                <span key={i} className="skill-tag">
+                  {skill}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -388,35 +534,63 @@ const Home: React.FC = () => {
 
         {/* Email with Copy Button */}
         <div className="email-wrapper">
-          <a href="mailto:hello@arshakil.com" className="contact-email-large">
-            hello@arshakil.com
+          <a
+            href="mailto:pshakilwizard@gmai.com"
+            className="contact-email-large"
+          >
+            pshakilwizard@gmail.com
           </a>
           <button
-            className={`copy-button ${emailCopied ? "copy-button-success" : ""}`}
+            className={`copy-button ${
+              emailCopied ? "copy-button-success" : ""
+            }`}
             onClick={copyEmail}
             aria-label="Copy email"
           >
             {emailCopied ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20 6L9 17l-5-5"/>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M20 6L9 17l-5-5" />
               </svg>
             ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
               </svg>
             )}
-            <span className="copy-text">{emailCopied ? "Copied!" : "Copy"}</span>
+            <span className="copy-text">
+              {emailCopied ? "Copied!" : "Copy"}
+            </span>
           </button>
         </div>
 
         {/* Book a Call Button */}
         <a href="#" className="book-call-button">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
           Book a Call
         </a>
@@ -426,17 +600,38 @@ const Home: React.FC = () => {
           <h3 className="form-title">Send a Message</h3>
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="name" className="form-label">Name</label>
-              <input type="text" id="name" className="form-input" placeholder="Your name" />
+              <label htmlFor="name" className="form-label">
+                Name
+              </label>
+              <input
+                type="text"
+                id="name"
+                className="form-input"
+                placeholder="Your name"
+              />
             </div>
             <div className="form-group">
-              <label htmlFor="email" className="form-label">Email</label>
-              <input type="email" id="email" className="form-input" placeholder="your@email.com" />
+              <label htmlFor="email" className="form-label">
+                Email
+              </label>
+              <input
+                type="email"
+                id="email"
+                className="form-input"
+                placeholder="your@email.com"
+              />
             </div>
           </div>
           <div className="form-group">
-            <label htmlFor="message" className="form-label">Message</label>
-            <textarea id="message" className="form-textarea" placeholder="Your message..." rows={4}></textarea>
+            <label htmlFor="message" className="form-label">
+              Message
+            </label>
+            <textarea
+              id="message"
+              className="form-textarea"
+              placeholder="Your message..."
+              rows={4}
+            ></textarea>
           </div>
           <button type="submit" className="btn btn-primary form-submit">
             Send Message
@@ -446,35 +641,35 @@ const Home: React.FC = () => {
         {/* Social Links */}
         <div className="social-links-enhanced">
           <a
-            href="https://github.com/arshakil"
+            href="https://github.com/anisurrahmann"
             target="_blank"
             rel="noopener noreferrer"
             className="social-link-enhanced"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
             </svg>
             <span className="social-label">GitHub</span>
           </a>
           <a
-            href="https://twitter.com/arshakil"
+            href="https://twitter.com/ar_shakil23"
             target="_blank"
             rel="noopener noreferrer"
             className="social-link-enhanced"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
             </svg>
             <span className="social-label">Twitter</span>
           </a>
           <a
-            href="https://linkedin.com/in/arshakil"
+            href="https://linkedin.com/in/shakil22"
             target="_blank"
             rel="noopener noreferrer"
             className="social-link-enhanced"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
             </svg>
             <span className="social-label">LinkedIn</span>
           </a>
