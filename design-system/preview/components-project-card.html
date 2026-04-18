@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Project card</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-mono)}
+.wrap{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{background:var(--bg-elevated);border:1px solid var(--border);padding:20px;position:relative;transition:border-color .3s}
+.card:hover{border-color:var(--accent)}
+.num{font-size:10px;color:var(--text-muted);letter-spacing:.1em;display:block;margin-bottom:10px}
+.title{font-family:'Instrument Serif',Georgia,serif;font-size:22px;margin:0 0 8px;color:var(--text);line-height:1.1}
+.desc{font-family:-apple-system,system-ui,sans-serif;font-size:12px;color:var(--text-muted);line-height:1.55;margin-bottom:12px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:9px;padding:3px 8px;border:1px solid var(--border);color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase}
+.arrow{position:absolute;top:20px;right:20px;color:var(--accent);font-size:14px}
+</style></head>
+<body><div class="wrap">
+ <div class="card">
+   <span class="num">002</span>
+   <div class="title">Foxreach</div>
+   <div class="desc">AI outreach platform — multi-channel automation with LangGraph state machines.</div>
+   <div class="tags"><span class="tag">LangGraph</span><span class="tag">FastAPI</span><span class="tag">Bedrock</span></div>
+   <div class="arrow">↗</div>
+ </div>
+ <div class="card">
+   <span class="num">004</span>
+   <div class="title">create-mvpkit</div>
+   <div class="desc">CLI to scaffold production-ready MVPs with AI integrations, auth, and DB in minutes.</div>
+   <div class="tags"><span class="tag">CLI</span><span class="tag">TypeScript</span><span class="tag">Templates</span></div>
+   <div class="arrow">↗</div>
+ </div>
+</div></body></html>

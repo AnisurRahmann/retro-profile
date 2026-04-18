@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0a;--bg-el:#111;--border:#1f1f1f;
+  --text:#f5f5f5;--muted:#6b6b6b;--dim:#2a2a2a;
+  --accent:#22c55e;--accent-dim:rgba(34,197,94,0.1);
+  --serif:'Instrument Serif',Georgia,serif;
+  --mono:'JetBrains Mono',monospace;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);padding:2rem;min-width:600px}
+
+.section{margin-bottom:3rem}
+.section-label{font-size:10px;color:var(--accent);letter-spacing:.2em;text-transform:uppercase;margin-bottom:1.5rem;display:flex;align-items:center;gap:.5rem}
+.section-label::before{content:'';width:1.5rem;height:1px;background:var(--accent)}
+
+/* COLORS */
+.swatches{display:flex;gap:1px;background:var(--border);margin-bottom:.5rem}
+.swatch{flex:1;padding:1.5rem .5rem .75rem;display:flex;flex-direction:column;gap:.5rem}
+.swatch-val{font-size:9px;color:var(--muted);letter-spacing:.05em}
+
+/* TYPOGRAPHY */
+.type-row{display:flex;align-items:baseline;gap:1.5rem;padding:1rem 0;border-bottom:1px solid var(--border)}
+.type-label{font-size:9px;color:var(--muted);min-width:70px;letter-spacing:.1em}
+
+/* BUTTONS */
+.btn-row{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem}
+.btn{font-family:var(--mono);font-size:10px;padding:.625rem 1.25rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;border:none;text-decoration:none}
+.btn-primary{background:var(--accent);color:#0a0a0a}
+.btn-ghost{border:1px solid var(--border);color:var(--muted);background:transparent}
+.btn-ghost:hover{border-color:var(--muted);color:var(--text)}
+
+/* TAGS */
+.tags{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem}
+.tag{font-size:9px;padding:.3rem .6rem;border:1px solid var(--border);color:var(--muted)}
+.tag-accent{border-color:var(--accent);color:var(--accent)}
+
+/* PROJECT CARD */
+.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin-bottom:1.5rem}
+.pcard{background:var(--bg);padding:2rem;position:relative;border-left:3px solid var(--accent)}
+.pcard-num{font-size:9px;color:var(--muted);margin-bottom:1rem;display:block;letter-spacing:.1em}
+.pcard-title{font-family:var(--serif);font-size:1.4rem;color:var(--accent);margin-bottom:.5rem;font-style:italic}
+.pcard-desc{font-size:11px;color:var(--muted);margin-bottom:1rem;line-height:1.6;font-family:sans-serif}
+.pcard-link{position:absolute;bottom:1.25rem;right:1.25rem;width:32px;height:32px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted)}
+
+.pcard2{background:var(--bg);padding:2rem;position:relative}
+.pcard2-num{font-size:9px;color:var(--muted);margin-bottom:1rem;display:block;letter-spacing:.1em}
+.pcard2-title{font-family:var(--serif);font-size:1.4rem;margin-bottom:.5rem}
+.pcard2-desc{font-size:11px;color:var(--muted);margin-bottom:1rem;line-height:1.6;font-family:sans-serif}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:1.5rem}
+.stat{background:var(--bg);padding:1.5rem 1rem}
+.stat-num{font-family:var(--serif);font-size:2rem;color:var(--accent);display:block;line-height:1;margin-bottom:.4rem}
+.stat-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;line-height:1.4}
+
+/* NOW */
+.now-badge{background:var(--accent);color:#0a0a0a;font-size:9px;padding:.2rem .7rem;text-transform:uppercase;letter-spacing:.12em;display:inline-flex;align-items:center;gap:.4rem;margin-bottom:1rem}
+.live-dot{width:5px;height:5px;border-radius:50%;background:#0a0a0a;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* BLOG ROW */
+.blog-row{display:grid;grid-template-columns:80px 1fr auto;gap:1.5rem;padding:1.25rem 0;border-bottom:1px solid var(--border);align-items:center}
+.blog-date{font-size:10px;color:var(--muted)}
+.blog-title{font-family:var(--serif);font-size:1.1rem}
+.blog-cat{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+
+/* NAV PREVIEW */
+.nav{display:flex;justify-content:space-between;align-items:center;padding:1.25rem 0;border-bottom:1px solid var(--border);margin-bottom:1.5rem}
+.logo{font-size:11px;letter-spacing:.05em;color:var(--muted)}
+.logo span{color:var(--accent)}
+.nav-links{display:flex;gap:2rem}
+.nav-links a{font-size:10px;color:var(--muted);text-decoration:none;letter-spacing:.05em}
+
+/* HERO PREVIEW */
+.hero-preview{padding:2rem 0;border:1px solid var(--border);padding:2rem;margin-bottom:1.5rem;background:var(--bg-el)}
+.hero-eyebrow{font-size:10px;color:var(--accent);letter-spacing:.2em;text-transform:uppercase;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem}
+.hero-eyebrow::before{content:'';width:1.5rem;height:1px;background:var(--accent)}
+.hero-h1{font-family:var(--serif);font-size:3.5rem;line-height:1;margin-bottom:1rem;letter-spacing:-.02em}
+.hero-h1 em{font-style:italic;color:var(--accent)}
+.hero-sub{font-size:13px;color:var(--muted);max-width:480px;line-height:1.7;font-family:sans-serif;margin-bottom:1.5rem}
+</style>
+</head>
+<body>
+<h2 style="sr-only">Arshakil Portfolio Design System Preview</h2>
+
+<div class="section">
+  <div class="section-label">Navigation</div>
+  <div class="nav">
+    <div class="logo">ar<span>.</span>shakil</div>
+    <div class="nav-links">
+      <a href="#">Work</a>
+      <a href="#">About</a>
+      <a href="#">Writing</a>
+      <a href="#">Now</a>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-label">Hero Typography</div>
+  <div class="hero-preview">
+    <div class="hero-eyebrow">Fullstack AI Engineer</div>
+    <div class="hero-h1">Building<br><em>AI systems</em><br>that ship.</div>
+    <div class="hero-sub">7 years of production engineering. $900K+ cost savings. $1M+/month GMV. Based in Sylhet — available globally.</div>
+    <div class="btn-row">
+      <div class="btn btn-primary">View Work →</div>
+      <div class="btn btn-ghost">Get In Touch</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-label">Color Tokens</div>
+  <div class="swatches">
+    <div class="swatch" style="background:#0a0a0a"><div class="swatch-val">--bg<br>#0a0a0a</div></div>
+    <div class="swatch" style="background:#111"><div class="swatch-val">--bg-el<br>#111111</div></div>
+    <div class="swatch" style="background:#1f1f1f"><div class="swatch-val">--border<br>#1f1f1f</div></div>
+    <div class="swatch" style="background:#6b6b6b"><div class="swatch-val" style="color:#f5f5f5">--muted<br>#6b6b6b</div></div>
+    <div class="swatch" style="background:#f5f5f5"><div class="swatch-val" style="color:#0a0a0a">--text<br>#f5f5f5</div></div>
+    <div class="swatch" style="background:#22c55e"><div class="swatch-val" style="color:#0a0a0a">--accent<br>#22c55e</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-label">Project Cards</div>
+  <div class="card-grid">
+    <div class="pcard">
+      <span class="pcard-num">01</span>
+      <div class="pcard-title">Foxreach</div>
+      <div class="pcard-desc">AI outreach agent — multi-channel automation with LangGraph state machines</div>
+      <div class="tags"><span class="tag">LangGraph</span><span class="tag">FastAPI</span><span class="tag">Bedrock</span></div>
+      <div class="pcard-link">↗</div>
+    </div>
+    <div class="pcard2">
+      <span class="pcard2-num">02</span>
+      <div class="pcard2-title">Tabsense</div>
+      <div class="pcard2-desc">AI learning coach built with LangGraph — adaptive curriculum and memory</div>
+      <div class="tags"><span class="tag">LangGraph</span><span class="tag">pgvector</span><span class="tag">Next.js</span></div>
+      <div class="pcard-link">↗</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-label">Impact Metrics</div>
+  <div class="stats">
+    <div class="stat"><span class="stat-num">$900K</span><div class="stat-label">Saved per year via AI</div></div>
+    <div class="stat"><span class="stat-num">$1M+</span><div class="stat-label">Monthly GMV enabled</div></div>
+    <div class="stat"><span class="stat-num">80%</span><div class="stat-label">Support time cut</div></div>
+    <div class="stat"><span class="stat-num">2.5K</span><div class="stat-label">SEO posts per hour</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-label">Now Section</div>
+  <div class="now-badge"><span class="live-dot"></span>Currently Building</div>
+  <div class="tags" style="margin-top:.75rem">
+    <span class="tag tag-accent">AICP Protocol</span>
+    <span class="tag">create-mvpkit</span>
+    <span class="tag">Open to roles</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-label">Writing / Blog</div>
+  <div class="blog-row">
+    <span class="blog-date">Apr 2025</span>
+    <span class="blog-title">Building Multi-Agent Systems at Production Scale</span>
+    <span class="blog-cat">Engineering</span>
+  </div>
+  <div class="blog-row">
+    <span class="blog-date">Mar 2025</span>
+    <span class="blog-title">AICP: A Wire-Format Compression Protocol for LLMs</span>
+    <span class="blog-cat">Research</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-label">Tags &amp; Buttons</div>
+  <div class="tags">
+    <span class="tag">LangChain</span><span class="tag">LangGraph</span>
+    <span class="tag">FastAPI</span><span class="tag">NestJS</span>
+    <span class="tag">pgvector</span><span class="tag">Bedrock</span>
+    <span class="tag tag-accent">YC W21</span><span class="tag tag-accent">Top 3% Toptal</span>
+  </div>
+  <div class="btn-row">
+    <div class="btn btn-primary">View Work →</div>
+    <div class="btn btn-ghost">Download CV</div>
+    <div class="btn btn-ghost" style="border-color:var(--accent);color:var(--accent)">pshakilwizard@gmail.com</div>
+  </div>
+</div>
+
+</body>
+</html>

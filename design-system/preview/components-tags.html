@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Tags & Chips</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-mono)}
+.wrap{padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tag{font-size:10px;padding:5px 10px;border:1px solid var(--border);color:var(--text-muted);letter-spacing:.05em}
+.tag.p{background:rgba(34,197,94,.1);border-color:var(--accent);color:var(--accent)}
+.tag.s{padding:5px 12px}
+.badge{font-size:10px;padding:5px 10px;letter-spacing:.1em;text-transform:uppercase}
+.badge.now{background:var(--accent);color:#0a0a0a;display:inline-flex;align-items:center;gap:8px}
+.badge.sec{background:rgba(34,197,94,.1);border:1px solid var(--accent);color:var(--accent)}
+.badge.cur{background:var(--accent);color:#0a0a0a}
+.dot{width:5px;height:5px;border-radius:50%;background:#0a0a0a;animation:p 2s infinite}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+.lbl{font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+</style></head>
+<body><div class="wrap">
+ <div>
+   <div class="lbl">Skill tags</div>
+   <div class="row">
+     <span class="tag p">LangChain</span><span class="tag p">FastAPI</span><span class="tag">Bedrock</span><span class="tag">pgvector</span><span class="tag">Next.js</span>
+   </div>
+ </div>
+ <div>
+   <div class="lbl">Badges</div>
+   <div class="row">
+     <span class="badge sec">Now</span>
+     <span class="badge now"><span class="dot"></span>CURRENTLY BUILDING</span>
+     <span class="badge cur">CURRENT</span>
+   </div>
+ </div>
+</div></body></html>

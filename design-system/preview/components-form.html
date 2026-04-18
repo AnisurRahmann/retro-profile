@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Form input</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-mono)}
+.wrap{padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.group{display:flex;flex-direction:column;gap:6px}
+.lbl{font-size:10px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase}
+.input{padding:12px 14px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);font-family:-apple-system,system-ui,sans-serif;font-size:14px}
+.input.focus{border-color:var(--accent);outline:none}
+.input::placeholder{color:var(--text-muted)}
+.hint{font-size:9px;color:var(--text-muted);letter-spacing:.05em}
+</style></head>
+<body><div class="wrap">
+ <div class="group">
+   <div class="lbl">Name</div>
+   <input class="input" placeholder="Your name">
+   <div class="hint">Default · 1px border, bg-elevated fill</div>
+ </div>
+ <div class="group">
+   <div class="lbl">Email</div>
+   <input class="input focus" value="shakil@mail.com">
+   <div class="hint">Focus · border-color flips to accent</div>
+ </div>
+</div></body></html>

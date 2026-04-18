@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Logo & wordmark</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-mono)}
+.wrap{padding:28px 30px;display:flex;gap:40px;align-items:center;flex-wrap:wrap}
+.lg1{font-size:32px;letter-spacing:.04em;color:var(--text);font-weight:500}
+.lg1 .d{color:var(--accent)}
+.lg2{font-family:'Instrument Serif',Georgia,serif;font-size:28px;letter-spacing:-.01em}
+.lg2 em{font-style:italic;color:var(--accent)}
+.lg3{font-size:14px;letter-spacing:.08em;color:var(--text);font-weight:500;text-transform:uppercase}
+.note{font-size:9px;color:var(--text-muted);letter-spacing:.1em;margin-top:6px;text-transform:uppercase}
+.col{display:flex;flex-direction:column;gap:4px}
+</style></head>
+<body><div class="wrap">
+ <div class="col"><div class="lg1">ar<span class="d">.</span>shakil</div><div class="note">Mono · accent period</div></div>
+ <div class="col"><div class="lg3">SHAKIL<span style="color:var(--accent)">.</span></div><div class="note">Navbar mark · 14px mono</div></div>
+ <div class="col"><div class="lg2">Shakil, <em>AI Engineer</em></div><div class="note">Editorial sig · serif italic</div></div>
+</div></body></html>

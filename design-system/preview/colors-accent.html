@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Colors — Accent scale</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-mono)}
+.wrap{padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+.row{display:grid;grid-template-columns:120px 1fr auto;gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:none}
+.chip{width:110px;height:36px;border:1px solid #262626}
+.name{font-size:10px;color:var(--text);letter-spacing:.1em;text-transform:uppercase}
+.val{font-size:10px;color:var(--text-muted);letter-spacing:.04em;text-align:right}
+.note{font-size:9px;color:var(--text-muted);letter-spacing:.05em}
+</style></head>
+<body><div class="wrap">
+ <div class="row"><div class="chip" style="background:#22c55e"></div><div><div class="name">accent</div><div class="note">Primary CTA · italic serif emphasis · live dots</div></div><div class="val">#22C55E</div></div>
+ <div class="row"><div class="chip" style="background:#16a34a"></div><div><div class="name">accent-dim</div><div class="note">Primary button hover</div></div><div class="val">#16A34A</div></div>
+ <div class="row"><div class="chip" style="background:rgba(34,197,94,0.15);border-color:#22c55e"></div><div><div class="name">accent-15</div><div class="note">Badge fills · availability pill</div></div><div class="val">rgba(34,197,94,.15)</div></div>
+ <div class="row"><div class="chip" style="background:rgba(34,197,94,0.10);border-color:#1f1f1f"></div><div><div class="name">accent-10</div><div class="note">Section badge · featured card gradient</div></div><div class="val">rgba(34,197,94,.10)</div></div>
+</div></body></html>

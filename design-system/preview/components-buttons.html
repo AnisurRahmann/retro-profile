@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Buttons</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-mono)}
+.wrap{padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.btn{font-family:var(--font-mono);font-size:11px;padding:14px 28px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--border);background:transparent;color:var(--text);text-decoration:none;display:inline-flex;align-items:center;gap:8px;cursor:pointer;transition:all .25s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#0a0a0a}
+.btn.book{border:2px solid var(--accent);color:var(--accent);padding:13px 27px}
+.note{font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-top:2px}
+</style></head>
+<body><div class="wrap">
+ <div class="row">
+   <a class="btn primary">View Projects →</a>
+   <a class="btn">Get in Touch</a>
+   <a class="btn book">📅 Book a Call</a>
+ </div>
+ <div class="note">Primary · Ghost · Book-a-call (accent-outlined). All mono, 0.1em tracked, uppercase. Hard corners.</div>
+</div></body></html>

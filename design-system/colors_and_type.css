@@ -1,0 +1,184 @@
+/* ==========================================================
+   Shakil Portfolio — Design Tokens
+   Extracted from AnisurRahmann/retro-profile (src/index.css)
+   ========================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ----- COLORS: CORE ------------------------------------ */
+  --bg:              #0a0a0a;  /* canvas — near-black */
+  --bg-elevated:     #111111;  /* cards, form fields, contact band */
+  --border:          #262626;  /* 1px hairlines */
+  --border-faint:    #1f1f1f;  /* preview-file variant, slightly deeper */
+  --text:            #fafafa;  /* body text */
+  --text-alt:        #f5f5f5;  /* preview-file alt */
+  --text-muted:      #737373;  /* labels, meta, descriptions */
+  --text-dim:        #6b6b6b;  /* preview-file dim */
+
+  /* ----- COLORS: ACCENT ---------------------------------- */
+  --accent:          #22c55e;  /* terminal green */
+  --accent-dim:      #16a34a;  /* hover / pressed primary */
+  --accent-10:       rgba(34, 197, 94, 0.10); /* tinted fills */
+  --accent-15:       rgba(34, 197, 94, 0.15);
+  --accent-40:       rgba(34, 197, 94, 0.40); /* pulse glow */
+
+  /* ----- COLORS: SEMANTIC CATEGORIES (blog only) --------- */
+  --cat-ai:          #22c55e;  /* AI Engineering */
+  --cat-career:      #3b82f6;  /* Career */
+  --cat-devtools:    #a855f7;  /* Dev Tools */
+
+  /* ----- FONT FAMILIES ----------------------------------- */
+  --font-serif:  'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-sans:   'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                 Roboto, Oxygen, Ubuntu, sans-serif;
+  --font-mono:   'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* ----- BASE TYPE VARS ---------------------------------- */
+  --fs-xxs: 10px;      /* nano labels, swatch readouts */
+  --fs-xs:  12px;      /* labels, meta, tags */
+  --fs-sm:  14px;      /* mono body, nav-logo */
+  --fs-md:  16px;      /* body */
+  --fs-lg:  18px;      /* lede */
+  --fs-xl:  20px;      /* section body */
+  --fs-2xl: 24px;      /* card titles */
+  --fs-3xl: 32px;      /* section titles */
+  --fs-4xl: 48px;      /* sub-display */
+  --fs-5xl: clamp(3rem, 8vw, 5.5rem); /* hero display */
+
+  --tracking-wide:    0.1em;
+  --tracking-wider:   0.2em;
+  --tracking-mono:    0.05em;
+
+  /* ----- SPACING / RHYTHM -------------------------------- */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+  --space-32: 8rem;
+  --max-content: 1200px;
+
+  /* ----- RADII + BORDERS --------------------------------- */
+  --radius-0:  0;     /* default — hard corners */
+  --radius-1:  2px;   /* chips, small tags */
+  --radius-full: 9999px; /* dots only */
+  --stroke-1:  1px solid var(--border);
+  --stroke-accent: 1px solid var(--accent);
+
+  /* ----- MOTION ------------------------------------------ */
+  --ease-default:  cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast:  150ms;
+  --dur:       300ms;
+  --dur-slow:  600ms;
+
+  /* ----- SHADOWS ----------------------------------------- */
+  --shadow-pulse-0: 0 0 0 0 var(--accent-40);
+  --shadow-pulse-8: 0 0 0 8px rgba(34,197,94,0);
+}
+
+/* ==========================================================
+   SEMANTIC TYPE — use these in components
+   ========================================================== */
+
+.ds-display,
+h1.ds {
+  font-family: var(--font-serif);
+  font-size:   var(--fs-5xl);
+  font-weight: 400;
+  line-height: 1.0;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.ds-display em,
+.ds-accent {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.ds-h2,
+h2.ds {
+  font-family: var(--font-serif);
+  font-size:   var(--fs-3xl);
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.ds-h3,
+h3.ds {
+  font-family: var(--font-serif);
+  font-size:   var(--fs-2xl);
+  font-weight: 400;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.ds-stat {
+  font-family: var(--font-serif);
+  font-size:   var(--fs-4xl);
+  line-height: 1.0;
+  color: var(--text);
+}
+
+.ds-body {
+  font-family: var(--font-sans);
+  font-size:   var(--fs-md);
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.ds-lede {
+  font-family: var(--font-sans);
+  font-size:   var(--fs-lg);
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.ds-label,
+.ds-eyebrow,
+.ds-tag,
+.ds-button {
+  font-family: var(--font-mono);
+  font-size:   var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-muted);
+}
+
+.ds-eyebrow {
+  letter-spacing: var(--tracking-wider);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.ds-eyebrow::before {
+  content: '';
+  display: block;
+  width: 2rem;
+  height: 1px;
+  background: var(--accent);
+}
+
+.ds-nano {
+  font-family: var(--font-mono);
+  font-size:   var(--fs-xxs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--text-muted);
+}
+
+.ds-code,
+code.ds {
+  font-family: var(--font-mono);
+  font-size:   0.875em;
+  background:  var(--bg-elevated);
+  padding:     0.125rem 0.375rem;
+  border-radius: var(--radius-1);
+}

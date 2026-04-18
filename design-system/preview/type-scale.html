@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Type — Scale</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-mono)}
+.wrap{padding:18px 22px}
+.row{display:grid;grid-template-columns:90px 1fr 90px;gap:14px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:none}
+.label{font-size:9px;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase}
+.specimen{color:var(--text)}
+.serif{font-family:'Instrument Serif',Georgia,serif}
+.sans{font-family:-apple-system,system-ui,sans-serif}
+.mono{font-family:var(--font-mono)}
+.size{font-size:9px;color:var(--text-muted);letter-spacing:.04em;text-align:right}
+</style></head>
+<body><div class="wrap">
+ <div class="row"><div class="label">H2 / Serif</div><div class="specimen serif" style="font-size:32px;line-height:1.2">Selected Projects</div><div class="size">32 / 1.2</div></div>
+ <div class="row"><div class="label">H3 / Serif</div><div class="specimen serif" style="font-size:24px;line-height:1.25">Building AI Agents</div><div class="size">24 / 1.25</div></div>
+ <div class="row"><div class="label">Body / Sans</div><div class="specimen sans" style="font-size:16px;line-height:1.7;color:var(--text-muted)">I build intelligent systems and AI-powered products.</div><div class="size">16 / 1.7</div></div>
+ <div class="row"><div class="label">Label / Mono</div><div class="specimen mono" style="font-size:12px;letter-spacing:.1em;text-transform:uppercase">AVAILABLE FOR WORK</div><div class="size">12 · 0.1em</div></div>
+ <div class="row"><div class="label">Nano / Mono</div><div class="specimen mono" style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--text-muted)">001 — PROJECT</div><div class="size">10 · 0.2em</div></div>
+</div></body></html>

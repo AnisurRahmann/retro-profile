@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Colors — Core</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-mono);min-height:100%}
+.wrap{padding:18px 20px}
+.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border)}
+.sw{background:var(--bg);padding:18px 14px;height:110px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px}
+.sw .name{font-size:10px;color:var(--text);letter-spacing:.08em;text-transform:uppercase}
+.sw .hex{font-size:9px;color:var(--text-muted);letter-spacing:.05em}
+</style></head>
+<body><div class="wrap">
+<div class="grid">
+ <div class="sw" style="background:#0a0a0a"><div class="name">bg</div><div class="hex">#0A0A0A</div></div>
+ <div class="sw" style="background:#111"><div class="name">bg-elevated</div><div class="hex">#111111</div></div>
+ <div class="sw" style="background:#262626"><div class="name">border</div><div class="hex">#262626</div></div>
+ <div class="sw" style="background:#737373"><div class="name" style="color:#fafafa">text-muted</div><div class="hex" style="color:#d4d4d4">#737373</div></div>
+ <div class="sw" style="background:#fafafa"><div class="name" style="color:#0a0a0a">text</div><div class="hex" style="color:#525252">#FAFAFA</div></div>
+ <div class="sw" style="background:#22c55e"><div class="name" style="color:#0a0a0a">accent</div><div class="hex" style="color:#064e1e">#22C55E</div></div>
+</div>
+</div></body></html>

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Colors — Semantic categories</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-mono)}
+.wrap{padding:24px;display:flex;flex-direction:column;gap:12px}
+.pill{display:inline-flex;align-items:center;padding:6px 10px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;border-radius:2px}
+.row{display:grid;grid-template-columns:190px 1fr auto;gap:14px;align-items:center}
+.meta{font-size:10px;color:var(--text-muted);letter-spacing:.04em}
+.hex{font-size:10px;color:var(--text-muted);font-family:var(--font-mono);letter-spacing:.03em}
+</style></head>
+<body><div class="wrap">
+ <div class="row"><span class="pill" style="background:rgba(34,197,94,.15);color:#22c55e">AI Engineering</span><div class="meta">Blog category · accent-tinted fill at 15%</div><div class="hex">#22C55E</div></div>
+ <div class="row"><span class="pill" style="background:rgba(59,130,246,.15);color:#3b82f6">Career</span><div class="meta">Blog category · used only in writing tags</div><div class="hex">#3B82F6</div></div>
+ <div class="row"><span class="pill" style="background:rgba(168,85,247,.15);color:#a855f7">Dev Tools</span><div class="meta">Blog category · used only in writing tags</div><div class="hex">#A855F7</div></div>
+</div></body></html>

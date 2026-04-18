@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Type — Display</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text)}
+.wrap{padding:22px 26px}
+.eye{font-family:var(--font-mono);font-size:10px;color:var(--accent);letter-spacing:.2em;text-transform:uppercase;display:inline-flex;align-items:center;gap:10px;margin-bottom:14px}
+.eye::before{content:'';width:22px;height:1px;background:var(--accent)}
+.h1{font-family:'Instrument Serif',Georgia,serif;font-size:64px;line-height:1;letter-spacing:-.02em;margin:0}
+.h1 em{font-style:italic;color:var(--accent)}
+.meta{font-family:var(--font-mono);font-size:9px;color:var(--text-muted);letter-spacing:.1em;margin-top:14px;text-transform:uppercase}
+</style></head>
+<body><div class="wrap">
+ <div class="eye">Fullstack AI Engineer</div>
+ <h1 class="h1">Building <em>AI systems</em> that ship.</h1>
+ <div class="meta">Instrument Serif · 64px · line-height 1.0 · tracking −0.02em · italic + accent on emphasis</div>
+</div></body></html>

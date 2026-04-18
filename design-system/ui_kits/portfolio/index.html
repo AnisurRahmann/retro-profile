@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Shakil — AI Engineer &amp; Builder</title>
+<link rel="stylesheet" href="portfolio.css"/>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="components-core.jsx"></script>
+<script type="text/babel" src="components-sections.jsx"></script>
+
+<script type="text/babel">
+const { useState } = React;
+
+const projects = [
+  { number:'001', title:'AI Workflow Agents', description:'LangChain + Amazon Bedrock agents automating internal processes at Gerald. Streamlined repetitive tasks with real-time data handling.', tags:['LangChain','Bedrock','AI Agents'] },
+  { number:'002', title:'Foxreach', description:'AI-powered outreach platform that helps founders connect with investors using intelligent matching and personalized messaging.', tags:['LLM','Next.js','Python'] },
+  { number:'003', title:'Tea Leaf Recognition', description:'React Native app with an ML model for tea-leaf classification. Achieved ~95% accuracy and 80% reduction in manual labor.', tags:['React Native','ML','Computer Vision'] },
+  { number:'004', title:'create-mvpkit', description:'CLI tool to scaffold production-ready MVPs with AI integrations, authentication, and database setup in minutes.', tags:['CLI','TypeScript','Templates'] },
+  { number:'005', title:'Falls Prevention Monitor', description:'Real-time monitoring app for older adults integrating sensor data. Built at SJ Innovation for healthcare clients.', tags:['React Native','Healthcare','Real-time'] },
+  { number:'006', title:'Energy Monitor PWA', description:'Progressive Web App for solar panel and battery monitoring at Social Energy (UK). Achieved 100% data accuracy.', tags:['PWA','Chart.js','Energy'] },
+];
+
+const nowItems = [
+  { title:'Building AI Agents', description:'Developing autonomous agents that can reason, plan, and execute complex tasks using LLMs and tool orchestration.' },
+  { title:'LLM Integration Patterns', description:'Exploring best practices for integrating large language models into production applications reliably.' },
+  { title:'Open Source Tools', description:'Contributing to and building open source developer tools that make AI more accessible to engineers.' },
+];
+
+const writings = [
+  { title:'Building Production-Ready AI Agents', date:'2024', readTime:'8 min read', category:'ai-engineering', featured:true,
+    excerpt:'A deep dive into architecting autonomous agents that can reason, plan, and execute complex tasks reliably in production environments.' },
+  { title:'The Art of Prompt Engineering', date:'2024', readTime:'5 min read', category:'ai-engineering',
+    excerpt:'Techniques and patterns for crafting effective prompts that consistently produce high-quality outputs from LLMs.' },
+  { title:'From Backend to AI: A Developer\u2019s Journey', date:'2023', readTime:'6 min read', category:'career',
+    excerpt:'How I transitioned from traditional backend development to AI engineering, and lessons learned along the way.' },
+  { title:'Essential Dev Tools for AI Engineers', date:'2023', readTime:'4 min read', category:'dev-tools',
+    excerpt:'A curated list of development tools and frameworks every AI engineer should have in their toolkit.' },
+];
+
+const stats = [
+  { number:'6+',  label:'Years Experience' },
+  { number:'90%', label:'Repayment Rate ↑' },
+  { number:'50%', label:'Cost Reduction' },
+  { number:'30%', label:'Revenue ↑' },
+];
+
+const companies = [
+  { name:'Gerald', badge:'YC W21', location:'USA', current:true },
+  { name:'re:cruit', location:'USA', clients:['Replo','First Delivery','Edlyft','Osmind','Virtually'] },
+  { name:'SJ Innovation LLC', location:'Bangladesh' },
+  { name:'Social Energy Ltd.', location:'UK' },
+];
+
+const skills = {
+  primary:   ['LangChain','Amazon Bedrock','Claude API','Python','FastAPI','Flask','Node.js','React','Next.js'],
+  secondary: ['AWS Serverless','GCP','Docker','MongoDB','MySQL','Chart.js','TradingView.js'],
+};
+
+function App() {
+  return (
+    <div data-screen-label="01 Home">
+      <Nav active="Projects" />
+      <Hero />
+
+      <section id="now" className="pf-section">
+        <SectionHeader badge="Now" title="What I'm Building" />
+        <NowGrid items={nowItems} />
+      </section>
+
+      <section id="projects" className="pf-section">
+        <SectionHeader badge="Work" title="Selected Projects" />
+        <ProjectsGrid projects={projects} />
+      </section>
+
+      <section id="experience" className="pf-section">
+        <SectionHeader badge="Experience" title="Shipped For" />
+        <CompaniesGrid companies={companies} />
+      </section>
+
+      <section id="writing" className="pf-section">
+        <SectionHeader badge="Blog" title="Writing" />
+        <div className="pf-writing-list">
+          {writings.map((w,i) => <WritingRow post={w} key={i} />)}
+        </div>
+        <div style={{textAlign:'center',marginTop:'2rem'}}>
+          <a className="pf-btn" href="#">View All Posts</a>
+        </div>
+      </section>
+
+      <section id="about" className="pf-section">
+        <SectionHeader badge="About" title="Background" />
+        <div className="pf-about-grid">
+          <div className="pf-about-text">
+            <p>My journey started in 2018 at Social Energy (UK), where I built energy monitoring systems. Since then, I've worked across the UK → Bangladesh → USA, building products for Y Combinator-backed startups and enterprise clients in fintech, healthcare, and edtech.</p>
+            <p>I hold a B.E. in Computer Science from Metropolitan University (2021). My expertise spans AI/ML integration with LangChain, Amazon Bedrock, and Claude API, plus full-stack development with Python, Node.js, React, and Next.js.</p>
+            <p>Currently at Gerald (YC W21), I've helped increase repayment rates by 90% through bank transaction analysis, reduced integration costs by 50%, and boosted revenue by 30% with recommender systems.</p>
+          </div>
+          <Stats stats={stats} />
+        </div>
+        <Skills primary={skills.primary} secondary={skills.secondary} />
+      </section>
+
+      <Contact />
+
+      <footer className="pf-footer">
+        &copy; 2026 Shakil. All rights reserved.
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Spacing — Radii</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-mono)}
+.wrap{padding:26px;display:grid;grid-template-columns:repeat(3,1fr);gap:24px;align-items:end}
+.cell{text-align:center}
+.sq{width:72px;height:72px;background:var(--bg-elevated);border:1px solid var(--border);margin:0 auto 10px}
+.sq.r1{border-radius:2px}
+.sq.rf{border-radius:9999px;background:var(--accent);border:none;width:16px;height:16px;margin-top:30px;margin-bottom:40px}
+.name{font-size:10px;color:var(--text);letter-spacing:.1em;text-transform:uppercase}
+.note{font-size:9px;color:var(--text-muted);margin-top:3px}
+</style></head>
+<body><div class="wrap">
+ <div class="cell"><div class="sq"></div><div class="name">radius-0</div><div class="note">Default · hard corners</div></div>
+ <div class="cell"><div class="sq r1"></div><div class="name">radius-1 · 2px</div><div class="note">Category chips only</div></div>
+ <div class="cell"><div class="sq rf"></div><div class="name">radius-full</div><div class="note">Dots · status indicators</div></div>
+</div></body></html>
