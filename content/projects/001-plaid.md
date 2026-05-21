@@ -2,7 +2,7 @@
 num: "001"
 title: "Plaid"
 italic: "Optimizer"
-desc: "Reduced Plaid bank connection costs 75% — from $100K to $25K monthly — through strategic funnel optimization. $900K annual savings."
+desc: "The bank connection funnel was bleeding $100K/month. I re-engineered it to defer API calls until users committed. 75% cost reduction, same completion rate. $900K saved annually."
 tags:
   - "Python"
   - "FastAPI"

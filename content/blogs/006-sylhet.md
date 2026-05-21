@@ -29,4 +29,4 @@ q: Remote work rewards the disciplined and punishes everyone else. I take full o
 
 ## end
 cta: "Reach out →"
-href: "mailto:ar.shakil022@gmail.com"
+href: "mailto:pshakilwizard@gmail.com"

@@ -33,4 +33,4 @@ q: If you're paying an agency for something a well-engineered pipeline can do be
 
 ## end
 cta: "Get in touch →"
-href: "mailto:ar.shakil022@gmail.com"
+href: "mailto:pshakilwizard@gmail.com"

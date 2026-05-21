@@ -33,4 +33,4 @@ q: I don't see engineering as a cost center. I see it as leverage. Every sprint 
 
 ## end
 cta: "Get in touch →"
-href: "mailto:ar.shakil022@gmail.com"
+href: "mailto:pshakilwizard@gmail.com"

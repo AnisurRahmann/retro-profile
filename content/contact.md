@@ -1,8 +1,8 @@
 ---
 rows:
   - label: "Email"
-    value: "ar.shakil022@gmail.com"
-    href: "mailto:ar.shakil022@gmail.com"
+    value: "pshakilwizard@gmail.com"
+    href: "mailto:pshakilwizard@gmail.com"
   - label: "GitHub"
     value: "@AnisurRahmann"
     href: "https://github.com/anisurrahmann"
@@ -12,7 +12,10 @@ rows:
   - label: "X"
     value: "@ar_shakil23"
     href: "https://x.com/ar_shakil23"
+  - label: "WhatsApp"
+    value: "+44 7763807656"
+    href: "https://wa.me/447763807656"
   - label: "Calendar"
-    value: "cal.com/anisur-rahman-br7fwe"
-    href: "https://cal.com/anisur-rahman-br7fwe/30min"
+    value: "cal.com/shakil-nee"
+    href: "https://cal.com/shakil-nee/30min"
 ---

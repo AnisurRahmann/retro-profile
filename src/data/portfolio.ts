@@ -104,47 +104,47 @@ export interface WritingPost {
 // ── Data ───────────────────────────────────────────────────
 
 export const HERO: HeroData = {
-    eyebrow: 'Backend & AI Engineer',
-    title_line1: 'Building',
-    title_em: 'systems',
-    title_line3: 'that move numbers.',
-    lede: '2.5+ years at Gerald (YC W21). $900K+ cost savings. $1M+/month GMV enabled. Based in Sylhet — available globally.',
-    location: 'AVAILABLE · OPEN TO ROLES',
+    eyebrow: 'Backend & AI Engineer · v7.0',
+    title_line1: 'Shipping',
+    title_em: 'production',
+    title_line3: 'since 2018.',
+    lede: '7 years in production. $900K+ saved on Plaid. $1M+/month GMV shipped. Currently deployed at Gerald (YC W21) — Sylhet, BD, available globally.',
+    location: 'LIVE · SYLHET · UTC+6',
     ring: true,
   };
 
 export const NOW_ITEMS: NowItem[] = [
     {
       title: 'AI Analytics Agents',
-      desc: 'AI Slack agents for real-time business metrics and natural language Redshift queries.',
+      desc: 'Slack agents that query Redshift in plain English. No SQL needed, no waiting on data teams.',
       live: true,
     },
     {
       title: 'SEO Content Engine',
-      desc: 'Generating 2,500 SEO-optimized posts/hour with automated backlinking and keyword targeting.',
+      desc: '2,500 posts/hour. Automated keyword targeting, backlinking, scheduling. Agency eliminated.',
     },
     {
       title: 'Observability Stack',
-      desc: 'New Relic + Datadog monitoring with custom dashboards and proactive alerting.',
+      desc: 'New Relic + Datadog. Dashboards that don\'t lie about the status code. Alerts before users notice.',
     },
   ];
 
 export const STATS: Stat[] = [
     {
       number: '$900K',
-      label: 'Saved / year via AI',
+      label: 'Plaid costs, vaporized yearly',
     },
     {
       number: '$1M+',
-      label: 'Monthly GMV enabled',
+      label: 'Monthly GMV, no inventory risk',
     },
     {
       number: '2,500+',
-      label: 'SEO posts / hour',
+      label: 'SEO posts/hr, agency replaced',
     },
     {
       number: '80%',
-      label: 'Support time cut',
+      label: 'Support time, automated away',
     },
   ];
 
@@ -153,21 +153,21 @@ export const PROJECTS: Project[] = [
       num: '001',
       title: 'Plaid',
       italic: 'Optimizer',
-      desc: 'Reduced Plaid bank connection costs 75% — from $100K to $25K monthly — through strategic funnel optimization. $900K annual savings.',
+      desc: 'The bank connection funnel was bleeding $100K/month. I re-engineered it to defer API calls until users committed. 75% cost reduction, same completion rate. $900K saved annually.',
       tags: ['Python', 'FastAPI', 'Analytics'],
     },
     {
       num: '002',
       title: 'AI',
       italic: 'SEO Engine',
-      desc: 'AI system generating 2,500 SEO-optimized posts/hour with automated backlinking. $96K/yr saved, 40% conversion lift, $1M+ monthly GMV.',
+      desc: 'Agency was charging $8K/month for generic content. Built an AI pipeline that generates 2,500 posts/hour with automated keyword targeting. $96K/yr saved, 40% conversion lift, $1M+ monthly GMV.',
       tags: ['AI/ML', 'Automation', 'SEO'],
     },
     {
       num: '003',
       title: 'Amazon',
       italic: 'Integration',
-      desc: 'Integrated Zinc API enabling Amazon product sales on Gerald. $1M+ monthly order value with zero inventory risk.',
+      desc: 'Gerald\'s catalog was limited. Integrated Zinc API to sell Amazon products directly — zero inventory risk, Amazon handles fulfillment. $1M+ monthly order value within months.',
       tags: ['Zinc API', 'Integration', 'E-commerce'],
     },
   ];
@@ -217,18 +217,24 @@ export const SOCIALS: SocialLink[] = [
       href: 'https://x.com/ar_shakil23',
     },
     {
+      id: 'whatsapp',
+      label: 'WhatsApp',
+      handle: '+44 7763807656',
+      href: 'https://wa.me/447763807656',
+    },
+    {
       id: 'email',
       label: 'Email',
-      handle: 'ar.shakil022@gmail.com',
-      href: 'mailto:ar.shakil022@gmail.com',
+      handle: 'pshakilwizard@gmail.com',
+      href: 'mailto:pshakilwizard@gmail.com',
     },
   ];
 
 export const CONTACT_ROWS: ContactRow[] = [
     {
       label: 'Email',
-      value: 'ar.shakil022@gmail.com',
-      href: 'mailto:ar.shakil022@gmail.com',
+      value: 'pshakilwizard@gmail.com',
+      href: 'mailto:pshakilwizard@gmail.com',
     },
     {
       label: 'GitHub',
@@ -246,41 +252,46 @@ export const CONTACT_ROWS: ContactRow[] = [
       href: 'https://x.com/ar_shakil23',
     },
     {
+      label: 'WhatsApp',
+      value: '+44 7763807656',
+      href: 'https://wa.me/447763807656',
+    },
+    {
       label: 'Calendar',
-      value: 'cal.com/anisur-rahman-br7fwe',
-      href: 'https://cal.com/anisur-rahman-br7fwe/30min',
+      value: 'cal.com/shakil-nee',
+      href: 'https://cal.com/shakil-nee/30min',
     },
   ];
 
 export const ABOUT: AboutData = {
-    quote: 'I don\'t just ship features — I ship <em>measurable business outcomes</em>. $900K saved here, $1M GMV enabled there.',
-    body: 'Started in 2018 at Social Energy (UK) building energy monitoring. Spent 2.5+ years at Gerald (YC W21) converting engineering solutions into revenue growth, cost reduction, and operational efficiency. B.E. Computer Science, 2021.',
+    quote: 'I don\'t brainstorm. I ship. Pipelines that cut $900K/year, AI engines that replace agencies, integrations that unlock $1M+ GMV.',
+    body: 'Started in 2018 building energy monitoring for the UK grid. Spent 2.5+ years at Gerald (YC W21) converting engineering problems into revenue — $900K saved on Plaid costs, $96K/yr by replacing an SEO agency with AI, $1M+ monthly GMV through Amazon integration. Every feature I ship has a number attached to it. B.E. Computer Science, 2021.',
     meta: [
       {
-        label: 'Based',
-        value: 'Sylhet, BD',
+        label: 'Deployed at',
+        value: 'Sylhet, BD · UTC+6',
       },
       {
-        label: 'Timezone',
-        value: 'UTC+6',
+        label: 'Uptime',
+        value: '7 years, 0 unplanned outages',
       },
       {
-        label: 'Shipped since',
-        value: '2018',
+        label: 'Stack',
+        value: 'Python · Go · React · AWS',
       },
       {
-        label: 'Open to',
-        value: 'Senior / Staff',
+        label: 'Status',
+        value: 'Open to Senior/Staff roles',
       },
     ],
   };
 
 export const OUTRO: OutroData = {
-    heading_line1: 'Thanks for',
-    heading_em: 'scrolling.',
-    sub: 'Questions, briefs, or just saying hi — my inbox is open.',
+    heading_line1: 'Don\'t redeploy',
+    heading_em: 'this engineer.',
+    sub: 'Already running in production. Open to new environments — email, coffee chat, or technical interview all welcome.',
     cta_label: 'Email me →',
-    cta_href: 'mailto:ar.shakil022@gmail.com',
+    cta_href: 'mailto:pshakilwizard@gmail.com',
     replay_label: 'Replay',
   };
 
@@ -368,7 +379,7 @@ export const BLOGS: Blog[] = [
   {
     kind: 'end',
     cta: 'Get in touch →',
-    href: 'mailto:ar.shakil022@gmail.com',
+    href: 'mailto:pshakilwizard@gmail.com',
   }
     ],
   },
@@ -410,7 +421,7 @@ export const BLOGS: Blog[] = [
   {
     kind: 'end',
     cta: 'Get in touch →',
-    href: 'mailto:ar.shakil022@gmail.com',
+    href: 'mailto:pshakilwizard@gmail.com',
   }
     ],
   },
@@ -452,7 +463,7 @@ export const BLOGS: Blog[] = [
   {
     kind: 'end',
     cta: 'Get in touch →',
-    href: 'mailto:ar.shakil022@gmail.com',
+    href: 'mailto:pshakilwizard@gmail.com',
   }
     ],
   },
@@ -494,7 +505,7 @@ export const BLOGS: Blog[] = [
   {
     kind: 'end',
     cta: 'Get in touch →',
-    href: 'mailto:ar.shakil022@gmail.com',
+    href: 'mailto:pshakilwizard@gmail.com',
   }
     ],
   },
@@ -536,7 +547,7 @@ export const BLOGS: Blog[] = [
   {
     kind: 'end',
     cta: 'Get in touch →',
-    href: 'mailto:ar.shakil022@gmail.com',
+    href: 'mailto:pshakilwizard@gmail.com',
   }
     ],
   },
@@ -573,7 +584,7 @@ export const BLOGS: Blog[] = [
   {
     kind: 'end',
     cta: 'Reach out →',
-    href: 'mailto:ar.shakil022@gmail.com',
+    href: 'mailto:pshakilwizard@gmail.com',
   }
     ],
   },
@@ -615,7 +626,7 @@ export const BLOGS: Blog[] = [
   {
     kind: 'end',
     cta: 'Get in touch →',
-    href: 'mailto:ar.shakil022@gmail.com',
+    href: 'mailto:pshakilwizard@gmail.com',
   }
     ],
   }

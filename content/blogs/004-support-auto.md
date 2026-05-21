@@ -33,4 +33,4 @@ q: Build tools that scale your team, not your headcount.
 
 ## end
 cta: "Get in touch →"
-href: "mailto:ar.shakil022@gmail.com"
+href: "mailto:pshakilwizard@gmail.com"

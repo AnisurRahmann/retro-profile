@@ -33,4 +33,4 @@ q: The best monitoring is the kind that wakes you up before the customer notices
 
 ## end
 cta: "Get in touch →"
-href: "mailto:ar.shakil022@gmail.com"
+href: "mailto:pshakilwizard@gmail.com"

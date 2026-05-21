@@ -77,7 +77,7 @@ const ActionRail: React.FC<ActionRailProps> = ({ onToast, onOpenSocials }) => {
     {
       icon: Icons.calendar,
       label: 'Book a call',
-      onClick: () => window.open('https://cal.com/anisur-rahman-br7fwe/30min', '_blank', 'noopener'),
+      onClick: () => window.open('https://cal.com/shakil-nee/30min', '_blank', 'noopener'),
     },
   ];
 

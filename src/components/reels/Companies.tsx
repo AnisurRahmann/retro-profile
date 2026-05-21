@@ -3,9 +3,9 @@ import { COMPANIES } from '../../data/portfolio';
 
 const Companies: React.FC = () => (
   <>
-    <div className="animate-in d1 eyebrow" style={{ marginTop: 20 }}>Shipped for</div>
+    <div className="animate-in d1 eyebrow" style={{ marginTop: 20 }}>Deployed at</div>
     <h2 className="animate-in d2 h2" style={{ marginTop: 12 }}>
-      Teams that trusted the <em style={{ color: 'var(--accent)', fontStyle: 'italic' }}>work.</em>
+      Production environments, <em>previously hosted.</em>
     </h2>
     <div className="animate-in d3 co-list">
       {COMPANIES.map((c, i) => (

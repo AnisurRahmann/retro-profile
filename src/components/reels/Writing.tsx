@@ -3,9 +3,9 @@ import { WRITING_POSTS } from '../../data/portfolio';
 
 const Writing: React.FC = () => (
   <>
-    <div className="animate-in d1 eyebrow" style={{ marginTop: 30 }}>Writing</div>
+    <div className="animate-in d1 eyebrow" style={{ marginTop: 30 }}>Changelog</div>
     <h2 className="animate-in d2 h2" style={{ marginTop: 12 }}>
-      Notes from the <em style={{ color: 'var(--accent)', fontStyle: 'italic' }}>build.</em>
+      Dispatches from <em>production.</em>
     </h2>
     <div className="animate-in d3 wr-list">
       {WRITING_POSTS.map((p, i) => (

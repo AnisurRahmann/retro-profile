@@ -7,7 +7,7 @@ interface OutroProps {
 
 const Outro: React.FC<OutroProps> = ({ onRestart }) => (
   <>
-    <div className="animate-in d1 outro-mark">&mdash; END OF REEL &mdash;</div>
+    <div className="animate-in d1 outro-mark">{'// END OF REEL //'}</div>
     <h2 className="animate-in d2 outro-h">
       {OUTRO.heading_line1}<br /><em>{OUTRO.heading_em}</em>
     </h2>

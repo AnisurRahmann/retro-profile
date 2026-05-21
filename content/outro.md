@@ -1,8 +1,8 @@
 ---
-heading_line1: "Thanks for"
-heading_em: "scrolling."
-sub: "Questions, briefs, or just saying hi — my inbox is open."
+heading_line1: "Don't redeploy"
+heading_em: "this engineer."
+sub: "Already running in production. Open to new environments — email, coffee chat, or technical interview all welcome."
 cta_label: "Email me →"
-cta_href: "mailto:ar.shakil022@gmail.com"
+cta_href: "mailto:pshakilwizard@gmail.com"
 replay_label: "Replay"
 ---

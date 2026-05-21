@@ -1,13 +1,13 @@
 ---
-quote: "I don't just ship features — I ship <em>measurable business outcomes</em>. $900K saved here, $1M GMV enabled there."
-body: "Started in 2018 at Social Energy (UK) building energy monitoring. Spent 2.5+ years at Gerald (YC W21) converting engineering solutions into revenue growth, cost reduction, and operational efficiency. B.E. Computer Science, 2021."
+quote: "I don't brainstorm. I ship. Pipelines that cut $900K/year, AI engines that replace agencies, integrations that unlock $1M+ GMV."
+body: "Started in 2018 building energy monitoring for the UK grid. Spent 2.5+ years at Gerald (YC W21) converting engineering problems into revenue — $900K saved on Plaid costs, $96K/yr by replacing an SEO agency with AI, $1M+ monthly GMV through Amazon integration. Every feature I ship has a number attached to it. B.E. Computer Science, 2021."
 meta:
-  - label: "Based"
-    value: "Sylhet, BD"
-  - label: "Timezone"
-    value: "UTC+6"
-  - label: "Shipped since"
-    value: "2018"
-  - label: "Open to"
-    value: "Senior / Staff"
+  - label: "Deployed at"
+    value: "Sylhet, BD · UTC+6"
+  - label: "Uptime"
+    value: "7 years, 0 unplanned outages"
+  - label: "Stack"
+    value: "Python · Go · React · AWS"
+  - label: "Status"
+    value: "Open to Senior/Staff roles"
 ---

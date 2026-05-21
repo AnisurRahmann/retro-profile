@@ -1,9 +1,9 @@
 ---
-eyebrow: "Backend & AI Engineer"
-title_line1: "Building"
-title_em: "systems"
-title_line3: "that move numbers."
-lede: "2.5+ years at Gerald (YC W21). $900K+ cost savings. $1M+/month GMV enabled. Based in Sylhet — available globally."
-location: "AVAILABLE · OPEN TO ROLES"
+eyebrow: "Backend & AI Engineer · v7.0"
+title_line1: "Shipping"
+title_em: "production"
+title_line3: "since 2018."
+lede: "7 years in production. $900K+ saved on Plaid. $1M+/month GMV shipped. Currently deployed at Gerald (YC W21) — Sylhet, BD, available globally."
+location: "LIVE · SYLHET · UTC+6"
 ring: true
 ---
