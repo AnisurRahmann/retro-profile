@@ -79,6 +79,37 @@
   display:flex;
 }
 
+/* Optional day photo: dimmed background behind the content column.
+   Desktop: a centered portrait column at natural scale (matching the
+   narrow content measure), edges fading into the canvas. Mobile the
+   column IS the viewport, so it reads full-bleed. */
+.gym-photo{
+  position:absolute;top:0;bottom:0;left:0;right:0;
+  margin:0 auto;
+  width:min(520px, 100%);
+  background-size:cover;background-position:center 22%;
+  filter:brightness(.82) saturate(.92);
+  pointer-events:none;user-select:none;
+}
+.gym-photo::after{
+  content:'';position:absolute;inset:0;
+  opacity:var(--dim, 1);
+  background:
+    linear-gradient(to right,
+      #0a0a0a 0%, rgba(10,10,10,0) 30%,
+      rgba(10,10,10,0) 70%, #0a0a0a 100%),
+    radial-gradient(130% 72% at 50% 30%,
+      rgba(10,10,10,0) 0%,
+      rgba(10,10,10,.38) 62%,
+      rgba(10,10,10,.72) 100%),
+    linear-gradient(to bottom,
+      rgba(10,10,10,.8) 0%,
+      rgba(10,10,10,.55) 26%,
+      rgba(10,10,10,.66) 46%,
+      rgba(10,10,10,.9) 62%,
+      #0a0a0a 78%);
+}
+
 /* content column — narrow reel-like measure, centered on wide screens */
 .gym-col{
   position:relative;
@@ -150,7 +181,12 @@
 /* --- Rest day: sparse, centered, lots of negative space -------- */
 .gym-rest .gym-col{align-items:center;text-align:center}
 .gym-rest .gym-title{font-size:clamp(72px, 18vmin, 128px);margin-bottom:16px}
-.gym-restline{font-size:13px;line-height:1.7;color:var(--muted);max-width:300px}
+.gym-restline{font-size:13px;line-height:1.7;color:#8f8f8f;max-width:300px}
+/* over a photo, lift the small text off the scene */
+.gym-rest .gym-head .eyebrow,
+.gym-rest .gym-restline{
+  text-shadow:0 1px 14px rgba(0,0,0,.65), 0 0 2px rgba(0,0,0,.5);
+}
 
 /* --- First-panel swipe hint ------------------------------------ */
 .gym-hint{

@@ -54,6 +54,16 @@ const DayPanel: React.FC<DayPanelProps> = ({ day, idx, today, revealed, hint, pa
       aria-labelledby={`${day.id}-title`}
       aria-label={label}
     >
+      {day.photo && (
+        <div
+          className="gym-photo"
+          style={{
+            backgroundImage: `url(${day.photo})`,
+            ...(day.photoDim !== undefined ? { '--dim': day.photoDim } : {}),
+          } as React.CSSProperties}
+          aria-hidden="true"
+        />
+      )}
       <div className="gym-col">
         <span className="gym-mark rv" style={{ '--i': 0 } as React.CSSProperties} aria-hidden="true">{day.num}</span>
 

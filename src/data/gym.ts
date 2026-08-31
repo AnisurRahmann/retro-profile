@@ -24,6 +24,10 @@ export interface GymDay {
   restLine?: string;
   /** rough duration shown in the meta line */
   duration: string;
+  /** optional photo shown as the panel's dimmed background, e.g. "/images/gym/day-1.jpg" */
+  photo?: string;
+  /** overlay strength for the photo, 0–1 — lower = more visible photo (default 1) */
+  photoDim?: number;
   exercises: GymExercise[];
 }
 
@@ -35,6 +39,7 @@ export const GYM_DAYS: GymDay[] = [
     split: 'Upper',
     emphasis: '(Heavy)',
     duration: '~60 min',
+    photo: '/images/gym/day-1.jpg',
     exercises: [
       { name: 'Barbell Bench Press', prescription: '3 x 5-7', note: 'RPE 8, leave a rep' },
       { name: 'Weighted Pull-Up', prescription: '3 x 6-8', note: 'bodyweight if needed' },
@@ -51,6 +56,7 @@ export const GYM_DAYS: GymDay[] = [
     split: 'Lower',
     emphasis: '(Heavy) + Cardio',
     duration: '~70 min',
+    photo: '/images/gym/day-2.jpg',
     exercises: [
       { name: 'Barbell Back Squat', prescription: '3 x 5-7' },
       { name: 'Romanian Deadlift', prescription: '3 x 8-10' },
@@ -66,6 +72,7 @@ export const GYM_DAYS: GymDay[] = [
     num: '03',
     split: 'Push',
     duration: '~50 min',
+    photo: '/images/gym/day-3.jpg',
     exercises: [
       { name: 'Incline DB Press', prescription: '3 x 8-10' },
       { name: 'Machine Chest Press', prescription: '3 x 10-12' },
@@ -80,6 +87,7 @@ export const GYM_DAYS: GymDay[] = [
     num: '04',
     split: 'Pull',
     duration: '~55 min',
+    photo: '/images/gym/day-4.jpg',
     exercises: [
       { name: 'Lat Pulldown', prescription: '3 x 8-10' },
       { name: 'Wide-Grip Cable Row', prescription: '3 x 10-12' },
@@ -96,6 +104,7 @@ export const GYM_DAYS: GymDay[] = [
     split: 'Legs',
     emphasis: '+ Cardio',
     duration: '~60 min',
+    photo: '/images/gym/day-5.jpg',
     exercises: [
       { name: 'Barbell Hip Thrust', prescription: '3 x 8-10' },
       { name: 'Leg Extension', prescription: '3 x 10-12' },
@@ -111,6 +120,7 @@ export const GYM_DAYS: GymDay[] = [
     split: 'Core',
     emphasis: '+ Delts',
     duration: '~45 min',
+    photo: '/images/gym/day-6.jpg',
     exercises: [
       { name: 'Hanging Leg Raise', prescription: '3 x 12-15' },
       { name: 'Decline Crunch', prescription: '3 x 10-12' },
@@ -127,6 +137,8 @@ export const GYM_DAYS: GymDay[] = [
     rest: true,
     restLine: 'Zero sets. Zero reps. Recover hard.',
     duration: '',
+    photo: '/images/gym/day-7.jpg',
+    photoDim: 0.62,
     exercises: [],
   },
 ];
