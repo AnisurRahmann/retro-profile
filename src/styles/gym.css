@@ -1,0 +1,274 @@
+/* ============================================================
+   /gym — Gym split reels
+   Full-viewport vertical reel, one training day per panel
+   ============================================================ */
+
+.gym-page{
+  position:fixed;inset:0;z-index:1;
+  background:radial-gradient(ellipse at 50% 40%, #0d0d0d 0%, #000 70%);
+  overflow:hidden;
+  animation:fadein .35s ease;
+}
+/* faint grid on canvas — same treatment as the stage */
+.gym-page::before{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(var(--border-faint) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-faint) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity:.25;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  pointer-events:none;
+}
+
+/* --- Fixed chrome: back, path label, brand ------------------- */
+.gym-top{
+  position:absolute;top:0;left:0;right:0;z-index:30;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:calc(16px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-right, 0px)) 0 calc(20px + env(safe-area-inset-left, 0px));
+  pointer-events:none;
+}
+.gym-back{
+  pointer-events:auto;
+  display:inline-flex;align-items:center;gap:6px;
+  background:transparent;border:0;padding:6px 2px;cursor:pointer;
+  color:var(--text);
+  font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;
+  transition:color .2s;
+}
+.gym-back:hover{color:var(--accent)}
+.gym-path{
+  font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+  color:var(--muted);
+}
+.gym-top-right{display:flex;align-items:center;gap:10px}
+.gym-home{
+  pointer-events:auto;
+  display:grid;place-items:center;
+  width:32px;height:32px;
+  background:transparent;border:0;padding:0;cursor:pointer;
+  color:var(--muted);
+  transition:color .2s;
+}
+.gym-home:hover{color:var(--accent)}
+.gym-foot{
+  position:absolute;left:20px;bottom:calc(18px + env(safe-area-inset-bottom, 0px));z-index:30;
+  font-family:var(--mono);font-size:10px;letter-spacing:.15em;
+  color:var(--muted);text-transform:uppercase;
+  pointer-events:none;
+}
+.gym-foot span{color:var(--accent)}
+
+/* --- Reel track ---------------------------------------------- */
+.gym-track{
+  position:relative;height:100%;z-index:1;
+  overflow-y:scroll;
+  scroll-snap-type:y mandatory;
+  scrollbar-width:none;
+}
+.gym-track::-webkit-scrollbar{display:none}
+.gym-track:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
+
+.gym-panel{
+  position:relative;
+  height:100vh;
+  height:100dvh;
+  scroll-snap-align:start;
+  scroll-snap-stop:always;
+  overflow:hidden;
+  display:flex;
+}
+
+/* content column — narrow reel-like measure, centered on wide screens */
+.gym-col{
+  position:relative;
+  width:min(520px, 100%);
+  margin:0 auto;
+  padding:clamp(76px, 12vh, 120px) 24px clamp(76px, 11vh, 110px);
+  display:flex;flex-direction:column;justify-content:center;
+}
+.gym-col > *{position:relative;z-index:1}
+
+/* day number watermark — same serif-italic treatment as section numbering */
+.gym-mark{
+  position:absolute;right:-10px;bottom:-2%;z-index:0;
+  font-family:var(--serif);font-style:italic;
+  font-size:min(58vmin, 340px);line-height:.75;
+  color:var(--accent);opacity:.08;
+  pointer-events:none;user-select:none;
+}
+.gym-col > .gym-mark{position:absolute}
+
+/* --- Panel header --------------------------------------------- */
+.gym-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin-bottom:14px;
+}
+.gym-head .eyebrow{min-width:0}
+
+.gym-today{
+  flex-shrink:0;
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--accent);color:#0a0a0a;
+  font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  padding:5px 9px;
+}
+.gym-today .dot{width:5px;height:5px;border-radius:50%;background:#0a0a0a;animation:pulse 2s ease-in-out infinite}
+
+.gym-title{
+  font-family:var(--serif);font-weight:400;
+  font-size:clamp(40px, 9.5vmin, 64px);
+  line-height:.95;letter-spacing:-.02em;
+  margin-bottom:12px;
+}
+.gym-title em{font-style:italic;color:var(--accent)}
+
+.gym-meta{
+  display:flex;flex-wrap:wrap;gap:8px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.14em;
+  color:var(--muted);text-transform:uppercase;
+  margin-bottom:26px;
+}
+
+/* --- Exercise rows --------------------------------------------- */
+.gym-rows{list-style:none}
+.gym-row{
+  display:grid;grid-template-columns:1fr auto;gap:4px 16px;align-items:start;
+  padding:13px 0;
+  border-bottom:1px solid var(--border-faint);
+}
+.gym-ex-name{
+  display:flex;flex-direction:column;gap:3px;
+  font-family:var(--serif);font-size:17px;line-height:1.25;
+}
+.gym-ex-note{font-family:var(--sans);font-size:11px;line-height:1.45;color:var(--muted)}
+.gym-ex-sets{
+  font-family:var(--mono);font-size:12px;line-height:1.5;
+  color:var(--text);white-space:nowrap;
+}
+
+/* --- Rest day: sparse, centered, lots of negative space -------- */
+.gym-rest .gym-col{align-items:center;text-align:center}
+.gym-rest .gym-title{font-size:clamp(72px, 18vmin, 128px);margin-bottom:16px}
+.gym-restline{font-size:13px;line-height:1.7;color:var(--muted);max-width:300px}
+
+/* --- First-panel swipe hint ------------------------------------ */
+.gym-hint{
+  position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom, 0px));
+  transform:translateX(-50%);z-index:2;
+  display:flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+  color:var(--muted);text-transform:uppercase;
+  transition:opacity .4s ease;
+}
+.gym-hint svg{animation:nudge 1.8s ease-in-out infinite}
+.gym-hint.off{opacity:0;pointer-events:none}
+
+/* --- Right-edge dot nav ---------------------------------------- */
+.gym-rail{
+  position:absolute;right:calc(12px + env(safe-area-inset-right, 0px));
+  top:50%;transform:translateY(-50%);z-index:30;
+  display:flex;flex-direction:column;gap:6px;
+}
+.gym-rail button{
+  position:relative;width:22px;height:22px;padding:0;
+  border:0;background:transparent;cursor:pointer;
+  display:grid;place-items:center;
+}
+.gym-rail-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:transparent;border:1px solid var(--dim);
+  transition:all .25s;
+}
+.gym-rail button:hover .gym-rail-dot{border-color:var(--muted)}
+.gym-rail button[aria-current="true"] .gym-rail-dot{
+  background:var(--accent);border-color:var(--accent);
+  box-shadow:0 0 8px var(--accent-40);
+}
+.gym-rail-lbl{
+  position:absolute;right:calc(100% + 2px);top:0;
+  line-height:22px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+  color:var(--muted);text-transform:uppercase;
+  opacity:0;transform:translateX(4px);
+  transition:all .2s;pointer-events:none;
+}
+.gym-rail button:hover .gym-rail-lbl,
+.gym-rail button:focus-visible .gym-rail-lbl{opacity:1;transform:translateX(0)}
+
+/* --- Staggered reveal: once per panel, via IntersectionObserver - */
+.gym-panel .rv{opacity:0}
+.gym-panel.in .rv{
+  animation:fadeup .55s ease both;
+  animation-delay:calc(var(--i, 0) * 55ms);
+}
+
+/* =========================================================
+   HERO BUBBLE (entry point on the home reel)
+   Accent outline at rest; lifts and glows a touch on hover.
+   ========================================================= */
+.gym-bubble{
+  align-self:flex-start;
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+  color:var(--accent);text-decoration:none;
+  border:1px solid var(--accent);border-radius:999px;
+  background:var(--accent-10);
+  padding:10px 15px;
+  box-shadow:0 0 20px rgba(34,197,94,.15);
+  transition:background .2s ease, box-shadow .2s ease, transform .25s ease;
+  animation:gym-float 4.5s ease-in-out infinite;
+}
+.gym-bubble svg{flex-shrink:0}
+.gym-bubble:hover{
+  background:var(--accent-15);
+  transform:translateY(-3px);
+  box-shadow:0 0 0 3px var(--accent-15), 0 6px 28px rgba(34,197,94,.3);
+}
+@keyframes gym-float{
+  0%,100%{translate:0 0}
+  50%{translate:0 -5px}
+}
+
+/* =========================================================
+   FOCUS
+   ========================================================= */
+.gym-back:focus-visible,
+.gym-home:focus-visible,
+.gym-rail button:focus-visible,
+.gym-bubble:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* =========================================================
+   SMALL SCREENS
+   ========================================================= */
+@media (max-width:640px){
+  .gym-top{padding-left:16px;padding-right:16px}
+  .gym-home{width:40px;height:40px}
+  .gym-col{padding-left:20px;padding-right:20px;padding-bottom:calc(76px + env(safe-area-inset-bottom, 0px))}
+  .gym-foot{left:16px}
+  .gym-rail{right:calc(6px + env(safe-area-inset-right, 0px))}
+  .gym-title{font-size:clamp(36px, 11.5vw, 48px)}
+  .gym-row{padding:11px 0}
+  .gym-ex-name{font-size:16px}
+}
+
+/* short viewports: tighten so the longest day fits without scrolling */
+@media (max-height:640px){
+  .gym-col{padding-top:64px;padding-bottom:64px;justify-content:flex-start}
+  .gym-title{font-size:34px;margin-bottom:8px}
+  .gym-meta{margin-bottom:14px}
+  .gym-row{padding:8px 0}
+  .gym-ex-name{font-size:15px}
+}
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+@media (prefers-reduced-motion: reduce){
+  .gym-page{animation:none}
+  .gym-panel .rv{opacity:1;animation:none}
+  .gym-hint svg{animation:none}
+  .gym-today .dot{animation:none}
+  .gym-bubble{animation:none}
+  .gym-track{scroll-behavior:auto}
+}

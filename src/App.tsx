@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import PhoneFrame from './components/Reel';
 import { ReelCounter, ReelFoot, RailNav } from './components/Reel/ReelChrome';
 import { ActionRail, SocialsSheet } from './components/Reel/ActionRail';
@@ -14,6 +15,7 @@ import About from './components/reels/About';
 import Outro from './components/reels/Outro';
 import BlogCards from './components/blogs/BlogCards';
 import BlogViewer from './components/blogs/BlogViewer';
+import GymPage from './components/gym/GymPage';
 import { BLOGS } from './data/portfolio';
 import type { Blog } from './data/portfolio';
 
@@ -53,7 +55,7 @@ const REELS: ReelDef[] = [
   { id: 'outro', label: 'Outro', className: 'reel-outro', render: ({ onRestart }) => <Outro onRestart={onRestart} /> },
 ];
 
-function App() {
+function HomeReels() {
   const [active, setActive] = useState(0);
   const [blogViewerOpen, setBlogViewerOpen] = useState(false);
   const [blogIndex, setBlogIndex] = useState(0);
@@ -157,6 +159,17 @@ function App() {
 
       {toastMsg && <Toast msg={toastMsg} onDone={dismissToast} />}
     </PhoneFrame>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/gym" element={<GymPage />} />
+        <Route path="*" element={<HomeReels />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
