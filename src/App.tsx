@@ -18,6 +18,7 @@ import BlogViewer from './components/blogs/BlogViewer';
 import GymPage from './components/gym/GymPage';
 import { BLOGS } from './data/portfolio';
 import type { Blog } from './data/portfolio';
+import { usePageMeta, applyPageMeta, PAGES } from './lib/pageMeta';
 
 interface ReelDef {
   id: string;
@@ -61,6 +62,23 @@ function HomeReels() {
   const [blogIndex, setBlogIndex] = useState(0);
   const [socialsOpen, setSocialsOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  usePageMeta('home');
+
+  // Blog overlay gets its own tab title/description; restore home meta on close
+  useEffect(() => {
+    const blog = BLOGS[blogIndex];
+    if (blogViewerOpen && blog) {
+      applyPageMeta({
+        title: `${blog.title} | Shakil`,
+        description: blog.excerpt,
+        image: PAGES.home.image,
+        path: '/',
+      });
+    } else {
+      applyPageMeta(PAGES.home);
+    }
+  }, [blogViewerOpen, blogIndex]);
 
   const reelsRef = useRef<HTMLDivElement>(null);
   const reelRefs = useRef<(HTMLDivElement | null)[]>([]);

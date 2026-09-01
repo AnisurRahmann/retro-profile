@@ -6,6 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePageMeta } from '../../lib/pageMeta';
 import { GYM_DAYS } from '../../data/gym';
 import type { GymDay } from '../../data/gym';
 
@@ -199,18 +200,8 @@ const GymPage: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [active, jump, navigate]);
 
-  // Page title + meta description (restored on unmount)
-  useEffect(() => {
-    const prevTitle = document.title;
-    document.title = 'Shakil | Gym Split';
-    const meta = document.querySelector('meta[name="description"]');
-    const prevDesc = meta?.getAttribute('content') ?? null;
-    meta?.setAttribute('content', 'My weekly training split — seven days, one screen each.');
-    return () => {
-      document.title = prevTitle;
-      if (meta && prevDesc !== null) meta.setAttribute('content', prevDesc);
-    };
-  }, []);
+  // Page title, description and social preview for /gym
+  usePageMeta('gym');
 
   return (
     <div className="gym-page">

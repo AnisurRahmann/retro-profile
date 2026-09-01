@@ -27,6 +27,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "postbuild": "node scripts/inject-route-meta.js",
     "parse-content": "node scripts/parse-content.js",
     "prebuild": "node scripts/parse-content.js",
     "test": "react-scripts test",
