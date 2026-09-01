@@ -1,10 +1,10 @@
 /* ============================================================
    /gym — Gym split reels
-   Full-viewport vertical reel, one training day per panel
+   Vertical reel inside the phone frame, one training day per panel
    ============================================================ */
 
 .gym-page{
-  position:fixed;inset:0;z-index:1;
+  position:absolute;inset:0;z-index:1;
   background:radial-gradient(ellipse at 50% 40%, #0d0d0d 0%, #000 70%);
   overflow:hidden;
   animation:fadein .35s ease;
@@ -25,7 +25,8 @@
 .gym-top{
   position:absolute;top:0;left:0;right:0;z-index:30;
   display:flex;align-items:center;justify-content:space-between;
-  padding:calc(16px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-right, 0px)) 0 calc(20px + env(safe-area-inset-left, 0px));
+  /* clear the in-frame status bar (48px) */
+  padding:calc(52px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-right, 0px)) 0 calc(20px + env(safe-area-inset-left, 0px));
   pointer-events:none;
 }
 .gym-back{
@@ -71,8 +72,7 @@
 
 .gym-panel{
   position:relative;
-  height:100vh;
-  height:100dvh;
+  height:100%;
   scroll-snap-align:start;
   scroll-snap-stop:always;
   overflow:hidden;
@@ -237,6 +237,12 @@
 .gym-panel.in .rv{
   animation:fadeup .55s ease both;
   animation-delay:calc(var(--i, 0) * 55ms);
+}
+/* the watermark rests at 8% opacity, not fadeup's 1 */
+.gym-panel.in .gym-mark.rv{animation-name:fadeup-mark}
+@keyframes fadeup-mark{
+  from{opacity:0;transform:translateY(14px)}
+  to  {opacity:.08;transform:translateY(0)}
 }
 
 /* =========================================================

@@ -6,6 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PhoneFrame from '../Reel';
 import { usePageMeta } from '../../lib/pageMeta';
 import { GYM_DAYS } from '../../data/gym';
 import type { GymDay } from '../../data/gym';
@@ -204,7 +205,8 @@ const GymPage: React.FC = () => {
   usePageMeta('gym');
 
   return (
-    <div className="gym-page">
+    <PhoneFrame label="SHAKIL · GYM · v1">
+      <div className="gym-page">
       <header className="gym-top">
         <button className="gym-back" onClick={() => navigate('/')} aria-label="Back to home">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -263,7 +265,8 @@ const GymPage: React.FC = () => {
       </nav>
 
       <span className="gym-foot" aria-hidden="true">ar<span>.</span>shakil</span>
-    </div>
+      </div>
+    </PhoneFrame>
   );
 };
 
