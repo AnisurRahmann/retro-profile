@@ -26,7 +26,7 @@ export const PAGES = {
   },
   gym: {
     title: 'Shakil | Gym Split',
-    description: 'My weekly training split — seven days, one screen each. Upper, Lower, Push, Pull, Legs, Core and a rest day.',
+    description: 'My weekly training split — five heavy-lift days, two rest days, one screen each. Squat, Bench, Pull-Up, OHP and RDL lead the week.',
     image: `${SITE_URL}/og-gym.png`,
     path: '/gym',
   },

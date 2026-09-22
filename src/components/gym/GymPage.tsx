@@ -11,7 +11,8 @@ import { usePageMeta } from '../../lib/pageMeta';
 import { GYM_DAYS } from '../../data/gym';
 import type { GymDay } from '../../data/gym';
 
-// Date.getDay(): 0 = Sunday … 6 = Saturday — GYM_DAYS is Monday-first
+// Date.getDay(): 0 = Sunday … 6 = Saturday — GYM_DAYS is training-week
+// order, Friday (Day 1) first through Thursday (second rest) last
 const JS_DAY_IDS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
 const todayDayId = () => JS_DAY_IDS[new Date().getDay()];
@@ -67,7 +68,9 @@ const DayPanel: React.FC<DayPanelProps> = ({ day, idx, today, revealed, hint, pa
         />
       )}
       <div className="gym-col">
-        <span className="gym-mark rv" style={{ '--i': 0 } as React.CSSProperties} aria-hidden="true">{day.num}</span>
+        {day.num ? (
+          <span className="gym-mark rv" style={{ '--i': 0 } as React.CSSProperties} aria-hidden="true">{day.num}</span>
+        ) : null}
 
         {hint && (
           <div className={`gym-hint ${hint === 'off' ? 'off' : ''}`} aria-hidden={hint === 'off'}>
@@ -79,7 +82,7 @@ const DayPanel: React.FC<DayPanelProps> = ({ day, idx, today, revealed, hint, pa
         )}
 
         <div className="gym-head rv" style={{ '--i': 0 } as React.CSSProperties}>
-          <p className="eyebrow">Day {day.num} &middot; {day.weekday}</p>
+          <p className="eyebrow">{day.num ? <>Day {day.num} &middot; </> : null}{day.weekday}</p>
           {today && (
             <span className="gym-today"><span className="dot" />today</span>
           )}
@@ -90,7 +93,16 @@ const DayPanel: React.FC<DayPanelProps> = ({ day, idx, today, revealed, hint, pa
         </h2>
 
         {day.rest ? (
-          <p className="gym-restline rv" style={{ '--i': 2 } as React.CSSProperties}>{day.restLine}</p>
+          <>
+            <p className="gym-restline rv" style={{ '--i': 2 } as React.CSSProperties}>{day.restLine}</p>
+            {day.rules && (
+              <div className="gym-rules rv" style={{ '--i': 3 } as React.CSSProperties}>
+                {day.rules.map(rule => (
+                  <span key={rule}>{rule}</span>
+                ))}
+              </div>
+            )}
+          </>
         ) : (
           <>
             <p className="gym-meta rv" style={{ '--i': 2 } as React.CSSProperties}>
@@ -205,7 +217,7 @@ const GymPage: React.FC = () => {
   usePageMeta('gym');
 
   return (
-    <PhoneFrame label="SHAKIL · GYM · v1">
+      <PhoneFrame label="SHAKIL · GYM · v2">
       <div className="gym-page">
       <header className="gym-top">
         <button className="gym-back" onClick={() => navigate('/')} aria-label="Back to home">
