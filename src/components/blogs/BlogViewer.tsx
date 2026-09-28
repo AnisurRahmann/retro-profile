@@ -10,6 +10,9 @@ const BlogViewer: React.FC<BlogViewerProps> = ({ blog, onClose }) => {
   const trackRef = useRef<HTMLDivElement>(null);
   const chRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [active, setActive] = useState(0);
+  // Chapters whose reveal has played. Append-only so scrolling back up
+  // never replays the stagger (replaying is what flickers).
+  const [seen, setSeen] = useState<Set<number>>(() => new Set([0]));
   const startY = useRef<number | null>(null);
 
   const jump = useCallback((i: number) => {
@@ -48,7 +51,9 @@ const BlogViewer: React.FC<BlogViewerProps> = ({ blog, onClose }) => {
       (entries) => {
         entries.forEach(e => {
           if (e.isIntersecting && e.intersectionRatio > 0.6) {
-            setActive(Number((e.target as HTMLElement).dataset.idx));
+            const i = Number((e.target as HTMLElement).dataset.idx);
+            setActive(i);
+            setSeen(prev => (prev.has(i) ? prev : new Set(prev).add(i)));
           }
         });
       },
@@ -103,7 +108,7 @@ const BlogViewer: React.FC<BlogViewerProps> = ({ blog, onClose }) => {
             key={i}
             ref={el => { chRefs.current[i] = el as HTMLDivElement; }}
             data-idx={i}
-            className={`bv-chapter bv-${ch.kind} ${active === i ? 'active' : ''}`}
+            className={`bv-chapter bv-${ch.kind} ${active === i ? 'active' : ''} ${seen.has(i) ? 'in' : ''}`}
           >
             {ch.kind === 'title' && (
               <>

@@ -234,10 +234,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   box-shadow:0 0 0 3px var(--accent-10);animation:pulse 2s ease-in-out infinite;
 }
 
-/* Hero blocks: animate in. opacity:1 by default; animation plays once. */
+/* Hero blocks: animate in. opacity:1 by default; animation plays once.
+   `both` holds the from-state during each stagger delay — without it the
+   element flashes fully visible, then jumps to 0 and fades in. */
 .reel-hero .block{
   opacity:1;
-  animation: fadeup .7s ease;
+  animation: fadeup .7s ease both;
 }
 .reel-hero .b1{animation-delay:.10s}
 .reel-hero .b2{animation-delay:.26s}
@@ -497,22 +499,34 @@ body[data-transition="fade"] .reel{
   0%,100%{transform:translateY(0)}
   50%{transform:translateY(-3px)}
 }
-@keyframes countup{from{filter:blur(6px);opacity:0}to{filter:blur(0);opacity:1}}
+/* opacity/transform only — animating filter:blur() repaints every frame
+   and shimmers on large serif numerals */
+@keyframes countup{
+  from{opacity:0;transform:translateY(10px)}
+  to  {opacity:1;transform:translateY(0)}
+}
 
-/* Stat counters + staggered fade-ins */
-.reel.active .animate-stat{animation:countup .7s ease}
-.reel.active .animate-stat:nth-child(1){animation-delay:.1s}
-.reel.active .animate-stat:nth-child(2){animation-delay:.25s}
-.reel.active .animate-stat:nth-child(3){animation-delay:.4s}
-.reel.active .animate-stat:nth-child(4){animation-delay:.55s}
+/* Stat counters + staggered fade-ins.
+   Gated on `.in`, which is append-only (set once per reel, never removed).
+   Gating on `.active` replayed the whole stagger every time the
+   IntersectionObserver flipped the class mid-scroll — the main flicker.
+   Unseen content rests at opacity:0 so an incoming reel doesn't flash
+   before its reveal; `both` holds the from-state through each delay. */
+.reel .animate-stat,
+.reel .animate-in{opacity:0}
+.reel.in .animate-stat{animation:countup .7s ease both}
+.reel.in .animate-stat:nth-child(1){animation-delay:.1s}
+.reel.in .animate-stat:nth-child(2){animation-delay:.25s}
+.reel.in .animate-stat:nth-child(3){animation-delay:.4s}
+.reel.in .animate-stat:nth-child(4){animation-delay:.55s}
 
-.reel.active .animate-in{animation:fadeup .6s ease}
-.reel.active .animate-in.d1{animation-delay:.08s}
-.reel.active .animate-in.d2{animation-delay:.18s}
-.reel.active .animate-in.d3{animation-delay:.3s}
-.reel.active .animate-in.d4{animation-delay:.42s}
-.reel.active .animate-in.d5{animation-delay:.54s}
-.reel.active .animate-in.d6{animation-delay:.66s}
+.reel.in .animate-in{animation:fadeup .6s ease both}
+.reel.in .animate-in.d1{animation-delay:.08s}
+.reel.in .animate-in.d2{animation-delay:.18s}
+.reel.in .animate-in.d3{animation-delay:.3s}
+.reel.in .animate-in.d4{animation-delay:.42s}
+.reel.in .animate-in.d5{animation-delay:.54s}
+.reel.in .animate-in.d6{animation-delay:.66s}
 
 /* =========================================================
    ACTION RAIL (Instagram-style, right side — 3 icons only)
@@ -820,26 +834,40 @@ body[data-variant="terminal"] .sheet-lbl{font-family:var(--mono);font-size:14px}
 .bv-end{justify-content:center;align-items:flex-start}
 .bv-ch-ctas{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
 
-/* Active chapter animations */
-.bv-chapter.active .bv-ch-eyebrow,
-.bv-chapter.active .bv-ch-title,
-.bv-chapter.active .bv-ch-sub,
-.bv-chapter.active .bv-ch-num,
-.bv-chapter.active .bv-ch-head,
-.bv-chapter.active .bv-ch-body,
-.bv-chapter.active .bv-ch-mark,
-.bv-chapter.active .bv-ch-quote,
-.bv-chapter.active .bv-ch-by,
-.bv-chapter.active .bv-ch-ctas{
+/* Chapter reveal: gated on `.in` (append-only, set once per chapter) so
+   scrolling back up never replays the stagger. Unseen chapters rest at
+   opacity:0; `both` holds the from-state through each delay. */
+.bv-chapter .bv-ch-eyebrow,
+.bv-chapter .bv-ch-title,
+.bv-chapter .bv-ch-sub,
+.bv-chapter .bv-ch-num,
+.bv-chapter .bv-ch-head,
+.bv-chapter .bv-ch-body,
+.bv-chapter .bv-ch-mark,
+.bv-chapter .bv-ch-quote,
+.bv-chapter .bv-ch-by,
+.bv-chapter .bv-ch-ctas{
+  opacity:0;
+}
+.bv-chapter.in .bv-ch-eyebrow,
+.bv-chapter.in .bv-ch-title,
+.bv-chapter.in .bv-ch-sub,
+.bv-chapter.in .bv-ch-num,
+.bv-chapter.in .bv-ch-head,
+.bv-chapter.in .bv-ch-body,
+.bv-chapter.in .bv-ch-mark,
+.bv-chapter.in .bv-ch-quote,
+.bv-chapter.in .bv-ch-by,
+.bv-chapter.in .bv-ch-ctas{
   animation:fadeup .6s ease both;
 }
-.bv-chapter.active .bv-ch-title,
-.bv-chapter.active .bv-ch-head,
-.bv-chapter.active .bv-ch-quote{animation-delay:.1s}
-.bv-chapter.active .bv-ch-sub,
-.bv-chapter.active .bv-ch-body,
-.bv-chapter.active .bv-ch-by{animation-delay:.22s}
-.bv-chapter.active .bv-ch-ctas{animation-delay:.34s}
+.bv-chapter.in .bv-ch-title,
+.bv-chapter.in .bv-ch-head,
+.bv-chapter.in .bv-ch-quote{animation-delay:.1s}
+.bv-chapter.in .bv-ch-sub,
+.bv-chapter.in .bv-ch-body,
+.bv-chapter.in .bv-ch-by{animation-delay:.22s}
+.bv-chapter.in .bv-ch-ctas{animation-delay:.34s}
 
 /* Terminal variant overrides for blog viewer */
 body[data-variant="terminal"] .blog-title,
@@ -887,20 +915,20 @@ body[data-variant="terminal"] .bv-glyph{font-size:180px}
    ========================================================= */
 @media (prefers-reduced-motion: reduce){
   .reel-hero .block{animation:none;opacity:1}
-  .reel.active .animate-stat,
-  .reel.active .animate-in{animation:none}
+  .reel.in .animate-stat,
+  .reel.in .animate-in{animation:none;opacity:1}
   .ring,.dot,.now-badge .dot{animation:none;opacity:1}
   .reel-hint svg{animation:none}
   .toast{animation:none;opacity:1}
   .blog-viewer{animation:none}
-  .bv-chapter.active .bv-ch-eyebrow,
-  .bv-chapter.active .bv-ch-title,
-  .bv-chapter.active .bv-ch-sub,
-  .bv-chapter.active .bv-ch-num,
-  .bv-chapter.active .bv-ch-head,
-  .bv-chapter.active .bv-ch-body,
-  .bv-chapter.active .bv-ch-mark,
-  .bv-chapter.active .bv-ch-quote,
-  .bv-chapter.active .bv-ch-by,
-  .bv-chapter.active .bv-ch-ctas{animation:none}
+  .bv-chapter.in .bv-ch-eyebrow,
+  .bv-chapter.in .bv-ch-title,
+  .bv-chapter.in .bv-ch-sub,
+  .bv-chapter.in .bv-ch-num,
+  .bv-chapter.in .bv-ch-head,
+  .bv-chapter.in .bv-ch-body,
+  .bv-chapter.in .bv-ch-mark,
+  .bv-chapter.in .bv-ch-quote,
+  .bv-chapter.in .bv-ch-by,
+  .bv-chapter.in .bv-ch-ctas{animation:none;opacity:1}
 }

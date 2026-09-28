@@ -58,6 +58,10 @@ const REELS: ReelDef[] = [
 
 function HomeReels() {
   const [active, setActive] = useState(0);
+  // Reels whose reveal animation has played. Append-only: the entrance
+  // animation must never replay when `active` flips back and forth while
+  // scrolling between snap panels — that replay is what flickers.
+  const [seen, setSeen] = useState<Set<number>>(() => new Set([0]));
   const [blogViewerOpen, setBlogViewerOpen] = useState(false);
   const [blogIndex, setBlogIndex] = useState(0);
   const [socialsOpen, setSocialsOpen] = useState(false);
@@ -91,7 +95,9 @@ function HomeReels() {
       (entries) => {
         entries.forEach(e => {
           if (e.isIntersecting && e.intersectionRatio > 0.6) {
-            setActive(Number((e.target as HTMLElement).dataset.idx));
+            const i = Number((e.target as HTMLElement).dataset.idx);
+            setActive(i);
+            setSeen(prev => (prev.has(i) ? prev : new Set(prev).add(i)));
           }
         });
       },
@@ -148,7 +154,7 @@ function HomeReels() {
             key={reel.id}
             ref={el => { reelRefs.current[i] = el; }}
             data-idx={i}
-            className={`reel ${reel.className} ${active === i ? 'active' : ''}`}
+            className={`reel ${reel.className} ${active === i ? 'active' : ''} ${seen.has(i) ? 'in' : ''}`}
           >
             <ReelCounter index={i} total={REELS.length} label={reel.label} />
             {reel.render(renderProps)}
