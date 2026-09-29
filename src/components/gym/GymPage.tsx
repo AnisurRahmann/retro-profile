@@ -217,7 +217,7 @@ const GymPage: React.FC = () => {
   usePageMeta('gym');
 
   return (
-      <PhoneFrame label="SHAKIL · GYM · v2">
+      <PhoneFrame label="SHAKIL · GYM · v3">
       <div className="gym-page">
       <header className="gym-top">
         <button className="gym-back" onClick={() => navigate('/')} aria-label="Back to home">
