@@ -42,7 +42,7 @@ export const GYM_DAYS: GymDay[] = [
     num: '01',
     split: 'Squat',
     emphasis: '(Heavy)',
-    duration: '~70 min',
+    duration: '~85-90 min',
     photo: '/images/gym/day-4.jpg',
     exercises: [
       { name: 'Barbell Back Squat', prescription: '3 x 5-7' },
@@ -51,6 +51,9 @@ export const GYM_DAYS: GymDay[] = [
       { name: 'Lat Pulldown', prescription: '3 x 8-10' },
       { name: 'DB Lateral Raise', prescription: '3 x 12-15' },
       { name: 'Rope Pushdown', prescription: '3 x 10-12' },
+      { name: 'Decline Crunch', prescription: '3 x 10-12', note: 'first cut if the session runs long' },
+      { name: 'Cable Crunch', prescription: '3 x 12-15' },
+      { name: 'Hanging Knee Raise', prescription: '3 x 15' },
       { name: 'Incline Walk', prescription: '10 min' },
     ],
   },

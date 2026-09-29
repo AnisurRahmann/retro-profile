@@ -53,7 +53,7 @@ const DayPanel: React.FC<DayPanelProps> = ({ day, idx, today, revealed, hint, pa
       ref={panelRef}
       data-idx={idx}
       id={day.id}
-      className={`gym-panel ${day.rest ? 'gym-rest' : ''} ${revealed ? 'in' : ''}`}
+      className={`gym-panel ${day.rest ? 'gym-rest' : ''} ${!day.rest && day.exercises.length >= 10 ? 'gym-dense' : ''} ${revealed ? 'in' : ''}`}
       aria-labelledby={`${day.id}-title`}
       aria-label={label}
     >
@@ -217,7 +217,7 @@ const GymPage: React.FC = () => {
   usePageMeta('gym');
 
   return (
-      <PhoneFrame label="SHAKIL · GYM · v3">
+      <PhoneFrame label="SHAKIL · GYM · v4">
       <div className="gym-page">
       <header className="gym-top">
         <button className="gym-back" onClick={() => navigate('/')} aria-label="Back to home">

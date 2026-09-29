@@ -178,6 +178,21 @@
   color:var(--text);white-space:nowrap;
 }
 
+/* Long days (10 exercises, e.g. squat day + core block): pull the
+   spacing in so every row still fits the fixed-height reel screen */
+.gym-dense .gym-head{margin-bottom:12px}
+.gym-dense .gym-title{margin-bottom:10px}
+.gym-dense .gym-meta{margin-bottom:18px}
+.gym-dense .gym-row{padding:11px 0}
+@media (max-height:860px){
+  .gym-dense .gym-col{padding-top:72px;padding-bottom:72px}
+  .gym-dense .gym-head{margin-bottom:8px}
+  .gym-dense .gym-title{font-size:40px;margin-bottom:6px}
+  .gym-dense .gym-meta{margin-bottom:14px}
+  .gym-dense .gym-row{padding:8px 0}
+  .gym-dense .gym-ex-name{font-size:15px}
+}
+
 /* --- Rest day: sparse, centered, lots of negative space -------- */
 .gym-rest .gym-col{align-items:center;text-align:center}
 .gym-rest .gym-title{font-size:clamp(72px, 18vmin, 128px);margin-bottom:16px}
@@ -303,12 +318,14 @@
 }
 
 /* short viewports: tighten so the longest day fits without scrolling */
-@media (max-height:640px){
+@media (max-height:720px){
   .gym-col{padding-top:64px;padding-bottom:64px;justify-content:flex-start}
   .gym-title{font-size:34px;margin-bottom:8px}
   .gym-meta{margin-bottom:14px}
   .gym-row{padding:8px 0}
   .gym-ex-name{font-size:15px}
+  .gym-dense .gym-row{padding:7px 0}
+  .gym-dense .gym-ex-note{font-size:10px}
 }
 
 /* =========================================================
