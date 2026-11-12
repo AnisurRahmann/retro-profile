@@ -1,0 +1,13 @@
+.next
+build
+node_modules
+design-system
+assets
+content
+pnpm-lock.yaml
+.shots
+test-results
+playwright-report
+CHANGELOG.md
+PRODUCT.md
+design-system.md

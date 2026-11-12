@@ -1,54 +1,38 @@
 {
-  "name": "personal-website",
-  "version": "0.2.0",
+  "name": "arshakil-drawing-set",
+  "version": "1.0.0",
   "private": true,
-  "dependencies": {
-    "@heroicons/react": "^2.1.5",
-    "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^13.5.0",
-    "@types/jest": "^27.5.2",
-    "@types/marked": "^5.0.2",
-    "@types/node": "^16.18.119",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "autoprefixer": "^10.4.20",
-    "gray-matter": "^4.0.3",
-    "marked": "^17.0.1",
-    "postcss": "^8.4.49",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^7.11.0",
-    "react-scripts": "5.0.1",
-    "tailwindcss": "^3.4.15",
-    "typescript": "^4.9.5",
-    "web-vitals": "^2.1.4"
-  },
+  "type": "module",
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "postbuild": "node scripts/inject-route-meta.js",
-    "parse-content": "node scripts/parse-content.js",
-    "prebuild": "node scripts/parse-content.js",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "shots": "node --experimental-strip-types scripts/shots.ts"
   },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+  "dependencies": {
+    "clsx": "^2",
+    "next": "16.4.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "^4"
   },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-  }
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@tailwindcss/turbopack": "4.3.3",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.6",
+    "prettier": "^3",
+    "tailwindcss": "4.3.3",
+    "typescript": "^5",
+    "vitest": "^5"
+  },
+  "packageManager": "pnpm@10.9.0"
 }
