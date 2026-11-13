@@ -110,7 +110,7 @@ export function Hero() {
 
         <div className="hero-paths mt-5 grid gap-3 md:grid-cols-3">
           {h.paths.map((path) => (
-            <a key={path.href} href={path.href} className="btn justify-between">
+            <a key={path.href} href={path.href} className="btn">
               <span>{path.label}</span>
               <span className="plain">{path.plain}</span>
             </a>

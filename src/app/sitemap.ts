@@ -10,6 +10,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/`, priority: 1 },
     { url: `${base}/gym/`, priority: 0.7 },
     { url: `${base}/notes/`, priority: 0.6 },
+    { url: `${base}/fb-privacy/`, priority: 0.2 },
+    { url: `${base}/fb-data-deletion/`, priority: 0.2 },
     ...allNotes().map((note) => ({ url: `${base}/notes/${note.slug}/`, priority: 0.5 })),
   ];
 }

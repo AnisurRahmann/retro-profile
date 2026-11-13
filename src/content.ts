@@ -39,7 +39,7 @@ export const profile = profileSchema.parse({
   location: "Sylhet, Bangladesh",
   hours: "Works overlapping US East Coast hours with distributed teams.",
   credentials: ["Toptal top 3% network", "B.E. Computer Science, Metropolitan University, Sylhet, 2021"],
-  site: "https://arshakil.com",
+  site: "https://www.arshakil.com",
   links: {
     email: { label: "pshakilwizard@gmail.com", href: "mailto:pshakilwizard@gmail.com" },
     calendar: { label: "cal.com/shakil-nee/30min", href: "https://cal.com/shakil-nee/30min" },
@@ -1118,6 +1118,7 @@ export const ui = {
     link: "Coach's Notes",
     linkPlain: "writing",
   },
+  legal: { updated: "Last updated", back: "arshakil.com" },
   notFound: {
     title: "No lift",
     plain: "page not found",

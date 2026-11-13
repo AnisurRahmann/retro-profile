@@ -969,6 +969,17 @@ a.topbar-cta:hover {
   font-weight: 600;
 }
 
+.hero-paths .btn {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+  padding-block: 0.625rem;
+}
+
+.hero-paths .btn .plain {
+  margin-left: 0;
+}
+
 .hero-bar {
   --sag: 12;
   --pt: 1.5rem; /* 24px: the plates are links, keep them a fair touch target */
@@ -1883,18 +1894,48 @@ details > summary {
   padding-left: 1rem;
 }
 
+/* ── Legal pages (rendered markdown) ──────────────────────── */
+
+.legal {
+  max-width: 62ch;
+}
+
+.legal h2 {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 2rem;
+  line-height: 0.95;
+  text-transform: uppercase;
+  margin-top: 2.25rem;
+}
+
+.legal p,
+.legal ul,
+.legal ol {
+  margin-top: 0.75rem;
+}
+
+.legal ul {
+  list-style: square;
+  padding-left: 1.25rem;
+}
+
+.legal ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+
+.legal li + li {
+  margin-top: 0.375rem;
+}
+
+.legal a {
+  text-decoration: underline;
+}
+
 /* ── Print: a clean log, one flight per page, register instead of the rack ── */
 
 @media print {
-  :root,
-  [data-theme="dark"] {
-    --chalk: #fff;
-    --chalk-2: #fff;
-    --iron: #000;
-    --steel: #444;
-    --knurl: #bbb;
-    color-scheme: light;
-  }
   @page {
     margin: 14mm;
   }
@@ -1960,4 +2001,17 @@ details > summary {
   }
 }
 
+}
+
+/* print palette: unlayered so it beats the theme tokens above */
+@media print {
+  :root,
+  [data-theme="dark"] {
+    --chalk: #fff;
+    --chalk-2: #fff;
+    --iron: #000;
+    --steel: #444;
+    --knurl: #bbb;
+    color-scheme: light;
+  }
 }

@@ -307,6 +307,18 @@ test.describe("pages", () => {
     await expect(page.locator("h1")).toHaveText(/How I cut \$900K\/year from Plaid costs/i);
   });
 
+  test("Meta app review pages survive the rebuild, readable without JS", async ({ browser }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    await page.goto("/fb-privacy");
+    await expect(page.locator("h1")).toHaveText(/Privacy Policy/i);
+    await expect(page.locator("main")).toContainText("Build Box");
+    await page.goto("/fb-data-deletion");
+    await expect(page.locator("h1")).toHaveText(/Data Deletion/i);
+    await expect(page.locator('main a[href="/fb-privacy"]')).toHaveCount(1);
+    await context.close();
+  });
+
   test("no emoji and no unfilled placeholders in the rendered pages", async ({ page }) => {
     for (const path of ["/", "/gym/", "/notes/"]) {
       await page.goto(path);
