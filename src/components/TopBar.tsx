@@ -9,8 +9,11 @@ export function TopBar({ base = "" }: { base?: string }) {
         {ui.skipToContent}
       </a>
       <div className="topbar-inner">
-        <a href={base || "#platform"} className="topbar-cell topbar-mono" aria-label={`${profile.name}, ${t.home}`}>
+        <a href={base || "#platform"} className="topbar-cell topbar-mono" >
           {profile.monogram}
+          <span className="sr-only">
+            , {profile.name}, {t.home}
+          </span>
         </a>
         <nav className="topbar-nav" aria-label={t.navLabel}>
           {flights.map((flight) => (
@@ -34,13 +37,14 @@ export function TopBar({ base = "" }: { base?: string }) {
           </nav>
         </details>
         <span className="topbar-spacer" />
-        <button type="button" className="topbar-cell lights-toggle" data-lights-toggle aria-label={t.lightsAria}>
+        <button type="button" className="topbar-cell lights-toggle" data-lights-toggle>
           <span className="when-light">
             {t.lightsOn} <span className="plain wide-only">{t.lightsOnPlain}</span>
           </span>
           <span className="when-dark">
             {t.lightsOut} <span className="plain wide-only">{t.lightsOutPlain}</span>
           </span>
+          <span className="sr-only">. {t.lightsAria}</span>
         </button>
         <a href={profile.links.calendar.href} className="topbar-cell topbar-cta">
           <span className="wide-only">{t.cta}&nbsp;·&nbsp;</span>

@@ -1,12 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, Big_Shoulders, IBM_Plex_Mono } from "next/font/google";
+import { Barlow, IBM_Plex_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { flights, meta, profile } from "@/content";
 import { Runtime } from "@/components/Runtime";
 import { bootScript } from "@/lib/boot";
 import "./globals.css";
 
-// "Big Shoulders Display" now ships as the Big Shoulders family with an optical-size axis.
-const big = Big_Shoulders({ subsets: ["latin"], weight: "variable", axes: ["opsz"], variable: "--font-big", display: "swap", adjustFontFallback: false });
+// Big Shoulders Display 900: Google now ships it as "Big Shoulders" with an optical-size axis.
+// The file is the latin instance pinned at opsz 72, wght 900 (14 kB instead of the 58 kB variable font),
+// fetched once from the Google Fonts CSS2 API and self-hosted. Licence: SIL OFL 1.1.
+const big = localFont({
+  src: "../assets/big-shoulders-display-900.woff2",
+  weight: "900",
+  variable: "--font-big",
+  display: "swap",
+  adjustFontFallback: false,
+});
 const barlow = Barlow({ subsets: ["latin"], weight: ["400", "600"], variable: "--font-barlow", display: "swap" });
 const plex = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "600"], variable: "--font-plex", display: "swap" });
 

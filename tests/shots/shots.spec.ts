@@ -32,3 +32,38 @@ for (const width of widths) {
     }
   }
 }
+
+// Game states: Load the Bar with plates on, Your Call answered.
+for (const width of [360, 1440]) {
+  for (const theme of themes) {
+    test(`games ${width} ${theme}`, async ({ browser }) => {
+      const context = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: "reduce" });
+      await context.addInitScript((value) => {
+        try {
+          localStorage.setItem("lights", value);
+        } catch {
+          // ignore
+        }
+      }, theme);
+      const page = await context.newPage();
+      await page.goto("/");
+      await page.evaluate(() => document.fonts.ready);
+      await page.locator("#h-load-the-bar").scrollIntoViewIfNeeded();
+      await page.locator('[data-ltb="live"]').waitFor();
+      for (const id of ["P-11", "P-12", "P-13", "P-14", "P-23", "P-01", "P-09", "P-26", "P-05"]) {
+        await page.locator(`[data-rack] [data-plate-id="${id}"]`).click();
+      }
+      await page.locator("#h-load-the-bar").scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `.shots/game-bar-${width}-${theme}.png` });
+      if (width === 360) {
+        await page.locator('[data-peg="tooling"]').scrollIntoViewIfNeeded();
+        await page.screenshot({ path: `.shots/game-bar-rack-${width}-${theme}.png` });
+      }
+      const first = page.locator("[data-yc]").first();
+      await first.locator('input[type="radio"]').nth(1).check();
+      await first.scrollIntoViewIfNeeded();
+      await first.screenshot({ path: `.shots/game-call-${width}-${theme}.png` });
+      await context.close();
+    });
+  }
+}

@@ -20,9 +20,12 @@ export function Hero() {
         data-slide=""
         data-p={index}
         style={{ "--i": index } as CSSProperties}
-        aria-label={`${h.prLabel} ${index + 1}: ${metric.lift}, ${metric.value} ${metric.short}`}
       >
-        <span aria-hidden="true">{metric.plate}</span>
+        <span className="sr-only">
+          {h.prLabel} {index + 1}: {metric.lift},{" "}
+        </span>
+        <span>{metric.plate}</span>
+        <span className="sr-only"> {metric.short}</span>
       </a>
     );
   };

@@ -17,10 +17,7 @@ export default function NotesIndex() {
     <>
       <TopBar base="/" />
       <main id="main" className="wrap pb-16 pt-[calc(var(--bar-h)+2rem)]">
-        <h1 className="sr-only">
-          {ui.notes.title}: {ui.notes.plain}
-        </h1>
-        <ScoreRow sub name={ui.notes.title} plain={ui.notes.plain} count={`${notes.length} ${ui.notes.entries}`} headingId="h-notes" />
+        <ScoreRow sub level={1} name={ui.notes.title} plain={ui.notes.plain} count={`${notes.length} ${ui.notes.entries}`} headingId="h-notes" />
         <ol className="mt-6 border-2 border-iron">
           {notes.map((note) => (
             <li key={note.slug} className="border-b-2 border-iron last:border-b-0">

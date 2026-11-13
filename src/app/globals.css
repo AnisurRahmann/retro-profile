@@ -971,10 +971,10 @@ a.topbar-cta:hover {
 
 .hero-bar {
   --sag: 12;
-  --pt: 1.125rem;
+  --pt: 1.5rem; /* 24px: the plates are links, keep them a fair touch target */
   --ph: 5.5rem;
   --gap: 3px;
-  padding-inline: 0.75rem;
+  padding-inline: 0.5rem;
 }
 
 .hero-bar .eplate {
@@ -986,7 +986,7 @@ a.topbar-cta:hover {
   overflow: hidden;
 }
 
-.hero-bar .eplate span {
+.hero-bar .eplate span:not(.sr-only) {
   writing-mode: vertical-rl;
   font-family: var(--font-mono);
   font-size: 0.625rem;
@@ -1002,7 +1002,7 @@ a.topbar-cta:hover {
 }
 
 .hero-bar .sleeve {
-  padding-inline-end: 1.25rem;
+  padding-inline-end: 0.75rem;
 }
 
 @media (min-width: 48rem) {
@@ -1012,7 +1012,7 @@ a.topbar-cta:hover {
     --gap: 5px;
     padding-inline: 2.5rem;
   }
-  .hero-bar .eplate span {
+  .hero-bar .eplate span:not(.sr-only) {
     font-size: 0.8125rem;
   }
   .hero-bar .sleeve {
@@ -1583,6 +1583,29 @@ details > summary {
   }
 }
 
+.ltb-game {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ltb-side {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 64rem) {
+  .ltb-game {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .ltb-side {
+    position: sticky;
+    top: calc(var(--bar-h) + 1rem);
+  }
+}
+
 /* small screens: bar on top, rack below, detail card pinned to the bottom so a tap shows its result */
 @media (max-width: 63.99rem) {
   .ltb-side {
@@ -1595,7 +1618,7 @@ details > summary {
     position: sticky;
     bottom: 0;
     z-index: 10;
-    max-height: 55vh;
+    max-height: 40vh;
     overflow-y: auto;
     overscroll-behavior: contain;
   }

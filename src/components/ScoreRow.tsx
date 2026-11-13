@@ -8,6 +8,7 @@ export function ScoreRow({
   count,
   headingId,
   sub = false,
+  level,
 }: {
   n?: string;
   name: string;
@@ -15,8 +16,10 @@ export function ScoreRow({
   count: string;
   headingId: string;
   sub?: boolean;
+  /** heading level, defaults to h2 for a flight and h3 for a sub row */
+  level?: 1 | 2 | 3;
 }) {
-  const Heading = sub ? "h3" : "h2";
+  const Heading = `h${level ?? (sub ? 3 : 2)}` as "h1" | "h2" | "h3";
   return (
     <header className={sub ? "scorerow scorerow-sub" : "scorerow"}>
       <span className="scorerow-n">{n ? `${ui.flight} ${n}` : plain}</span>

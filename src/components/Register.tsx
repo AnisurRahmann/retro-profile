@@ -134,13 +134,13 @@ export function Register({
                 <span className="display block text-2xl">{row.name}</span>
                 <span className="mt-1 block">{row.oneLiner}</span>
                 {row.link ? (
-                  <a href={row.link.href} className="mono mt-1 block break-all">
+                  <a href={row.link.href} className="mono mt-1 inline-block break-all py-1">
                     {row.link.label}
                   </a>
                 ) : null}
                 {row.detail || row.install || row.connectsTo.length > 0 ? (
                   <details className="mt-1" data-print-open>
-                    <summary className="label steel">{copy.detail}</summary>
+                    <summary className="label steel py-1.5">{copy.detail}</summary>
                     {row.detail ? <p className="steel mt-1">{row.detail}</p> : null}
                     {row.install ? (
                       <p className="mono mt-1">
@@ -161,7 +161,7 @@ export function Register({
                         {row.connectsTo.map((id, index) => (
                           <span key={id}>
                             {index > 0 ? ", " : ""}
-                            <a href={`#reg-${id}`}>
+                            <a href={`#reg-${id}`} className="inline-block py-1">
                               {id} {names.get(id)}
                             </a>
                           </span>

@@ -34,7 +34,7 @@ export default async function NotePage({ params }: Params) {
       <main id="main" className="wrap pb-16 pt-[calc(var(--bar-h)+2rem)]">
         <article className="note-body mx-auto max-w-3xl">
           <p className="label flex flex-wrap justify-between gap-2 border-b-2 border-iron pb-2">
-            <a href="/notes/" className="font-semibold">
+            <a href="/notes/" className="inline-flex min-h-9 items-center font-semibold">
               ← {ui.notes.back}
             </a>
             <span className="steel">

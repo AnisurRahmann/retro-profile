@@ -85,7 +85,7 @@ export function LoadTheBarView({
   };
 
   return (
-    <div className="ltb-game mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:items-start">
+    <div className="ltb-game mt-6">
       {/* plate rack */}
       <div className="panel" data-rack>
         <p className="label flex flex-wrap justify-between gap-2 border-b-2 border-iron p-3">
@@ -116,7 +116,6 @@ export function LoadTheBarView({
                         type="button"
                         {...plateAttrs(plate)}
                         aria-pressed={isLoaded}
-                        aria-label={`${plate.id} ${plate.name}. ${plate.busName}. ${plate.statusCall}, ${plate.statusPlain}.`}
                         data-selected={selected === id ? "" : undefined}
                         onClick={() => handlers.onPlate(id)}
                         onPointerDown={(event) => handlers.onPointerDown(event, id)}
@@ -125,14 +124,19 @@ export function LoadTheBarView({
                         onPointerCancel={handlers.onPointerCancel}
                       >
                         <PlateFaceContent plate={plate} />
+                        <span className="sr-only">
+                          : {plate.name}. {plate.busName}. {plate.statusCall}, {plate.statusPlain}.
+                        </span>
                       </button>
                     ) : (
                       <a
                         href={`#reg-${plate.id}`}
                         {...plateAttrs(plate)}
-                        aria-label={`${plate.id} ${plate.name}. ${plate.busName}. ${plate.statusCall}, ${plate.statusPlain}.`}
                       >
                         <PlateFaceContent plate={plate} />
+                        <span className="sr-only">
+                          : {plate.name}. {plate.busName}. {plate.statusCall}, {plate.statusPlain}.
+                        </span>
                       </a>
                     )}
                     </span>
@@ -168,7 +172,7 @@ export function LoadTheBarView({
       </div>
 
       {/* bar and detail card */}
-      <div className="ltb-side grid gap-4 lg:sticky lg:top-[4.25rem]">
+      <div className="ltb-side">
         <div className="panel dropzone" data-dropzone data-over={over ? "" : undefined} ref={dropRef}>
           <p className="label flex flex-wrap items-center justify-between gap-2 border-b-2 border-iron p-3">
             <span>

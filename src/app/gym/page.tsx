@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   openGraph: { title: GYM_UI.metaTitle, description: GYM_UI.metaDescription, url: "/gym/", images: ["/og.png"] },
 };
 
+/** Grayscale WebP derivatives of the original photos live in /images/gym/opt (the originals stay untouched). */
+const optimised = (photo: string) => photo.replace("/images/gym/", "/images/gym/opt/").replace(/\.jpg$/, ".webp");
+
 export default function GymPage() {
   const lift = projectById("P-13");
   return (
@@ -20,12 +23,12 @@ export default function GymPage() {
       <main id="main" className="pt-[var(--bar-h)]">
         <div className="backlink border-b-2 border-iron bg-chalk">
           <div className="wrap flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
-            <a href="/" className="label font-semibold">
+            <a href="/" className="label inline-flex min-h-9 items-center font-semibold">
               ← {GYM_UI.back}
             </a>
-            <nav aria-label={GYM_UI.jump} className="label flex flex-wrap gap-x-3 gap-y-1">
+            <nav aria-label={GYM_UI.jump} className="label flex flex-wrap gap-1">
               {GYM_DAYS.map((day) => (
-                <a key={day.id} href={`#${day.id}`} className="is-day px-1" data-day={day.id}>
+                <a key={day.id} href={`#${day.id}`} className="is-day inline-flex min-h-9 min-w-9 items-center justify-center px-1.5" data-day={day.id}>
                   {day.weekday.slice(0, 3)}
                 </a>
               ))}
@@ -34,11 +37,9 @@ export default function GymPage() {
         </div>
 
         <div className="wrap pb-16 pt-8">
-          <h1 className="sr-only">
-            {GYM_UI.pageTitle}: {GYM_UI.pagePlain}
-          </h1>
           <ScoreRow
             sub
+            level={1}
             name={GYM_UI.pageTitle}
             plain={GYM_UI.pagePlain}
             count={`${TRAINING_DAY_COUNT} ${GYM_UI.trainingDays} · ${REST_DAY_COUNT} ${GYM_UI.restDays}`}
@@ -52,12 +53,20 @@ export default function GymPage() {
           ) : null}
 
           <div className="mt-8 grid gap-6">
-            {GYM_DAYS.map((day) => (
+            {GYM_DAYS.map((day, index) => (
               <article key={day.id} id={day.id} className="gym-day scroll-mt-28 border-2 border-iron" data-gym-day={day.id}>
                 <header className="gym-head p-4 md:p-6">
                   {day.photo ? (
                     // eslint-disable-next-line @next/next/no-img-element -- static export, decorative dimmed background
-                    <img src={day.photo} alt="" width={788} height={1400} loading="lazy" decoding="async" />
+                    <img
+                      src={optimised(day.photo)}
+                      alt=""
+                      width={640}
+                      height={1137}
+                      loading={index === 0 ? "eager" : "lazy"}
+                      fetchPriority={index === 0 ? "high" : "auto"}
+                      decoding="async"
+                    />
                   ) : null}
                   <p className="label flex flex-wrap justify-between gap-2">
                     <span>
@@ -108,6 +117,7 @@ export default function GymPage() {
           <section className="mt-10" aria-labelledby="h-gym-rules">
             <ScoreRow
               sub
+              level={2}
               name={GYM_UI.rulesTitle}
               plain={GYM_UI.rulesPlain}
               count={`${GYM_RULES.length} ${ui.counts.rules}`}
@@ -115,9 +125,11 @@ export default function GymPage() {
             />
             <ol className="panel mt-4">
               {GYM_RULES.map((rule, index) => (
-                <li key={rule} className="flex gap-4 border-b border-knurl p-4 last:border-b-0" data-gym-rule>
+                <li key={rule} className="flex gap-4 border-b border-knurl p-4 last:border-b-0">
                   <span className="display steel w-8 flex-none text-3xl">{String(index + 1).padStart(2, "0")}</span>
-                  <span className="font-semibold">{rule}</span>
+                  <span className="font-semibold" data-gym-rule>
+                    {rule}
+                  </span>
                 </li>
               ))}
             </ol>
