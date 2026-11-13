@@ -1,2 +1,12 @@
 node_modules
+.next
+out
 build
+.shots
+.lighthouse
+test-results
+playwright-report
+next-env.d.ts
+*.tsbuildinfo
+.DS_Store
+.claude
