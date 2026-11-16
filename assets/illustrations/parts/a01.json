@@ -1,0 +1,7 @@
+{
+  "asset": "a01",
+  "source": "a01-character-sheet.png",
+  "rejected": "Splits into 14 components, the spec lists 16 parts. Each arm is one piece (upper arm and forearm merged, two of them with the hand attached), each leg is one piece (thigh and shin merged), torso and hips are one piece. No elbow, wrist or knee joint can be rigged. The site uses a01b (whole poses) instead.",
+  "components": 14,
+  "parts": {}
+}

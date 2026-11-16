@@ -1,0 +1,27 @@
+{
+  "asset": "a02",
+  "source": "a02-rack-sheet.png",
+  "components": 20,
+  "parts": {
+    "0": { "name": "bar-straight", "pivot": [0.5, 0.5], "z": 2 },
+    "1": { "name": "plate-face-red", "pivot": [0.5, 0.5], "z": 5 },
+    "2": { "name": "plate-face-blue", "pivot": [0.5, 0.5], "z": 5 },
+    "3": { "ignore": "duplicate face-on red plate, not in the spec" },
+    "4": { "ignore": "duplicate face-on blue plate, not in the spec" },
+    "5": { "name": "plate-face-yellow", "pivot": [0.5, 0.5], "z": 5 },
+    "6": { "name": "collar-a", "pivot": [0.5, 0.28], "z": 4 },
+    "7": { "name": "collar-b", "pivot": [0.5, 0.28], "z": 4 },
+    "8": { "name": "plate-face-green", "pivot": [0.5, 0.5], "z": 5 },
+    "9": { "name": "plate-face-chalk", "pivot": [0.5, 0.5], "z": 5 },
+    "10": { "name": "rack", "pivot": [0.5, 1], "z": 1 },
+    "11": { "name": "bar-bowed", "pivot": [0.5, 0.5], "z": 2 },
+    "12": { "ignore": "duplicate face-on chalk plate, not in the spec" },
+    "13": { "name": "plate-face-iron", "pivot": [0.5, 0.5], "z": 5 },
+    "14": { "name": "plate-side-red", "pivot": [0.5, 0.5], "z": 3 },
+    "15": { "name": "plate-side-blue", "pivot": [0.5, 0.5], "z": 3 },
+    "16": { "name": "plate-side-yellow", "pivot": [0.5, 0.5], "z": 3 },
+    "17": { "name": "plate-side-green", "pivot": [0.5, 0.5], "z": 3 },
+    "18": { "name": "plate-side-chalk", "pivot": [0.5, 0.5], "z": 3 },
+    "19": { "name": "plate-side-iron", "pivot": [0.5, 0.5], "z": 3 }
+  }
+}

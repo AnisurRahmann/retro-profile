@@ -191,6 +191,58 @@ export const gymDaySchema = z.object({
   exercises: z.array(gymExerciseSchema),
 });
 
+// ── Illustrations (written by `pnpm illustrations`) and the garage scene ──
+
+export const PALETTE_CLASSES = ["i-chalk", "i-iron", "i-grey", "i-tan", "i-red", "i-blue", "i-yellow", "i-green", "i-skin"] as const;
+
+const point = z.tuple([z.number(), z.number()]);
+
+export const illustrationPartSchema = z.object({
+  name: z.string().regex(/^[a-z][a-z0-9-]*$/),
+  viewBox: z.string().regex(/^0 0 \d+ \d+$/),
+  /** intrinsic size in source sheet pixels */
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  /** top left corner on the source sheet, so parts of one sheet keep their relative scale and position */
+  origin: point,
+  /** joint or anchor point, normalised to the part's box */
+  pivot: point,
+  z: z.number().int(),
+  bytes: z.number().int().positive(),
+});
+
+export const illustrationAssetSchema = z.object({
+  id: z.string().regex(/^a\d{2}b?$/),
+  source: text,
+  /** svg: traced and palette-snapped. webp: keyed cut-outs, the fallback when a trace is too heavy or wobbly */
+  format: z.enum(["svg", "webp"]),
+  bytes: z.number().int().positive(),
+  gzipBytes: z.number().int().positive(),
+  parts: z.array(illustrationPartSchema).min(1),
+});
+
+export const illustrationManifestSchema = z.record(z.string(), illustrationAssetSchema);
+
+export const stationSchema = z.object({
+  id: z.string().regex(/^[a-z][a-z-]*$/),
+  /** illustration sheet for this object */
+  asset: z.string().regex(/^a\d{2}b?$/),
+  /** top left corner and footprint in the 1600 x 900 scene */
+  x: z.number().min(0).max(1600),
+  y: z.number().min(0).max(900),
+  w: z.number().positive(),
+  h: z.number().positive(),
+  /** scene units per source sheet pixel */
+  scale: z.number().positive(),
+  z: z.number().int(),
+  /** where the station leads. null only for the lamp, which is a control and not a link */
+  href: z.string().regex(/^\/[a-z-]*\/(#[a-z-]+)?$/).nullable(),
+  label: text,
+  plain: text,
+  /** the flight (page section) this object stands for, when it stands for one */
+  section: text.nullable(),
+});
+
 export type Link = z.infer<typeof linkSchema>;
 export type Profile = z.infer<typeof profileSchema>;
 export type Flight = z.infer<typeof flightSchema>;
@@ -214,3 +266,10 @@ export type Miss = z.infer<typeof missSchema>;
 export type GymExercise = z.infer<typeof gymExerciseSchema>;
 export type GymDay = z.infer<typeof gymDaySchema>;
 export type WeekdayId = (typeof WEEKDAY_IDS)[number];
+export type PaletteClass = (typeof PALETTE_CLASSES)[number];
+export type IllustrationPart = z.infer<typeof illustrationPartSchema>;
+export type IllustrationAsset = z.infer<typeof illustrationAssetSchema>;
+export type IllustrationManifest = z.infer<typeof illustrationManifestSchema>;
+/** traced layers of one part, bottom first: palette class and path data */
+export type IllustrationPaths = Record<string, readonly (readonly [cls: PaletteClass, d: string])[]>;
+export type Station = z.infer<typeof stationSchema>;

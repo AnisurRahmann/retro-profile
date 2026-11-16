@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "playwright test",
-    "shots": "playwright test --config playwright.shots.config.ts"
+    "shots": "playwright test --config playwright.shots.config.ts",
+    "illustrations": "tsx scripts/illustrations/run.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -24,6 +25,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@neplex/vectorizer": "^0.1.0",
     "@playwright/test": "^1.65.0",
     "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^26.6.6",
@@ -31,7 +33,11 @@
     "@types/react-dom": "^19.3.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "16.4.6",
+    "potrace": "^2.1.8",
+    "sharp": "^0.35.5",
+    "svgo": "^4.1.0",
     "tailwindcss": "^4.3.5",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^5.1.0"
   }

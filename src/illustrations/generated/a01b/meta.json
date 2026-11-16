@@ -1,0 +1,105 @@
+{
+  "id": "a01b",
+  "source": "a01b-character-poses.png",
+  "format": "svg",
+  "bytes": 49364,
+  "gzipBytes": 20179,
+  "parts": [
+    {
+      "name": "pose-chalk",
+      "viewBox": "0 0 196 567",
+      "width": 196,
+      "height": 567,
+      "origin": [
+        760,
+        118
+      ],
+      "pivot": [
+        0.514,
+        1
+      ],
+      "z": 1,
+      "bytes": 12202
+    },
+    {
+      "name": "pose-idle",
+      "viewBox": "0 0 228 569",
+      "width": 228,
+      "height": 569,
+      "origin": [
+        42,
+        116
+      ],
+      "pivot": [
+        0.499,
+        1
+      ],
+      "z": 1,
+      "bytes": 11804
+    },
+    {
+      "name": "pose-overhead",
+      "viewBox": "0 0 293 609",
+      "width": 293,
+      "height": 609,
+      "origin": [
+        1040,
+        76
+      ],
+      "pivot": [
+        0.499,
+        1
+      ],
+      "z": 1,
+      "bytes": 12972
+    },
+    {
+      "name": "pose-wave",
+      "viewBox": "0 0 280 600",
+      "width": 280,
+      "height": 600,
+      "origin": [
+        344,
+        85
+      ],
+      "pivot": [
+        0.591,
+        1
+      ],
+      "z": 1,
+      "bytes": 11201
+    },
+    {
+      "name": "puff-a",
+      "viewBox": "0 0 38 35",
+      "width": 38,
+      "height": 35,
+      "origin": [
+        911,
+        228
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 3,
+      "bytes": 559
+    },
+    {
+      "name": "puff-b",
+      "viewBox": "0 0 38 42",
+      "width": 38,
+      "height": 42,
+      "origin": [
+        949,
+        267
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 3,
+      "bytes": 626
+    }
+  ]
+}

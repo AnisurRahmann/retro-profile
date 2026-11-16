@@ -1,0 +1,13 @@
+{
+  "asset": "a01b",
+  "source": "a01b-character-poses.png",
+  "components": 6,
+  "parts": {
+    "0": { "name": "puff-a", "pivot": [0.5, 0.5], "z": 3 },
+    "1": { "name": "puff-b", "pivot": [0.5, 0.5], "z": 3 },
+    "2": { "name": "pose-idle", "pivot": [0.499, 1], "z": 1 },
+    "3": { "name": "pose-wave", "pivot": [0.591, 1], "z": 1 },
+    "4": { "name": "pose-chalk", "pivot": [0.514, 1], "z": 1 },
+    "5": { "name": "pose-overhead", "pivot": [0.499, 1], "z": 1 }
+  }
+}
