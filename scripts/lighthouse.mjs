@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 const PORT = 4174;
 const pages = [
   ["home", "/"],
+  ["log", "/log/"],
   ["gym", "/gym/"],
 ];
 mkdirSync(".lighthouse", { recursive: true });

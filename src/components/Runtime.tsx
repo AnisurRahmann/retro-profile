@@ -51,7 +51,7 @@ export function Runtime({ flightIds }: { flightIds: string[] }) {
         const id = flightIds[Number(key)];
         if (!id) return;
         if (document.getElementById(id)) window.location.hash = id;
-        else window.location.href = `/#${id}`;
+        else window.location.href = `/log/#${id}`;
       }
     };
     document.addEventListener("keydown", onKey);

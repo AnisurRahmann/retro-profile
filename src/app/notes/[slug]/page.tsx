@@ -30,7 +30,7 @@ export default async function NotePage({ params }: Params) {
   const lead = note.chapters.find((chapter) => chapter.kind === "title");
   return (
     <>
-      <TopBar base="/" />
+      <TopBar base="/log/" />
       <main id="main" className="wrap pb-16 pt-[calc(var(--bar-h)+2rem)]">
         <article className="note-body mx-auto max-w-3xl">
           <p className="label flex flex-wrap justify-between gap-2 border-b-2 border-iron pb-2">

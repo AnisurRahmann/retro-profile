@@ -5,6 +5,7 @@ const widths = [360, 768, 1440];
 const themes = ["light", "dark"] as const;
 const pages = [
   { name: "home", path: "/" },
+  { name: "log", path: "/log/" },
   { name: "gym", path: "/gym/" },
   { name: "notes", path: "/notes/" },
   { name: "note", path: "/notes/plaid-costs/" },
@@ -46,7 +47,7 @@ for (const width of [360, 1440]) {
         }
       }, theme);
       const page = await context.newPage();
-      await page.goto("/");
+      await page.goto("/log/");
       await page.evaluate(() => document.fonts.ready);
       await page.locator("#h-load-the-bar").scrollIntoViewIfNeeded();
       await page.locator('[data-ltb="live"]').waitFor();

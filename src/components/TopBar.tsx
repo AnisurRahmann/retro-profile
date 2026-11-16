@@ -1,6 +1,6 @@
 import { flights, profile, ui } from "@/content";
 
-/** Fixed top bar. `base` is "" on the home page and "/" on sub pages so flight links still resolve. */
+/** Fixed top bar. `base` is "" on /log/ (where the flights live) and "/log/" on every other page so flight links still resolve. */
 export function TopBar({ base = "" }: { base?: string }) {
   const t = ui.topbar;
   return (
@@ -9,7 +9,7 @@ export function TopBar({ base = "" }: { base?: string }) {
         {ui.skipToContent}
       </a>
       <div className="topbar-inner">
-        <a href={base || "#platform"} className="topbar-cell topbar-mono" >
+        <a href={base ? "/" : "#platform"} className="topbar-cell topbar-mono" >
           {profile.monogram}
           <span className="sr-only">
             , {profile.name}, {t.home}

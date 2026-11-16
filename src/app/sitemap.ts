@@ -8,6 +8,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const base = profile.site;
   return [
     { url: `${base}/`, priority: 1 },
+    { url: `${base}/log/`, priority: 0.9 },
     { url: `${base}/gym/`, priority: 0.7 },
     { url: `${base}/notes/`, priority: 0.6 },
     { url: `${base}/fb-privacy/`, priority: 0.2 },

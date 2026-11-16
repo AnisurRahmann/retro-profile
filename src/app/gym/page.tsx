@@ -19,7 +19,7 @@ export default function GymPage() {
   const lift = projectById("P-13");
   return (
     <>
-      <TopBar base="/" />
+      <TopBar base="/log/" />
       <main id="main" className="pt-[var(--bar-h)]">
         <div className="backlink border-b-2 border-iron bg-chalk">
           <div className="wrap flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">

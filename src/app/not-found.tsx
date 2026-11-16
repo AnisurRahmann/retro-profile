@@ -6,7 +6,7 @@ export default function NotFound() {
   const t = ui.notFound;
   return (
     <>
-      <TopBar base="/" />
+      <TopBar base="/log/" />
       <main id="main" className="wrap pb-24 pt-28">
         <Lights status={statusById("failed")} />
         <h1 className="display mt-4 text-8xl">{t.title}</h1>

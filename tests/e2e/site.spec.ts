@@ -13,7 +13,7 @@ async function liveGame(page: Page) {
 const plate = (page: Page, id: string) => page.locator(`[data-rack] [data-plate-id="${id}"]`);
 
 test.describe("layout", () => {
-  for (const path of ["/", "/gym/", "/notes/", "/notes/plaid-costs/"]) {
+  for (const path of ["/log/", "/gym/", "/notes/", "/notes/plaid-costs/"]) {
     test(`no horizontal scroll at 360px on ${path}`, async ({ browser }) => {
       const context = await browser.newContext({ viewport: { width: 360, height: 740 }, reducedMotion: "reduce" });
       const page = await context.newPage();
@@ -28,7 +28,7 @@ test.describe("layout", () => {
     const height = 740;
     const context = await browser.newContext({ viewport: { width: 360, height }, reducedMotion: "reduce" });
     const page = await context.newPage();
-    await page.goto("/");
+    await page.goto("/log/");
     await expect(page.locator("h1")).toHaveText(new RegExp(profile.name.replace(" ", "\\s*"), "i"));
     await expect(page.locator(".topbar-cta")).toBeInViewport();
     await expect(page.getByText(profile.line)).toBeVisible();
@@ -44,7 +44,7 @@ test.describe("without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
 
   test("home still has every project, metric, block, goal, outcome and gym day", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/log/");
     for (const id of ids) {
       await expect(page.locator(`[data-rack] a[data-plate-id="${id}"]`)).toHaveAttribute("href", `#reg-${id}`);
       await expect(page.locator(`#reg-${id}`)).toBeVisible();
@@ -73,7 +73,7 @@ test.describe("without JavaScript", () => {
 
 test.describe("projects", () => {
   test("every project is in the rack and the register with the right colour and lights", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/log/");
     await liveGame(page);
     for (const project of projects) {
       const bus = buses.find((entry) => entry.id === project.bus)!;
@@ -93,7 +93,7 @@ test.describe("projects", () => {
   });
 
   test("register filters and sorts", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/log/");
     await page.locator('[data-filter="bus"]').selectOption("voice");
     await expect(page.locator("tr[data-row]")).toHaveCount(4);
     await expect(page.locator("[data-showing]")).toContainText("4 / 27");
@@ -108,13 +108,13 @@ test.describe("projects", () => {
 
 test.describe("Load the Bar", () => {
   test("has a skip link to the register", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/log/");
     await page.locator("[data-skip-game]").click();
     await expect(page).toHaveURL(/#register$/);
   });
 
   test("works by keyboard, celebrates once, strips and persists", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/log/");
     await liveGame(page);
     await plate(page, "P-01").focus();
     await page.keyboard.press("Enter");
@@ -148,7 +148,7 @@ test.describe("Load the Bar", () => {
 
   test("drag a plate onto the bar with the mouse", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.goto("/");
+    await page.goto("/log/");
     await liveGame(page);
     await plate(page, "P-13").scrollIntoViewIfNeeded();
     const from = (await plate(page, "P-13").boundingBox())!;
@@ -174,7 +174,7 @@ test.describe("Load the Bar", () => {
   test("tap loads a plate on a touch screen", async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true });
     const page = await context.newPage();
-    await page.goto("/");
+    await page.goto("/log/");
     await liveGame(page);
     await plate(page, "P-12").tap();
     await expect(page.locator("[data-counter]")).toContainText("1 / 27");
@@ -186,7 +186,7 @@ test.describe("Load the Bar", () => {
 
 test.describe("Your Call", () => {
   test("is operable by keyboard and never scores", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/log/");
     const first = page.locator("[data-yc]").first();
     await first.scrollIntoViewIfNeeded();
     await expect(first.locator(".yc-outcome")).toBeHidden();
@@ -209,7 +209,7 @@ test.describe("reduced motion", () => {
   test("renders final states with no animation", async ({ browser }) => {
     const context = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 1280, height: 800 } });
     const page = await context.newPage();
-    await page.goto("/");
+    await page.goto("/log/");
     await expect(page.locator("[data-armed]")).toHaveCount(0);
     const animation = await page.locator(".hero-bar .eplate").first().evaluate((node) => getComputedStyle(node).animationName);
     expect(animation).toBe("none");
@@ -225,7 +225,7 @@ test.describe("reduced motion", () => {
   });
 
   test("with motion allowed, lights arm below the fold and switch on when seen", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/log/");
     await expect(page.locator("#pr-06 [data-reveal]")).toHaveAttribute("data-armed", "");
     await page.locator("#pr-06").scrollIntoViewIfNeeded();
     await expect(page.locator("#pr-06 [data-reveal]")).toHaveAttribute("data-lit", "");
@@ -242,7 +242,7 @@ test.describe("today's session", () => {
   for (const entry of cases) {
     test(`shows ${entry.day} for ${entry.utc}`, async ({ page }) => {
       await page.clock.setFixedTime(new Date(entry.utc));
-      await page.goto("/");
+      await page.goto("/log/");
       await expect(page.locator("html")).toHaveAttribute("data-today", entry.day);
       const chip = page.locator("[data-today-chip]:visible");
       await expect(chip).toHaveCount(1);
@@ -255,7 +255,7 @@ test.describe("today's session", () => {
 
 test.describe("theme and keyboard", () => {
   test("lights toggle persists and applies before paint", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/log/");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     await page.locator("[data-lights-toggle]").click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -266,7 +266,7 @@ test.describe("theme and keyboard", () => {
   });
 
   test("0 to 8 jump to flights, L toggles lights, G opens the gym log", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/log/");
     await page.locator("body").click({ position: { x: 5, y: 400 } });
     await page.keyboard.press("3");
     await expect(page).toHaveURL(/#load-the-bar$/);
@@ -277,7 +277,7 @@ test.describe("theme and keyboard", () => {
     await page.keyboard.press("g");
     await expect(page).toHaveURL(/\/gym\/$/);
     await page.keyboard.press("5");
-    await expect(page).toHaveURL(/\/#next-block$/);
+    await expect(page).toHaveURL(/\/log\/#next-block$/);
   });
 });
 
@@ -290,7 +290,7 @@ test.describe("pages", () => {
   });
 
   test("home metadata, JSON-LD and assets", async ({ page, request }) => {
-    await page.goto("/");
+    await page.goto("/log/");
     await expect(page).toHaveTitle("Anisur Rahman (Shakil): Fullstack AI Engineer, Voice Agents and Agentic Systems");
     const person = JSON.parse((await page.locator('script[type="application/ld+json"]').textContent()) ?? "{}");
     expect(person["@type"]).toBe("Person");
@@ -320,7 +320,7 @@ test.describe("pages", () => {
   });
 
   test("no emoji and no unfilled placeholders in the rendered pages", async ({ page }) => {
-    for (const path of ["/", "/gym/", "/notes/"]) {
+    for (const path of ["/", "/log/", "/gym/", "/notes/"]) {
       await page.goto(path);
       const text = await page.locator("body").innerText();
       expect(text).not.toMatch(/\[\[|\]\]/);

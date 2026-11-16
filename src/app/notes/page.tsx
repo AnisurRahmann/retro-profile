@@ -15,7 +15,7 @@ export default function NotesIndex() {
   const notes = allNotes();
   return (
     <>
-      <TopBar base="/" />
+      <TopBar base="/log/" />
       <main id="main" className="wrap pb-16 pt-[calc(var(--bar-h)+2rem)]">
         <ScoreRow sub level={1} name={ui.notes.title} plain={ui.notes.plain} count={`${notes.length} ${ui.notes.entries}`} headingId="h-notes" />
         <ol className="mt-6 border-2 border-iron">
