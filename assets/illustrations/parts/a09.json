@@ -1,0 +1,15 @@
+{
+  "asset": "a09",
+  "source": "a09-miss-bin-sheet.png",
+  "components": 8,
+  "parts": {
+    "0": { "name": "bar-bent", "pivot": [0.5, 0.5], "z": 1 },
+    "1": { "name": "bin", "pivot": [0.5, 1], "z": 3 },
+    "2": { "name": "paper-b", "pivot": [0.5, 0.5], "z": 2 },
+    "3": { "name": "paper-a", "pivot": [0.5, 0.5], "z": 2 },
+    "4": { "name": "paper-c", "pivot": [0.5, 0.5], "z": 2 },
+    "5": { "ignore": "fourth paper ball, the spec lists three" },
+    "6": { "name": "plate-cracked", "pivot": [0.5, 1], "z": 2 },
+    "7": { "name": "plaster", "pivot": [0.5, 0.5], "z": 4 }
+  }
+}

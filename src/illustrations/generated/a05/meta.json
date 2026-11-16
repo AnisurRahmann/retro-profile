@@ -1,0 +1,169 @@
+{
+  "id": "a05",
+  "source": "a05-bot-sheet.png",
+  "format": "svg",
+  "bytes": 26130,
+  "gzipBytes": 10393,
+  "parts": [
+    {
+      "name": "arm-left",
+      "viewBox": "0 0 100 291",
+      "width": 100,
+      "height": 291,
+      "origin": [
+        665,
+        396
+      ],
+      "pivot": [
+        0.58,
+        0.12
+      ],
+      "z": 1,
+      "bytes": 1758
+    },
+    {
+      "name": "arm-right",
+      "viewBox": "0 0 100 291",
+      "width": 100,
+      "height": 291,
+      "origin": [
+        858,
+        396
+      ],
+      "pivot": [
+        0.42,
+        0.12
+      ],
+      "z": 1,
+      "bytes": 1958
+    },
+    {
+      "name": "body",
+      "viewBox": "0 0 296 309",
+      "width": 296,
+      "height": 309,
+      "origin": [
+        76,
+        378
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 2,
+      "bytes": 6072
+    },
+    {
+      "name": "head-closed",
+      "viewBox": "0 0 272 211",
+      "width": 272,
+      "height": 211,
+      "origin": [
+        376,
+        96
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 3,
+      "bytes": 3575
+    },
+    {
+      "name": "head-happy",
+      "viewBox": "0 0 272 211",
+      "width": 272,
+      "height": 211,
+      "origin": [
+        680,
+        96
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 3,
+      "bytes": 3792
+    },
+    {
+      "name": "head-open",
+      "viewBox": "0 0 272 211",
+      "width": 272,
+      "height": 211,
+      "origin": [
+        72,
+        96
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 3,
+      "bytes": 4158
+    },
+    {
+      "name": "antenna",
+      "viewBox": "0 0 52 208",
+      "width": 52,
+      "height": 208,
+      "origin": [
+        789,
+        396
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 4,
+      "bytes": 987
+    },
+    {
+      "name": "arc-large",
+      "viewBox": "0 0 293 94",
+      "width": 293,
+      "height": 94,
+      "origin": [
+        658,
+        766
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 5,
+      "bytes": 1652
+    },
+    {
+      "name": "arc-medium",
+      "viewBox": "0 0 220 77",
+      "width": 220,
+      "height": 77,
+      "origin": [
+        695,
+        813
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 5,
+      "bytes": 1436
+    },
+    {
+      "name": "arc-small",
+      "viewBox": "0 0 149 63",
+      "width": 149,
+      "height": 63,
+      "origin": [
+        730,
+        859
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 5,
+      "bytes": 742
+    }
+  ]
+}

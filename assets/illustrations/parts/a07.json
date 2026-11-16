@@ -1,0 +1,19 @@
+{
+  "asset": "a07",
+  "source": "a07-chalk-logbook-sheet.png",
+  "components": 12,
+  "parts": {
+    "0": { "name": "puff-a", "pivot": [0.5, 0.5], "z": 5 },
+    "1": { "name": "puff-b", "pivot": [0.5, 0.5], "z": 5 },
+    "2": { "name": "puff-c", "pivot": [0.5, 0.5], "z": 5 },
+    "3": { "name": "stool", "pivot": [0.5, 1], "z": 1 },
+    "4": { "name": "bowl", "pivot": [0.5, 1], "z": 3 },
+    "5": { "name": "chalk-block", "pivot": [0.5, 1], "z": 3 },
+    "6": { "name": "puff-d", "pivot": [0.5, 0.5], "z": 5 },
+    "7": { "name": "puff-e", "pivot": [0.5, 0.5], "z": 5 },
+    "8": { "name": "logbook-open", "pivot": [0.5, 1], "z": 2 },
+    "9": { "name": "page-turn", "pivot": [0, 0.5], "z": 4 },
+    "10": { "name": "logbook-closed", "pivot": [0.5, 1], "z": 2 },
+    "11": { "name": "pencil", "pivot": [0.5, 1], "z": 2 }
+  }
+}

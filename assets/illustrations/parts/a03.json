@@ -1,0 +1,20 @@
+{
+  "asset": "a03",
+  "source": "a03-whiteboard-sheet.png",
+  "components": 13,
+  "parts": {
+    "0": { "name": "marker-red", "pivot": [0.5, 0.5], "z": 3 },
+    "1": { "name": "marker-blue", "pivot": [0.5, 0.5], "z": 3 },
+    "2": { "name": "marker-writing", "pivot": [0.04, 0.97], "z": 5 },
+    "3": { "name": "marker-iron", "pivot": [0.5, 0.5], "z": 3 },
+    "4": { "name": "marker-cap", "pivot": [0.5, 0.5], "z": 3 },
+    "5": { "name": "board", "pivot": [0.5, 0.5], "z": 1 },
+    "6": { "name": "eraser", "pivot": [0.5, 1], "z": 3 },
+    "7": { "name": "magnet-yellow", "pivot": [0.5, 0.5], "z": 4 },
+    "8": { "name": "magnet-green", "pivot": [0.5, 0.5], "z": 4 },
+    "9": { "name": "tick", "pivot": [0.3, 0.9], "z": 4 },
+    "10": { "ignore": "fourth capped marker (second red), the spec lists three" },
+    "11": { "ignore": "two more capped markers drawn touching (blue and iron), duplicates of 1 and 3" },
+    "12": { "name": "underline", "pivot": [0, 0.5], "z": 4 }
+  }
+}

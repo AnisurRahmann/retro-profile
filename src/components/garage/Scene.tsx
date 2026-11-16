@@ -1,30 +1,28 @@
 import type { CSSProperties, ReactNode } from "react";
-import { buses, ui } from "@/content";
-import { hasArt, ROOM, SCENE, stations } from "@/scene";
+import { buses, goals, metrics, ui } from "@/content";
+import { GYM_UI } from "@/gym";
+import { decor, hasArt, ROOM, SCENE, stations } from "@/scene";
 import type { Station } from "@/schema";
 import { CharacterObject } from "./CharacterObject";
+import { BikeObject, BinObject, BotObject, CalendarObject, ChalkObject, DecorObject, KitObject, LampCord, lampCordPlace, LampObject, PhoneObject, WhiteboardObject } from "./Objects";
 import { RackObject } from "./RackObject";
 
 /** Objects whose art is traced. Everything else is a dashed placeholder at the object's footprint. */
 const OBJECTS: Record<string, () => ReactNode> = {
   character: () => <CharacterObject />,
+  whiteboard: () => <WhiteboardObject values={metrics.map((metric) => metric.value)} />,
   rack: () => <RackObject categories={buses.map((bus) => bus.name)} />,
+  chalk: () => <ChalkObject />,
+  calendar: () => <CalendarObject goals={goals.map(({ lift, target }) => ({ lift, target }))} />,
+  bin: () => <BinObject />,
+  bike: () => <BikeObject />,
+  kit: () => <KitObject timeZone={GYM_UI.timeZone} placeholder={ui.garage.clockPlaceholder} />,
+  phone: () => <PhoneObject />,
+  bot: () => <BotObject />,
+  lamp: () => <LampObject />,
 };
 
 function StationLabel({ station }: { station: Station }) {
-  if (!station.href) {
-    // the lamp: its label follows the lights
-    const t = ui.topbar;
-    return (
-      <span className="station-label">
-        <b className="when-light">{t.lightsOn}</b>
-        <b className="when-dark">{t.lightsOut}</b>
-        <span className="plain when-light">{t.lightsOnPlain}</span>
-        <span className="plain when-dark">{t.lightsOutPlain}</span>
-        <span className="sr-only">. {t.lightsAria}</span>
-      </span>
-    );
-  }
   return (
     <span className="station-label">
       <b>{station.label}</b>
@@ -36,23 +34,24 @@ function StationLabel({ station }: { station: Station }) {
 function StationItem({ station }: { station: Station }) {
   const render = hasArt(station) ? OBJECTS[station.id] : undefined;
   const style = { "--x": station.x, "--y": station.y, "--w": station.w, "--h": station.h, "--z": station.z } as CSSProperties;
-  const body = (
-    <>
-      <span className="station-obj">{render ? render() : null}</span>
-      <StationLabel station={station} />
-    </>
-  );
-  const shared = { className: "station", "data-station": station.id, "data-art": render ? "svg" : "pending", style };
+  const object = <span className="station-obj">{render ? render() : null}</span>;
+  const shared = { "data-station": station.id, "data-art": render ? "svg" : "pending", style };
   if (!station.href) {
+    // the lamp is a control, not a link: the pull cord is the button, pressed while the lights are out
     return (
-      <button type="button" {...shared} className="station js-only" data-lights-toggle>
-        {body}
-      </button>
+      <div className="station js-only" {...shared}>
+        {object}
+        <button type="button" className="lamp-cord" data-lights-toggle aria-pressed="false" style={lampCordPlace(station.scale)}>
+          <LampCord />
+          <StationLabel station={station} />
+        </button>
+      </div>
     );
   }
   return (
-    <a href={station.href} {...shared}>
-      {body}
+    <a href={station.href} className="station" {...shared}>
+      {object}
+      <StationLabel station={station} />
     </a>
   );
 }
@@ -61,6 +60,7 @@ function StationItem({ station }: { station: Station }) {
 export function Scene() {
   const g = ui.garage;
   const { bandY, floorY, platform } = ROOM;
+  const bot = stations.find((station) => station.id === "bot" && hasArt(station));
   return (
     <section className="garage" aria-labelledby="h-garage">
       <div className="wrap garage-head">
@@ -80,9 +80,16 @@ export function Scene() {
             <rect className="room-line" x={platform.x - 4} y={platform.y - 4} width={platform.w + 8} height={platform.h + 8} />
             <rect className="room-platform" x={platform.x} y={platform.y} width={platform.w} height={platform.h} />
           </svg>
+          {decor.map((item) => (
+            <span key={item.id} className="garage-decor" style={{ "--x": item.x, "--y": item.y, "--w": item.w, "--h": item.h, "--z": item.z } as CSSProperties}>
+              <DecorObject id={item.id} />
+            </span>
+          ))}
           {stations.map((station) => (
             <StationItem key={station.id} station={station} />
           ))}
+          {/* the bot speaks the plain label of the station in focus. Off for assistive tech: the link already has that name. */}
+          {bot ? <span className="bot-say" data-say="" aria-live="off" style={{ "--x": bot.x + 12, "--y": bot.y + 40 } as CSSProperties} /> : null}
         </div>
       </div>
       <p className="wrap label garage-note">{g.pending}</p>

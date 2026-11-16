@@ -1,0 +1,15 @@
+{
+  "asset": "a06",
+  "source": "a06-bike-sheet.png",
+  "components": 8,
+  "parts": {
+    "0": { "name": "speed-line-b", "pivot": [1, 0.5], "z": 0 },
+    "1": { "name": "speed-line-a", "pivot": [1, 0.5], "z": 0 },
+    "2": { "name": "speed-line-c", "pivot": [1, 0.5], "z": 0 },
+    "3": { "name": "wheel-front", "pivot": [0.5, 0.5], "z": 1 },
+    "4": { "name": "frame", "pivot": [0.5, 1], "z": 2 },
+    "5": { "name": "wheel-rear", "pivot": [0.5, 0.5], "z": 1 },
+    "6": { "name": "helmet", "pivot": [0.5, 0.5], "z": 3 },
+    "7": { "name": "kickstand", "pivot": [0.75, 0.06], "z": 1 }
+  }
+}

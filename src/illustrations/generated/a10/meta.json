@@ -1,0 +1,137 @@
+{
+  "id": "a10",
+  "source": "a10-phone-sheet.png",
+  "format": "svg",
+  "bytes": 33809,
+  "gzipBytes": 13883,
+  "parts": [
+    {
+      "name": "note",
+      "viewBox": "0 0 186 201",
+      "width": 186,
+      "height": 201,
+      "origin": [
+        621,
+        576
+      ],
+      "pivot": [
+        0.5,
+        0.05
+      ],
+      "z": 1,
+      "bytes": 786
+    },
+    {
+      "name": "body",
+      "viewBox": "0 0 299 718",
+      "width": 299,
+      "height": 718,
+      "origin": [
+        118,
+        104
+      ],
+      "pivot": [
+        0.5,
+        0
+      ],
+      "z": 2,
+      "bytes": 16514
+    },
+    {
+      "name": "cord",
+      "viewBox": "0 0 379 236",
+      "width": 379,
+      "height": 236,
+      "origin": [
+        93,
+        877
+      ],
+      "pivot": [
+        0.5,
+        0
+      ],
+      "z": 3,
+      "bytes": 9981
+    },
+    {
+      "name": "handset",
+      "viewBox": "0 0 382 136",
+      "width": 382,
+      "height": 136,
+      "origin": [
+        452,
+        111
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 4,
+      "bytes": 3311
+    },
+    {
+      "name": "ring-a",
+      "viewBox": "0 0 33 121",
+      "width": 33,
+      "height": 121,
+      "origin": [
+        423,
+        371
+      ],
+      "pivot": [
+        0,
+        0.5
+      ],
+      "z": 5,
+      "bytes": 634
+    },
+    {
+      "name": "ring-b",
+      "viewBox": "0 0 42 171",
+      "width": 42,
+      "height": 171,
+      "origin": [
+        448,
+        346
+      ],
+      "pivot": [
+        0,
+        0.5
+      ],
+      "z": 5,
+      "bytes": 789
+    },
+    {
+      "name": "ring-c",
+      "viewBox": "0 0 52 219",
+      "width": 52,
+      "height": 219,
+      "origin": [
+        472,
+        322
+      ],
+      "pivot": [
+        0,
+        0.5
+      ],
+      "z": 5,
+      "bytes": 750
+    },
+    {
+      "name": "ring-d",
+      "viewBox": "0 0 61 267",
+      "width": 61,
+      "height": 267,
+      "origin": [
+        496,
+        298
+      ],
+      "pivot": [
+        0,
+        0.5
+      ],
+      "z": 5,
+      "bytes": 1044
+    }
+  ]
+}

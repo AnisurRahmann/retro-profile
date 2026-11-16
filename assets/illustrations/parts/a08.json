@@ -1,0 +1,12 @@
+{
+  "asset": "a08",
+  "source": "a08-calendar-sheet.png",
+  "components": 5,
+  "parts": {
+    "0": { "name": "page-flat", "pivot": [0.5, 0], "z": 2 },
+    "1": { "name": "pad", "pivot": [0.515, 0.03], "z": 1 },
+    "2": { "name": "flag", "pivot": [0.1, 1], "z": 3 },
+    "3": { "name": "page-curl", "pivot": [0.5, 0], "z": 3 },
+    "4": { "name": "pushpin", "pivot": [0.5, 1], "z": 4 }
+  }
+}

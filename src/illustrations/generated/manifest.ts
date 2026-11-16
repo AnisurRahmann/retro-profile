@@ -387,5 +387,1334 @@ export const manifest = illustrationManifestSchema.parse({
         "bytes": 2209
       }
     ]
+  },
+  "a03": {
+    "id": "a03",
+    "source": "a03-whiteboard-sheet.png",
+    "format": "svg",
+    "bytes": 11352,
+    "gzipBytes": 4190,
+    "parts": [
+      {
+        "name": "board",
+        "viewBox": "0 0 719 492",
+        "width": 719,
+        "height": 492,
+        "origin": [
+          77,
+          89
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 1,
+        "bytes": 1861
+      },
+      {
+        "name": "eraser",
+        "viewBox": "0 0 172 91",
+        "width": 172,
+        "height": 91,
+        "origin": [
+          856,
+          358
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 3,
+        "bytes": 532
+      },
+      {
+        "name": "marker-blue",
+        "viewBox": "0 0 243 49",
+        "width": 243,
+        "height": 49,
+        "origin": [
+          836,
+          166
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 3,
+        "bytes": 1132
+      },
+      {
+        "name": "marker-cap",
+        "viewBox": "0 0 75 73",
+        "width": 75,
+        "height": 73,
+        "origin": [
+          1224,
+          209
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 3,
+        "bytes": 690
+      },
+      {
+        "name": "marker-iron",
+        "viewBox": "0 0 243 49",
+        "width": 243,
+        "height": 49,
+        "origin": [
+          836,
+          234
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 3,
+        "bytes": 661
+      },
+      {
+        "name": "marker-red",
+        "viewBox": "0 0 243 50",
+        "width": 243,
+        "height": 50,
+        "origin": [
+          836,
+          98
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 3,
+        "bytes": 1157
+      },
+      {
+        "name": "magnet-green",
+        "viewBox": "0 0 56 57",
+        "width": 56,
+        "height": 57,
+        "origin": [
+          1217,
+          351
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 4,
+        "bytes": 423
+      },
+      {
+        "name": "magnet-yellow",
+        "viewBox": "0 0 55 57",
+        "width": 55,
+        "height": 57,
+        "origin": [
+          1134,
+          351
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 4,
+        "bytes": 678
+      },
+      {
+        "name": "tick",
+        "viewBox": "0 0 137 144",
+        "width": 137,
+        "height": 144,
+        "origin": [
+          1137,
+          527
+        ],
+        "pivot": [
+          0.3,
+          0.9
+        ],
+        "z": 4,
+        "bytes": 1445
+      },
+      {
+        "name": "underline",
+        "viewBox": "0 0 211 24",
+        "width": 211,
+        "height": 24,
+        "origin": [
+          860,
+          652
+        ],
+        "pivot": [
+          0,
+          0.5
+        ],
+        "z": 4,
+        "bytes": 916
+      },
+      {
+        "name": "marker-writing",
+        "viewBox": "0 0 157 191",
+        "width": 157,
+        "height": 191,
+        "origin": [
+          1122,
+          92
+        ],
+        "pivot": [
+          0.04,
+          0.97
+        ],
+        "z": 5,
+        "bytes": 1857
+      }
+    ]
+  },
+  "a05": {
+    "id": "a05",
+    "source": "a05-bot-sheet.png",
+    "format": "svg",
+    "bytes": 26130,
+    "gzipBytes": 10393,
+    "parts": [
+      {
+        "name": "arm-left",
+        "viewBox": "0 0 100 291",
+        "width": 100,
+        "height": 291,
+        "origin": [
+          665,
+          396
+        ],
+        "pivot": [
+          0.58,
+          0.12
+        ],
+        "z": 1,
+        "bytes": 1758
+      },
+      {
+        "name": "arm-right",
+        "viewBox": "0 0 100 291",
+        "width": 100,
+        "height": 291,
+        "origin": [
+          858,
+          396
+        ],
+        "pivot": [
+          0.42,
+          0.12
+        ],
+        "z": 1,
+        "bytes": 1958
+      },
+      {
+        "name": "body",
+        "viewBox": "0 0 296 309",
+        "width": 296,
+        "height": 309,
+        "origin": [
+          76,
+          378
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 2,
+        "bytes": 6072
+      },
+      {
+        "name": "head-closed",
+        "viewBox": "0 0 272 211",
+        "width": 272,
+        "height": 211,
+        "origin": [
+          376,
+          96
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 3,
+        "bytes": 3575
+      },
+      {
+        "name": "head-happy",
+        "viewBox": "0 0 272 211",
+        "width": 272,
+        "height": 211,
+        "origin": [
+          680,
+          96
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 3,
+        "bytes": 3792
+      },
+      {
+        "name": "head-open",
+        "viewBox": "0 0 272 211",
+        "width": 272,
+        "height": 211,
+        "origin": [
+          72,
+          96
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 3,
+        "bytes": 4158
+      },
+      {
+        "name": "antenna",
+        "viewBox": "0 0 52 208",
+        "width": 52,
+        "height": 208,
+        "origin": [
+          789,
+          396
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 4,
+        "bytes": 987
+      },
+      {
+        "name": "arc-large",
+        "viewBox": "0 0 293 94",
+        "width": 293,
+        "height": 94,
+        "origin": [
+          658,
+          766
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 5,
+        "bytes": 1652
+      },
+      {
+        "name": "arc-medium",
+        "viewBox": "0 0 220 77",
+        "width": 220,
+        "height": 77,
+        "origin": [
+          695,
+          813
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 5,
+        "bytes": 1436
+      },
+      {
+        "name": "arc-small",
+        "viewBox": "0 0 149 63",
+        "width": 149,
+        "height": 63,
+        "origin": [
+          730,
+          859
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 5,
+        "bytes": 742
+      }
+    ]
+  },
+  "a06": {
+    "id": "a06",
+    "source": "a06-bike-sheet.png",
+    "format": "svg",
+    "bytes": 64865,
+    "gzipBytes": 25853,
+    "parts": [
+      {
+        "name": "speed-line-a",
+        "viewBox": "0 0 173 13",
+        "width": 173,
+        "height": 13,
+        "origin": [
+          136,
+          143
+        ],
+        "pivot": [
+          1,
+          0.5
+        ],
+        "z": 0,
+        "bytes": 333
+      },
+      {
+        "name": "speed-line-b",
+        "viewBox": "0 0 188 13",
+        "width": 188,
+        "height": 13,
+        "origin": [
+          79,
+          172
+        ],
+        "pivot": [
+          1,
+          0.5
+        ],
+        "z": 0,
+        "bytes": 345
+      },
+      {
+        "name": "speed-line-c",
+        "viewBox": "0 0 151 13",
+        "width": 151,
+        "height": 13,
+        "origin": [
+          158,
+          201
+        ],
+        "pivot": [
+          1,
+          0.5
+        ],
+        "z": 0,
+        "bytes": 327
+      },
+      {
+        "name": "kickstand",
+        "viewBox": "0 0 75 164",
+        "width": 75,
+        "height": 164,
+        "origin": [
+          866,
+          554
+        ],
+        "pivot": [
+          0.75,
+          0.06
+        ],
+        "z": 1,
+        "bytes": 1324
+      },
+      {
+        "name": "wheel-front",
+        "viewBox": "0 0 333 326",
+        "width": 333,
+        "height": 326,
+        "origin": [
+          995,
+          50
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 1,
+        "bytes": 18003
+      },
+      {
+        "name": "wheel-rear",
+        "viewBox": "0 0 342 337",
+        "width": 342,
+        "height": 337,
+        "origin": [
+          988,
+          394
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 1,
+        "bytes": 17349
+      },
+      {
+        "name": "frame",
+        "viewBox": "0 0 702 555",
+        "width": 702,
+        "height": 555,
+        "origin": [
+          209,
+          60
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 2,
+        "bytes": 24639
+      },
+      {
+        "name": "helmet",
+        "viewBox": "0 0 152 153",
+        "width": 152,
+        "height": 153,
+        "origin": [
+          668,
+          578
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 3,
+        "bytes": 2545
+      }
+    ]
+  },
+  "a07": {
+    "id": "a07",
+    "source": "a07-chalk-logbook-sheet.png",
+    "format": "svg",
+    "bytes": 34784,
+    "gzipBytes": 14155,
+    "parts": [
+      {
+        "name": "stool",
+        "viewBox": "0 0 209 287",
+        "width": 209,
+        "height": 287,
+        "origin": [
+          61,
+          55
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 1,
+        "bytes": 14811
+      },
+      {
+        "name": "logbook-closed",
+        "viewBox": "0 0 249 351",
+        "width": 249,
+        "height": 351,
+        "origin": [
+          979,
+          343
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 2,
+        "bytes": 1281
+      },
+      {
+        "name": "logbook-open",
+        "viewBox": "0 0 538 314",
+        "width": 538,
+        "height": 314,
+        "origin": [
+          57,
+          373
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 2,
+        "bytes": 3591
+      },
+      {
+        "name": "pencil",
+        "viewBox": "0 0 47 342",
+        "width": 47,
+        "height": 342,
+        "origin": [
+          1275,
+          360
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 2,
+        "bytes": 2773
+      },
+      {
+        "name": "bowl",
+        "viewBox": "0 0 285 216",
+        "width": 285,
+        "height": 216,
+        "origin": [
+          317,
+          60
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 3,
+        "bytes": 4240
+      },
+      {
+        "name": "chalk-block",
+        "viewBox": "0 0 168 109",
+        "width": 168,
+        "height": 109,
+        "origin": [
+          667,
+          119
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 3,
+        "bytes": 722
+      },
+      {
+        "name": "page-turn",
+        "viewBox": "0 0 246 347",
+        "width": 246,
+        "height": 347,
+        "origin": [
+          667,
+          334
+        ],
+        "pivot": [
+          0,
+          0.5
+        ],
+        "z": 4,
+        "bytes": 2354
+      },
+      {
+        "name": "puff-a",
+        "viewBox": "0 0 96 83",
+        "width": 96,
+        "height": 83,
+        "origin": [
+          900,
+          84
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 5,
+        "bytes": 1125
+      },
+      {
+        "name": "puff-b",
+        "viewBox": "0 0 119 116",
+        "width": 119,
+        "height": 116,
+        "origin": [
+          1060,
+          60
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 5,
+        "bytes": 1442
+      },
+      {
+        "name": "puff-c",
+        "viewBox": "0 0 56 53",
+        "width": 56,
+        "height": 53,
+        "origin": [
+          1241,
+          120
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 5,
+        "bytes": 720
+      },
+      {
+        "name": "puff-d",
+        "viewBox": "0 0 66 61",
+        "width": 66,
+        "height": 61,
+        "origin": [
+          965,
+          196
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 5,
+        "bytes": 915
+      },
+      {
+        "name": "puff-e",
+        "viewBox": "0 0 71 69",
+        "width": 71,
+        "height": 69,
+        "origin": [
+          1162,
+          192
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 5,
+        "bytes": 810
+      }
+    ]
+  },
+  "a08": {
+    "id": "a08",
+    "source": "a08-calendar-sheet.png",
+    "format": "svg",
+    "bytes": 7700,
+    "gzipBytes": 3296,
+    "parts": [
+      {
+        "name": "pad",
+        "viewBox": "0 0 422 556",
+        "width": 422,
+        "height": 556,
+        "origin": [
+          82,
+          89
+        ],
+        "pivot": [
+          0.515,
+          0.03
+        ],
+        "z": 1,
+        "bytes": 1988
+      },
+      {
+        "name": "page-flat",
+        "viewBox": "0 0 358 363",
+        "width": 358,
+        "height": 363,
+        "origin": [
+          570,
+          100
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "z": 2,
+        "bytes": 420
+      },
+      {
+        "name": "flag",
+        "viewBox": "0 0 129 196",
+        "width": 129,
+        "height": 196,
+        "origin": [
+          314,
+          722
+        ],
+        "pivot": [
+          0.1,
+          1
+        ],
+        "z": 3,
+        "bytes": 1043
+      },
+      {
+        "name": "page-curl",
+        "viewBox": "0 0 414 380",
+        "width": 414,
+        "height": 380,
+        "origin": [
+          514,
+          556
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "z": 3,
+        "bytes": 2673
+      },
+      {
+        "name": "pushpin",
+        "viewBox": "0 0 99 172",
+        "width": 99,
+        "height": 172,
+        "origin": [
+          133,
+          735
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 4,
+        "bytes": 1576
+      }
+    ]
+  },
+  "a09": {
+    "id": "a09",
+    "source": "a09-miss-bin-sheet.png",
+    "format": "svg",
+    "bytes": 26660,
+    "gzipBytes": 11151,
+    "parts": [
+      {
+        "name": "bar-bent",
+        "viewBox": "0 0 539 106",
+        "width": 539,
+        "height": 106,
+        "origin": [
+          428,
+          92
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 1,
+        "bytes": 2901
+      },
+      {
+        "name": "paper-a",
+        "viewBox": "0 0 239 238",
+        "width": 239,
+        "height": 238,
+        "origin": [
+          467,
+          277
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 2,
+        "bytes": 5792
+      },
+      {
+        "name": "paper-b",
+        "viewBox": "0 0 149 147",
+        "width": 149,
+        "height": 147,
+        "origin": [
+          746,
+          236
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 2,
+        "bytes": 3253
+      },
+      {
+        "name": "paper-c",
+        "viewBox": "0 0 138 139",
+        "width": 138,
+        "height": 139,
+        "origin": [
+          746,
+          441
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 2,
+        "bytes": 3438
+      },
+      {
+        "name": "plate-cracked",
+        "viewBox": "0 0 372 373",
+        "width": 372,
+        "height": 373,
+        "origin": [
+          417,
+          579
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 2,
+        "bytes": 2641
+      },
+      {
+        "name": "bin",
+        "viewBox": "0 0 323 546",
+        "width": 323,
+        "height": 546,
+        "origin": [
+          68,
+          84
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 3,
+        "bytes": 5683
+      },
+      {
+        "name": "plaster",
+        "viewBox": "0 0 103 334",
+        "width": 103,
+        "height": 334,
+        "origin": [
+          842,
+          620
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 4,
+        "bytes": 2952
+      }
+    ]
+  },
+  "a10": {
+    "id": "a10",
+    "source": "a10-phone-sheet.png",
+    "format": "svg",
+    "bytes": 33809,
+    "gzipBytes": 13883,
+    "parts": [
+      {
+        "name": "note",
+        "viewBox": "0 0 186 201",
+        "width": 186,
+        "height": 201,
+        "origin": [
+          621,
+          576
+        ],
+        "pivot": [
+          0.5,
+          0.05
+        ],
+        "z": 1,
+        "bytes": 786
+      },
+      {
+        "name": "body",
+        "viewBox": "0 0 299 718",
+        "width": 299,
+        "height": 718,
+        "origin": [
+          118,
+          104
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "z": 2,
+        "bytes": 16514
+      },
+      {
+        "name": "cord",
+        "viewBox": "0 0 379 236",
+        "width": 379,
+        "height": 236,
+        "origin": [
+          93,
+          877
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "z": 3,
+        "bytes": 9981
+      },
+      {
+        "name": "handset",
+        "viewBox": "0 0 382 136",
+        "width": 382,
+        "height": 136,
+        "origin": [
+          452,
+          111
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 4,
+        "bytes": 3311
+      },
+      {
+        "name": "ring-a",
+        "viewBox": "0 0 33 121",
+        "width": 33,
+        "height": 121,
+        "origin": [
+          423,
+          371
+        ],
+        "pivot": [
+          0,
+          0.5
+        ],
+        "z": 5,
+        "bytes": 634
+      },
+      {
+        "name": "ring-b",
+        "viewBox": "0 0 42 171",
+        "width": 42,
+        "height": 171,
+        "origin": [
+          448,
+          346
+        ],
+        "pivot": [
+          0,
+          0.5
+        ],
+        "z": 5,
+        "bytes": 789
+      },
+      {
+        "name": "ring-c",
+        "viewBox": "0 0 52 219",
+        "width": 52,
+        "height": 219,
+        "origin": [
+          472,
+          322
+        ],
+        "pivot": [
+          0,
+          0.5
+        ],
+        "z": 5,
+        "bytes": 750
+      },
+      {
+        "name": "ring-d",
+        "viewBox": "0 0 61 267",
+        "width": 61,
+        "height": 267,
+        "origin": [
+          496,
+          298
+        ],
+        "pivot": [
+          0,
+          0.5
+        ],
+        "z": 5,
+        "bytes": 1044
+      }
+    ]
+  },
+  "a11": {
+    "id": "a11",
+    "source": "a11-gym-kit-sheet.png",
+    "format": "svg",
+    "bytes": 18862,
+    "gzipBytes": 7828,
+    "parts": [
+      {
+        "name": "timer",
+        "viewBox": "0 0 333 196",
+        "width": 333,
+        "height": 196,
+        "origin": [
+          551,
+          114
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 1,
+        "bytes": 569
+      },
+      {
+        "name": "bag",
+        "viewBox": "0 0 447 294",
+        "width": 447,
+        "height": 294,
+        "origin": [
+          88,
+          394
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 2,
+        "bytes": 3891
+      },
+      {
+        "name": "rope",
+        "viewBox": "0 0 322 255",
+        "width": 322,
+        "height": 255,
+        "origin": [
+          972,
+          88
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 2,
+        "bytes": 6307
+      },
+      {
+        "name": "bottle",
+        "viewBox": "0 0 100 280",
+        "width": 100,
+        "height": 280,
+        "origin": [
+          876,
+          408
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 3,
+        "bytes": 1287
+      },
+      {
+        "name": "kettlebell-blue",
+        "viewBox": "0 0 198 258",
+        "width": 198,
+        "height": 258,
+        "origin": [
+          92,
+          84
+        ],
+        "pivot": [
+          0.5,
+          0.06
+        ],
+        "z": 3,
+        "bytes": 2870
+      },
+      {
+        "name": "kettlebell-yellow",
+        "viewBox": "0 0 136 182",
+        "width": 136,
+        "height": 182,
+        "origin": [
+          314,
+          160
+        ],
+        "pivot": [
+          0.5,
+          0.06
+        ],
+        "z": 3,
+        "bytes": 2268
+      },
+      {
+        "name": "towel",
+        "viewBox": "0 0 226 241",
+        "width": 226,
+        "height": 241,
+        "origin": [
+          1068,
+          428
+        ],
+        "pivot": [
+          0.5,
+          1
+        ],
+        "z": 3,
+        "bytes": 1670
+      }
+    ]
+  },
+  "a12": {
+    "id": "a12",
+    "source": "a12-fixtures-sheet.png",
+    "format": "svg",
+    "bytes": 23058,
+    "gzipBytes": 9358,
+    "parts": [
+      {
+        "name": "light-cone",
+        "viewBox": "0 0 279 258",
+        "width": 279,
+        "height": 258,
+        "origin": [
+          87,
+          428
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "z": 1,
+        "bytes": 2369
+      },
+      {
+        "name": "socket",
+        "viewBox": "0 0 188 220",
+        "width": 188,
+        "height": 220,
+        "origin": [
+          1102,
+          460
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "z": 1,
+        "bytes": 1668
+      },
+      {
+        "name": "window",
+        "viewBox": "0 0 226 237",
+        "width": 226,
+        "height": 237,
+        "origin": [
+          826,
+          443
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 1,
+        "bytes": 1720
+      },
+      {
+        "name": "lamp",
+        "viewBox": "0 0 277 362",
+        "width": 277,
+        "height": 362,
+        "origin": [
+          88,
+          0
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "z": 2,
+        "bytes": 1919
+      },
+      {
+        "name": "cord",
+        "viewBox": "0 0 30 346",
+        "width": 30,
+        "height": 346,
+        "origin": [
+          413,
+          0
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "z": 3,
+        "bytes": 531
+      },
+      {
+        "name": "pegboard",
+        "viewBox": "0 0 285 253",
+        "width": 285,
+        "height": 253,
+        "origin": [
+          493,
+          306
+        ],
+        "pivot": [
+          0.5,
+          0.5
+        ],
+        "z": 4,
+        "bytes": 6753
+      },
+      {
+        "name": "hex-keys",
+        "viewBox": "0 0 95 216",
+        "width": 95,
+        "height": 216,
+        "origin": [
+          1191,
+          106
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "z": 5,
+        "bytes": 2795
+      },
+      {
+        "name": "screwdriver",
+        "viewBox": "0 0 52 280",
+        "width": 52,
+        "height": 280,
+        "origin": [
+          960,
+          88
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "z": 5,
+        "bytes": 1478
+      },
+      {
+        "name": "tape-measure",
+        "viewBox": "0 0 131 100",
+        "width": 131,
+        "height": 100,
+        "origin": [
+          1061,
+          194
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "z": 5,
+        "bytes": 1742
+      },
+      {
+        "name": "wrench",
+        "viewBox": "0 0 80 282",
+        "width": 80,
+        "height": 282,
+        "origin": [
+          834,
+          86
+        ],
+        "pivot": [
+          0.5,
+          0
+        ],
+        "z": 5,
+        "bytes": 2083
+      }
+    ]
   }
 });

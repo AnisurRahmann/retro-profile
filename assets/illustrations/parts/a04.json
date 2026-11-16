@@ -1,0 +1,7 @@
+{
+  "asset": "a04",
+  "source": "a04-desk-sheet.png",
+  "rejected": "Splits into 13 components, the spec lists 16 parts. The laptop base and lid are not separate: the sheet has two whole laptops (5 with a grey screen, 6 with a chalk screen), so the lid cannot tilt. The mic head and boom arm are one piece (1). Only one of the three steam wisps (3) survives: the other two have no iron outline and fall below the speck threshold. The desk stays a placeholder.",
+  "components": 13,
+  "parts": {}
+}

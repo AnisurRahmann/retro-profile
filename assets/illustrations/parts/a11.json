@@ -1,0 +1,14 @@
+{
+  "asset": "a11",
+  "source": "a11-gym-kit-sheet.png",
+  "components": 7,
+  "parts": {
+    "0": { "name": "kettlebell-blue", "pivot": [0.5, 0.06], "z": 3 },
+    "1": { "name": "timer", "pivot": [0.5, 0.5], "z": 1 },
+    "2": { "name": "rope", "pivot": [0.5, 0.5], "z": 2 },
+    "3": { "name": "kettlebell-yellow", "pivot": [0.5, 0.06], "z": 3 },
+    "4": { "name": "bag", "pivot": [0.5, 1], "z": 2 },
+    "5": { "name": "bottle", "pivot": [0.5, 1], "z": 3 },
+    "6": { "name": "towel", "pivot": [0.5, 1], "z": 3 }
+  }
+}

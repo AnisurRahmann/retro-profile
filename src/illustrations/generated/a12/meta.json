@@ -1,0 +1,169 @@
+{
+  "id": "a12",
+  "source": "a12-fixtures-sheet.png",
+  "format": "svg",
+  "bytes": 23058,
+  "gzipBytes": 9358,
+  "parts": [
+    {
+      "name": "light-cone",
+      "viewBox": "0 0 279 258",
+      "width": 279,
+      "height": 258,
+      "origin": [
+        87,
+        428
+      ],
+      "pivot": [
+        0.5,
+        0
+      ],
+      "z": 1,
+      "bytes": 2369
+    },
+    {
+      "name": "socket",
+      "viewBox": "0 0 188 220",
+      "width": 188,
+      "height": 220,
+      "origin": [
+        1102,
+        460
+      ],
+      "pivot": [
+        0.5,
+        0
+      ],
+      "z": 1,
+      "bytes": 1668
+    },
+    {
+      "name": "window",
+      "viewBox": "0 0 226 237",
+      "width": 226,
+      "height": 237,
+      "origin": [
+        826,
+        443
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 1,
+      "bytes": 1720
+    },
+    {
+      "name": "lamp",
+      "viewBox": "0 0 277 362",
+      "width": 277,
+      "height": 362,
+      "origin": [
+        88,
+        0
+      ],
+      "pivot": [
+        0.5,
+        0
+      ],
+      "z": 2,
+      "bytes": 1919
+    },
+    {
+      "name": "cord",
+      "viewBox": "0 0 30 346",
+      "width": 30,
+      "height": 346,
+      "origin": [
+        413,
+        0
+      ],
+      "pivot": [
+        0.5,
+        0
+      ],
+      "z": 3,
+      "bytes": 531
+    },
+    {
+      "name": "pegboard",
+      "viewBox": "0 0 285 253",
+      "width": 285,
+      "height": 253,
+      "origin": [
+        493,
+        306
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 4,
+      "bytes": 6753
+    },
+    {
+      "name": "hex-keys",
+      "viewBox": "0 0 95 216",
+      "width": 95,
+      "height": 216,
+      "origin": [
+        1191,
+        106
+      ],
+      "pivot": [
+        0.5,
+        0
+      ],
+      "z": 5,
+      "bytes": 2795
+    },
+    {
+      "name": "screwdriver",
+      "viewBox": "0 0 52 280",
+      "width": 52,
+      "height": 280,
+      "origin": [
+        960,
+        88
+      ],
+      "pivot": [
+        0.5,
+        0
+      ],
+      "z": 5,
+      "bytes": 1478
+    },
+    {
+      "name": "tape-measure",
+      "viewBox": "0 0 131 100",
+      "width": 131,
+      "height": 100,
+      "origin": [
+        1061,
+        194
+      ],
+      "pivot": [
+        0.5,
+        0
+      ],
+      "z": 5,
+      "bytes": 1742
+    },
+    {
+      "name": "wrench",
+      "viewBox": "0 0 80 282",
+      "width": 80,
+      "height": 282,
+      "origin": [
+        834,
+        86
+      ],
+      "pivot": [
+        0.5,
+        0
+      ],
+      "z": 5,
+      "bytes": 2083
+    }
+  ]
+}

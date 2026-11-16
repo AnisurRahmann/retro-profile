@@ -1,0 +1,16 @@
+{
+  "asset": "a10",
+  "source": "a10-phone-sheet.png",
+  "components": 9,
+  "parts": {
+    "0": { "name": "handset", "pivot": [0.5, 0.5], "z": 4 },
+    "1": { "name": "body", "pivot": [0.5, 0], "z": 2 },
+    "2": { "name": "ring-a", "pivot": [0, 0.5], "z": 5 },
+    "3": { "name": "ring-b", "pivot": [0, 0.5], "z": 5 },
+    "4": { "name": "ring-c", "pivot": [0, 0.5], "z": 5 },
+    "5": { "name": "ring-d", "pivot": [0, 0.5], "z": 5 },
+    "6": { "name": "note", "pivot": [0.5, 0.05], "z": 1 },
+    "7": { "name": "cord", "pivot": [0.5, 0], "z": 3 },
+    "8": { "ignore": "second paper note, the spec lists one" }
+  }
+}

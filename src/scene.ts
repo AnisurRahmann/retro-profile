@@ -1,7 +1,21 @@
 import { z } from "zod";
 import { flights, ui } from "@/content";
 import { GYM_UI } from "@/gym";
-import { characterLayout, rackLayout } from "@/illustrations/compose";
+import {
+  bikeLayout,
+  binLayout,
+  botLayout,
+  calendarLayout,
+  characterLayout,
+  chalkLayout,
+  kitLayout,
+  lampLayout,
+  pegboardLayout,
+  phoneLayout,
+  rackLayout,
+  whiteboardLayout,
+  windowLayout,
+} from "@/illustrations/compose";
 import { manifest } from "@/illustrations/generated/manifest";
 import { stationSchema, type Station } from "@/schema";
 
@@ -41,18 +55,24 @@ export const stations: Station[] = z
   .length(12)
   .parse([
     { id: "character", asset: "a01b", ...footprint(characterLayout(), 0.78, 1178, 772), z: 6, ...flightLabel("platform") },
-    { id: "whiteboard", asset: "a03", x: 160, y: 205, w: 300, h: 220, scale: 1, z: 2, ...flightLabel("pr-board") },
+    { id: "whiteboard", asset: "a03", ...footprint(whiteboardLayout(), 0.42, 318, 405), z: 2, ...flightLabel("pr-board") },
     { id: "desk", asset: "a04", x: 150, y: 574, w: 320, h: 170, scale: 1, z: 3, ...flightLabel("training-blocks") },
     { id: "rack", asset: "a02", ...footprint(rackLayout(), 1, 760, 757), z: 5, ...flightLabel("load-the-bar") },
-    { id: "chalk", asset: "a07", x: 1296, y: 572, w: 164, h: 160, scale: 1, z: 3, ...flightLabel("training-rules") },
-    { id: "calendar", asset: "a08", x: 1340, y: 225, w: 150, h: 150, scale: 1, z: 2, ...flightLabel("next-block") },
-    { id: "bin", asset: "a09", x: 1472, y: 602, w: 112, h: 130, scale: 1, z: 3, ...flightLabel("no-lift") },
-    { id: "bike", asset: "a06", x: 1352, y: 752, w: 232, h: 132, scale: 1, z: 4, ...flightLabel("actual-log") },
-    { id: "kit", asset: "a11", x: 1060, y: 800, w: 250, h: 84, scale: 1, z: 7, href: "/gym/", label: t.gym, plain: GYM_UI.openLogPlain, section: "actual-log" },
-    { id: "phone", asset: "a10", x: 24, y: 262, w: 112, h: 200, scale: 1, z: 2, ...flightLabel("spot-me") },
-    { id: "bot", asset: "a05", x: 236, y: 458, w: 150, h: 112, scale: 1, z: 4, href: "/notes/", label: ui.notes.link, plain: ui.notes.linkPlain, section: null },
-    { id: "lamp", asset: "a12", x: 680, y: 0, w: 160, h: 190, scale: 1, z: 2, href: null, label: t.lightsOn, plain: t.lightsOnPlain, section: null },
+    { id: "chalk", asset: "a07", ...footprint(chalkLayout(), 0.42, 1376, 736), z: 3, ...flightLabel("training-rules") },
+    { id: "calendar", asset: "a08", ...footprint(calendarLayout(), 0.46, 1424, 432), z: 2, ...flightLabel("next-block") },
+    { id: "bin", asset: "a09", ...footprint(binLayout(), 0.21, 1532, 734), z: 3, ...flightLabel("no-lift") },
+    { id: "bike", asset: "a06", ...footprint(bikeLayout(), 0.27, 1444, 888), z: 4, ...flightLabel("actual-log") },
+    { id: "kit", asset: "a11", ...footprint(kitLayout(), 0.3, 1100, 888), z: 7, href: "/gym/", label: t.gym, plain: GYM_UI.openLogPlain, section: "actual-log" },
+    { id: "phone", asset: "a10", ...footprint(phoneLayout(), 0.27, 78, 470), z: 2, ...flightLabel("spot-me") },
+    { id: "bot", asset: "a05", ...footprint(botLayout(), 0.24, 408, 574), z: 4, href: "/notes/", label: ui.notes.link, plain: ui.notes.linkPlain, section: null },
+    { id: "lamp", asset: "a12", ...footprint(lampLayout(), 0.5, 760, 323), z: 2, href: null, label: t.lightsOut, plain: t.lightsOutPlain, section: null },
   ]);
+
+/** Wall fixtures from the A12 sheet. Not stations: they are drawn in the scaled room only and lead nowhere. */
+export const decor = [
+  { id: "pegboard", ...footprint(pegboardLayout(), 0.62, 1174, 228), z: 1 },
+  { id: "window", ...footprint(windowLayout(), 0.5, 560, 270), z: 1 },
+] as const;
 
 /** Stations whose art is traced and in the manifest. The rest render as dashed placeholders. */
 export function hasArt(station: Station): boolean {

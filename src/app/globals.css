@@ -2056,6 +2056,72 @@ details > summary {
   }
 }
 
+/* idle loops start and end on the final pose, so a paused loop is the final pose */
+@keyframes bot-bob {
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes bot-eyes-open {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0;
+  }
+}
+
+@keyframes bot-eyes-closed {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  96% {
+    opacity: 1;
+  }
+}
+
+/* 400 ms of shaking at the start of every 9 s */
+@keyframes phone-shake {
+  0%,
+  4.4%,
+  100% {
+    transform: rotate(0deg);
+  }
+  0.6%,
+  1.8%,
+  3% {
+    transform: rotate(-4deg);
+  }
+  1.2%,
+  2.4%,
+  3.6% {
+    transform: rotate(4deg);
+  }
+}
+
+@keyframes phone-rings {
+  0.1% {
+    opacity: 1;
+  }
+  0%,
+  4.4%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes lamp-sway {
+  25% {
+    transform: rotate(1.5deg);
+  }
+  75% {
+    transform: rotate(-1.5deg);
+  }
+}
+
 @layer components {
 .i-chalk { fill: var(--i-chalk); }
 .i-iron { fill: var(--i-iron); }
@@ -2263,15 +2329,6 @@ details > summary {
   content: none;
 }
 
-.station .when-dark,
-[data-theme="dark"] .station .when-light {
-  display: none;
-}
-
-[data-theme="dark"] .station .when-dark {
-  display: inline;
-}
-
 /* hover and focus: never colour alone. The label is underlined, focus adds a ring. */
 .station:hover .station-label b,
 .station:focus-visible .station-label b {
@@ -2379,6 +2436,302 @@ details > summary {
   }
 }
 
+/* ── A03 to A12: the object's box, live text on blank surfaces, labels ── */
+
+/* The box has the drawing's proportions. Text laid over it is sized in container units, so it scales with the object. */
+.ill-box {
+  position: relative;
+  display: block;
+  width: min(100%, calc(6rem * var(--ar)));
+  aspect-ratio: var(--ar);
+  container-type: inline-size;
+}
+
+.ill-box > .ill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+.wb,
+.cal,
+.kit-clock {
+  position: absolute;
+  color: var(--i-iron);
+}
+
+.wb {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.wb-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+}
+
+.wb-n {
+  font-size: 5.4cqw;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.cal {
+  overflow: hidden;
+}
+
+.cal-goal {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5cqw;
+  padding: 3cqw 2.5cqw;
+  text-align: left;
+}
+
+.cal-goal[hidden] {
+  display: none;
+}
+
+.cal-goal b {
+  font-family: var(--font-display);
+  font-size: 11cqw;
+  font-weight: 900;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.cal-goal span {
+  font-size: 6.4cqw;
+  line-height: 1.25;
+}
+
+.kit-clock {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 3.5cqw;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* the timer's display is grey: iron text stops being readable on it with the lights out */
+[data-lights="off"] .kit-clock {
+  color: #f4f1ea;
+}
+
+.garage-decor,
+.bot-say {
+  display: none;
+}
+
+/* stacked layout: objects that carry text, or are much wider than tall, get the full row */
+.station[data-station="whiteboard"],
+.station[data-station="kit"] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.station[data-station="whiteboard"] .station-obj,
+.station[data-station="kit"] .station-obj {
+  height: auto;
+  justify-content: flex-start;
+}
+
+.station[data-station="whiteboard"] .ill-box,
+.station[data-station="kit"] .ill-box {
+  width: min(100%, 22rem);
+}
+
+.station[data-station="calendar"] .station-obj {
+  height: 9rem;
+}
+
+.station[data-station="calendar"] .ill-box {
+  width: min(100%, calc(9rem * var(--ar)));
+}
+
+/* the lamp is not a link: its pull cord is the button */
+div.station {
+  cursor: default;
+}
+
+div.station:hover {
+  background: none;
+}
+
+.lamp-cord {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lamp-cord .ill {
+  width: auto;
+  height: 3.5rem;
+  flex: none;
+}
+
+.lamp-cord:focus-visible {
+  outline: 3px solid var(--iron);
+  outline-offset: 3px;
+}
+
+.lamp-cord:hover .station-label b,
+.lamp-cord:focus-visible .station-label b {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+@media (min-width: 64rem) {
+  .ill-box {
+    width: 100%;
+    height: 100%;
+  }
+
+  .station[data-station="whiteboard"] .ill-box,
+  .station[data-station="kit"] .ill-box,
+  .station[data-station="calendar"] .ill-box {
+    width: 100%;
+  }
+
+  .station[data-station="calendar"] .station-obj {
+    height: auto;
+  }
+
+  .garage-decor {
+    display: block;
+    position: absolute;
+    left: calc(var(--x) * 0.0625cqw);
+    top: calc(var(--y) * 0.0625cqw);
+    width: calc(var(--w) * 0.0625cqw);
+    height: calc(var(--h) * 0.0625cqw);
+    z-index: var(--z);
+    pointer-events: none;
+  }
+
+  .garage-decor .ill {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* the bot's speech: the plain label of the station in focus */
+  .bot-say {
+    display: block;
+    position: absolute;
+    left: calc(var(--x) * 0.0625cqw);
+    top: calc(var(--y) * 0.0625cqw);
+    transform: translateX(-100%);
+    z-index: 9;
+    padding: 0.125rem 0.375rem;
+    border: 2px solid var(--iron);
+    background: var(--chalk);
+    color: var(--iron);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    line-height: 1.35;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .bot-say:empty {
+    display: none;
+  }
+
+  /* labels sit beside the drawing, not on it */
+  .station[data-station="whiteboard"] .station-label {
+    top: 0;
+    left: 45%;
+    transform: translate(-50%, -112%);
+  }
+
+  .station[data-station="chalk"] .station-label,
+  .station[data-station="bin"] .station-label {
+    top: 0;
+    transform: translate(-50%, -108%);
+  }
+
+  .station[data-station="bin"] .station-label {
+    left: 62%;
+  }
+
+  .station[data-station="calendar"] .station-label {
+    top: 0;
+    transform: translate(-50%, -108%);
+  }
+
+  .station[data-station="phone"] .station-label {
+    top: 100%;
+  }
+
+  /* the bot's label and its speech both sit to its left, on the empty wall under the whiteboard */
+  .station[data-station="bot"] .station-label {
+    top: 72%;
+    left: 0;
+    transform: translate(-100%, -50%);
+  }
+
+  .station[data-station="phone"] .station-label {
+    left: 0;
+    transform: translate(0, 0.25rem);
+  }
+
+  .station[data-station="bike"] .station-label {
+    top: 100%;
+    left: 52%;
+    transform: translate(-50%, -112%);
+  }
+
+  .station[data-station="kit"] .station-label {
+    top: 0;
+    left: 14%;
+    transform: translate(-50%, -112%);
+  }
+
+  .lamp-cord {
+    position: absolute;
+    left: calc(var(--cord-x) * 0.0625cqw);
+    top: calc(var(--cord-y) * 0.0625cqw);
+    transform: translateX(-50%);
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .lamp-cord .ill {
+    width: calc(var(--cord-w) * 0.0625cqw);
+    height: calc(var(--cord-h) * 0.0625cqw);
+  }
+
+  .lamp-cord .station-label {
+    position: static;
+    transform: none;
+  }
+
+  /* the lamp's label inverts while the lights are out (the button is pressed), not on hover */
+  .station[data-station="lamp"]:hover .station-label {
+    background: var(--chalk);
+    color: var(--iron);
+  }
+
+  .station[data-station="lamp"] .lamp-cord[aria-pressed="true"] .station-label {
+    background: var(--iron);
+    color: var(--chalk);
+  }
+}
+
 /* ── Motion: transform and opacity on SVG groups, origins from the manifest pivots ── */
 
 [data-rk="plate"],
@@ -2390,6 +2743,7 @@ details > summary {
 }
 
 /* parts that only show during a sequence */
+.ill [data-hidden],
 [data-rk="bowed"],
 [data-ch="wave"],
 [data-ch="chalk"],
@@ -2397,7 +2751,75 @@ details > summary {
   opacity: 0;
 }
 
+/* the light cone is light: half there with the lights on, gone with them off */
+[data-p="cone"] {
+  opacity: 0.35;
+}
+
+[data-lights="off"] [data-p="cone"] {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  /* idle loops run on screen only, and stop with the tab */
+  .station {
+    --idle: paused;
+  }
+
+  .station[data-onscreen] {
+    --idle: running;
+  }
+
+  [data-tab-hidden] .station[data-onscreen] {
+    --idle: paused;
+  }
+
+  [data-p="antenna-bob"] {
+    animation: bot-bob 1.8s ease-in-out infinite;
+    animation-play-state: var(--idle);
+  }
+
+  [data-p="head-open"] {
+    animation: bot-eyes-open 6s step-end infinite;
+    animation-play-state: var(--idle);
+  }
+
+  [data-p="head-closed"] {
+    animation: bot-eyes-closed 6s step-end infinite;
+    animation-play-state: var(--idle);
+  }
+
+  [data-station="phone"] [data-p="handset"] {
+    animation: phone-shake 9s linear infinite;
+    animation-play-state: var(--idle);
+  }
+
+  [data-station="phone"] [data-p="rings"] {
+    animation: phone-rings 9s step-end infinite;
+    animation-play-state: var(--idle);
+  }
+
+  /* a lifted handset does not ring */
+  [data-station="phone"][data-active] [data-p="handset"],
+  [data-station="phone"][data-active] [data-p="rings"] {
+    animation: none;
+  }
+
+  [data-p="sway"],
+  [data-p="cord-sway"] {
+    animation: lamp-sway 6s ease-in-out infinite;
+    animation-play-state: var(--idle);
+  }
+
+  /* before their entry: the numbers are not on the board yet, the kickstand is still down */
+  .js .station[data-station="whiteboard"]:not([data-entered]) .wb-row {
+    animation: ill-late 1ms 3s both;
+  }
+
+  .js .station[data-station="bike"]:not([data-entered]) [data-p="stand"] {
+    transform: rotate(-68deg);
+  }
+
   /* plates wait off the bar until the runtime slides them in. If it never arrives, they appear on their own. */
   .js .station[data-station="rack"]:not([data-entered]) [data-rk="plate"] {
     animation: ill-late 1ms 3s both;
@@ -2426,6 +2848,25 @@ details > summary {
   .station[data-active] [data-rk="bowed"],
   .station[data-active] [data-ch="wave"] {
     opacity: 1;
+  }
+
+  .station[data-active] [data-p="head-open"],
+  .station[data-speaking] [data-p="head-open"] {
+    opacity: 0;
+  }
+
+  .station[data-active] [data-p="head-happy"],
+  .station[data-speaking] [data-p="head-happy"] {
+    opacity: 1;
+  }
+
+  .station[data-active] [data-p="handset"] {
+    transform: translateY(-46px) rotate(-10deg);
+  }
+
+  .station[data-active] .wb-n:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 0.12em;
   }
 }
 

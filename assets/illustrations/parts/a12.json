@@ -1,0 +1,17 @@
+{
+  "asset": "a12",
+  "source": "a12-fixtures-sheet.png",
+  "components": 10,
+  "parts": {
+    "0": { "name": "cord", "pivot": [0.5, 0], "z": 3 },
+    "1": { "name": "wrench", "pivot": [0.5, 0], "z": 5 },
+    "2": { "name": "tape-measure", "pivot": [0.5, 0], "z": 5 },
+    "3": { "name": "hex-keys", "pivot": [0.5, 0], "z": 5 },
+    "4": { "name": "lamp", "pivot": [0.5, 0], "z": 2 },
+    "5": { "name": "screwdriver", "pivot": [0.5, 0], "z": 5 },
+    "6": { "name": "pegboard", "pivot": [0.5, 0.5], "z": 4 },
+    "7": { "name": "light-cone", "pivot": [0.5, 0], "z": 1 },
+    "8": { "name": "window", "pivot": [0.5, 0.5], "z": 1 },
+    "9": { "name": "socket", "pivot": [0.5, 0], "z": 1 }
+  }
+}

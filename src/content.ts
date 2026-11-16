@@ -1126,6 +1126,8 @@ export const ui = {
     listTitle: "Section list",
     listPlain: "the same links as text",
     pending: "Dashed boxes are objects still being drawn. They already work as links.",
+    /** shown on the timer until the browser fills in the time in Dhaka */
+    clockPlaceholder: "--:--:--",
     plates: "Plates on the bar",
     platesPlain: "project categories, inside out",
     fullLog: "Read the whole log",

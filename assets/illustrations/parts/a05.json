@@ -1,0 +1,23 @@
+{
+  "asset": "a05",
+  "source": "a05-bot-sheet.png",
+  "components": 16,
+  "parts": {
+    "0": { "name": "head-open", "pivot": [0.5, 1], "z": 3 },
+    "1": { "name": "head-closed", "pivot": [0.5, 1], "z": 3 },
+    "2": { "name": "head-happy", "pivot": [0.5, 1], "z": 3 },
+    "3": { "name": "body", "pivot": [0.5, 1], "z": 2 },
+    "4": { "ignore": "third arm, straight, the spec lists two" },
+    "5": { "name": "arm-left", "pivot": [0.58, 0.12], "z": 1 },
+    "6": { "name": "antenna", "pivot": [0.5, 1], "z": 4 },
+    "7": { "name": "arm-right", "pivot": [0.42, 0.12], "z": 1 },
+    "8": { "ignore": "loose small arc, duplicate of 15" },
+    "9": { "ignore": "left foot, not in the spec" },
+    "10": { "ignore": "right foot, not in the spec" },
+    "11": { "ignore": "loose medium arc, duplicate of 13" },
+    "12": { "name": "arc-large", "pivot": [0.5, 1], "z": 5 },
+    "13": { "name": "arc-medium", "pivot": [0.5, 1], "z": 5 },
+    "14": { "ignore": "loose small arc, duplicate of 15" },
+    "15": { "name": "arc-small", "pivot": [0.5, 1], "z": 5 }
+  }
+}

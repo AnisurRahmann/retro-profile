@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { countUp } from "@/lib/countup";
 
 const THEME_KEY = "lights";
 
@@ -15,6 +16,13 @@ export function Runtime({ flightIds }: { flightIds: string[] }) {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const cleanups: (() => void)[] = [];
 
+    // toggles that carry aria-pressed (the lamp's pull cord) are pressed while the lights are out
+    const syncPressed = () => {
+      const out = root.dataset.theme === "dark";
+      document.querySelectorAll("[data-lights-toggle][aria-pressed]").forEach((toggle) => toggle.setAttribute("aria-pressed", String(out)));
+    };
+    syncPressed();
+
     const toggleTheme = () => {
       const next = root.dataset.theme === "dark" ? "light" : "dark";
       root.dataset.theme = next;
@@ -26,6 +34,7 @@ export function Runtime({ flightIds }: { flightIds: string[] }) {
       } catch {
         // private mode: the toggle still works for this page view
       }
+      syncPressed();
     };
 
     const onClick = (event: MouseEvent) => {
@@ -96,30 +105,13 @@ export function Runtime({ flightIds }: { flightIds: string[] }) {
       lights.forEach((node) => lightObserver.observe(node));
 
       // numbers count up once
-      const frames = new Set<number>();
+      const counting: (() => void)[] = [];
       const countObserver = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
             if (!entry.isIntersecting) continue;
             countObserver.unobserve(entry.target);
-            const node = entry.target as HTMLElement;
-            const final = node.textContent ?? "";
-            const match = /\d[\d,]*(?:\.\d+)?/.exec(final);
-            if (!match) continue;
-            const target = Number(match[0].replace(/,/g, ""));
-            const decimals = match[0].split(".")[1]?.length ?? 0;
-            const grouped = match[0].includes(",");
-            const started = performance.now();
-            node.style.fontVariantNumeric = "tabular-nums";
-            const tick = (now: number) => {
-              const progress = Math.min(1, (now - started) / 700);
-              const eased = 1 - (1 - progress) ** 3;
-              const value = (target * eased).toFixed(decimals);
-              const shown = grouped ? Number(value).toLocaleString("en-US") : value;
-              node.textContent = progress === 1 ? final : final.replace(match[0], shown);
-              if (progress < 1) frames.add(requestAnimationFrame(tick));
-            };
-            frames.add(requestAnimationFrame(tick));
+            counting.push(countUp(entry.target as HTMLElement));
           }
         },
         { threshold: 0.6 },
@@ -131,7 +123,7 @@ export function Runtime({ flightIds }: { flightIds: string[] }) {
       cleanups.push(() => {
         lightObserver.disconnect();
         countObserver.disconnect();
-        frames.forEach((frame) => cancelAnimationFrame(frame));
+        counting.forEach((cancel) => cancel());
         document.querySelectorAll("[data-armed]").forEach((node) => node.removeAttribute("data-armed"));
       });
     }

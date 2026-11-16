@@ -1,0 +1,89 @@
+{
+  "id": "a08",
+  "source": "a08-calendar-sheet.png",
+  "format": "svg",
+  "bytes": 7700,
+  "gzipBytes": 3296,
+  "parts": [
+    {
+      "name": "pad",
+      "viewBox": "0 0 422 556",
+      "width": 422,
+      "height": 556,
+      "origin": [
+        82,
+        89
+      ],
+      "pivot": [
+        0.515,
+        0.03
+      ],
+      "z": 1,
+      "bytes": 1988
+    },
+    {
+      "name": "page-flat",
+      "viewBox": "0 0 358 363",
+      "width": 358,
+      "height": 363,
+      "origin": [
+        570,
+        100
+      ],
+      "pivot": [
+        0.5,
+        0
+      ],
+      "z": 2,
+      "bytes": 420
+    },
+    {
+      "name": "flag",
+      "viewBox": "0 0 129 196",
+      "width": 129,
+      "height": 196,
+      "origin": [
+        314,
+        722
+      ],
+      "pivot": [
+        0.1,
+        1
+      ],
+      "z": 3,
+      "bytes": 1043
+    },
+    {
+      "name": "page-curl",
+      "viewBox": "0 0 414 380",
+      "width": 414,
+      "height": 380,
+      "origin": [
+        514,
+        556
+      ],
+      "pivot": [
+        0.5,
+        0
+      ],
+      "z": 3,
+      "bytes": 2673
+    },
+    {
+      "name": "pushpin",
+      "viewBox": "0 0 99 172",
+      "width": 99,
+      "height": 172,
+      "origin": [
+        133,
+        735
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 4,
+      "bytes": 1576
+    }
+  ]
+}

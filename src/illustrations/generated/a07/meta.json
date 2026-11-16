@@ -1,0 +1,201 @@
+{
+  "id": "a07",
+  "source": "a07-chalk-logbook-sheet.png",
+  "format": "svg",
+  "bytes": 34784,
+  "gzipBytes": 14155,
+  "parts": [
+    {
+      "name": "stool",
+      "viewBox": "0 0 209 287",
+      "width": 209,
+      "height": 287,
+      "origin": [
+        61,
+        55
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 1,
+      "bytes": 14811
+    },
+    {
+      "name": "logbook-closed",
+      "viewBox": "0 0 249 351",
+      "width": 249,
+      "height": 351,
+      "origin": [
+        979,
+        343
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 2,
+      "bytes": 1281
+    },
+    {
+      "name": "logbook-open",
+      "viewBox": "0 0 538 314",
+      "width": 538,
+      "height": 314,
+      "origin": [
+        57,
+        373
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 2,
+      "bytes": 3591
+    },
+    {
+      "name": "pencil",
+      "viewBox": "0 0 47 342",
+      "width": 47,
+      "height": 342,
+      "origin": [
+        1275,
+        360
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 2,
+      "bytes": 2773
+    },
+    {
+      "name": "bowl",
+      "viewBox": "0 0 285 216",
+      "width": 285,
+      "height": 216,
+      "origin": [
+        317,
+        60
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 3,
+      "bytes": 4240
+    },
+    {
+      "name": "chalk-block",
+      "viewBox": "0 0 168 109",
+      "width": 168,
+      "height": 109,
+      "origin": [
+        667,
+        119
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 3,
+      "bytes": 722
+    },
+    {
+      "name": "page-turn",
+      "viewBox": "0 0 246 347",
+      "width": 246,
+      "height": 347,
+      "origin": [
+        667,
+        334
+      ],
+      "pivot": [
+        0,
+        0.5
+      ],
+      "z": 4,
+      "bytes": 2354
+    },
+    {
+      "name": "puff-a",
+      "viewBox": "0 0 96 83",
+      "width": 96,
+      "height": 83,
+      "origin": [
+        900,
+        84
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 5,
+      "bytes": 1125
+    },
+    {
+      "name": "puff-b",
+      "viewBox": "0 0 119 116",
+      "width": 119,
+      "height": 116,
+      "origin": [
+        1060,
+        60
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 5,
+      "bytes": 1442
+    },
+    {
+      "name": "puff-c",
+      "viewBox": "0 0 56 53",
+      "width": 56,
+      "height": 53,
+      "origin": [
+        1241,
+        120
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 5,
+      "bytes": 720
+    },
+    {
+      "name": "puff-d",
+      "viewBox": "0 0 66 61",
+      "width": 66,
+      "height": 61,
+      "origin": [
+        965,
+        196
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 5,
+      "bytes": 915
+    },
+    {
+      "name": "puff-e",
+      "viewBox": "0 0 71 69",
+      "width": 71,
+      "height": 69,
+      "origin": [
+        1162,
+        192
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 5,
+      "bytes": 810
+    }
+  ]
+}

@@ -1,0 +1,185 @@
+{
+  "id": "a03",
+  "source": "a03-whiteboard-sheet.png",
+  "format": "svg",
+  "bytes": 11352,
+  "gzipBytes": 4190,
+  "parts": [
+    {
+      "name": "board",
+      "viewBox": "0 0 719 492",
+      "width": 719,
+      "height": 492,
+      "origin": [
+        77,
+        89
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 1,
+      "bytes": 1861
+    },
+    {
+      "name": "eraser",
+      "viewBox": "0 0 172 91",
+      "width": 172,
+      "height": 91,
+      "origin": [
+        856,
+        358
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 3,
+      "bytes": 532
+    },
+    {
+      "name": "marker-blue",
+      "viewBox": "0 0 243 49",
+      "width": 243,
+      "height": 49,
+      "origin": [
+        836,
+        166
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 3,
+      "bytes": 1132
+    },
+    {
+      "name": "marker-cap",
+      "viewBox": "0 0 75 73",
+      "width": 75,
+      "height": 73,
+      "origin": [
+        1224,
+        209
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 3,
+      "bytes": 690
+    },
+    {
+      "name": "marker-iron",
+      "viewBox": "0 0 243 49",
+      "width": 243,
+      "height": 49,
+      "origin": [
+        836,
+        234
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 3,
+      "bytes": 661
+    },
+    {
+      "name": "marker-red",
+      "viewBox": "0 0 243 50",
+      "width": 243,
+      "height": 50,
+      "origin": [
+        836,
+        98
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 3,
+      "bytes": 1157
+    },
+    {
+      "name": "magnet-green",
+      "viewBox": "0 0 56 57",
+      "width": 56,
+      "height": 57,
+      "origin": [
+        1217,
+        351
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 4,
+      "bytes": 423
+    },
+    {
+      "name": "magnet-yellow",
+      "viewBox": "0 0 55 57",
+      "width": 55,
+      "height": 57,
+      "origin": [
+        1134,
+        351
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 4,
+      "bytes": 678
+    },
+    {
+      "name": "tick",
+      "viewBox": "0 0 137 144",
+      "width": 137,
+      "height": 144,
+      "origin": [
+        1137,
+        527
+      ],
+      "pivot": [
+        0.3,
+        0.9
+      ],
+      "z": 4,
+      "bytes": 1445
+    },
+    {
+      "name": "underline",
+      "viewBox": "0 0 211 24",
+      "width": 211,
+      "height": 24,
+      "origin": [
+        860,
+        652
+      ],
+      "pivot": [
+        0,
+        0.5
+      ],
+      "z": 4,
+      "bytes": 916
+    },
+    {
+      "name": "marker-writing",
+      "viewBox": "0 0 157 191",
+      "width": 157,
+      "height": 191,
+      "origin": [
+        1122,
+        92
+      ],
+      "pivot": [
+        0.04,
+        0.97
+      ],
+      "z": 5,
+      "bytes": 1857
+    }
+  ]
+}

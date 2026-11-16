@@ -263,8 +263,9 @@ describe("g. manifest", () => {
     expect(() => illustrationManifestSchema.parse({ a99: { id: "a99", source: "x", format: "svg", bytes: 1, gzipBytes: 1, parts: [{ ...part, viewBox: "1 1 10 10" }] } })).toThrow();
   });
 
-  it("the committed manifest has the rack and the character, inside the size budget", () => {
-    expect(Object.keys(manifest).sort()).toEqual(["a01b", "a02"]);
+  it("the committed manifest has every accepted sheet, inside the size budget", () => {
+    // a01 (puppet) and a04 (desk) are rejected in their parts maps: nothing is emitted for them
+    expect(Object.keys(manifest).sort()).toEqual(["a01b", "a02", "a03", "a05", "a06", "a07", "a08", "a09", "a10", "a11", "a12"]);
     const rack = manifest.a02!;
     expect(rack.parts).toHaveLength(17);
     for (const colour of ["red", "blue", "yellow", "green", "chalk", "iron"]) {

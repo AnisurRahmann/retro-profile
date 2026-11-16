@@ -1,0 +1,121 @@
+{
+  "id": "a09",
+  "source": "a09-miss-bin-sheet.png",
+  "format": "svg",
+  "bytes": 26660,
+  "gzipBytes": 11151,
+  "parts": [
+    {
+      "name": "bar-bent",
+      "viewBox": "0 0 539 106",
+      "width": 539,
+      "height": 106,
+      "origin": [
+        428,
+        92
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 1,
+      "bytes": 2901
+    },
+    {
+      "name": "paper-a",
+      "viewBox": "0 0 239 238",
+      "width": 239,
+      "height": 238,
+      "origin": [
+        467,
+        277
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 2,
+      "bytes": 5792
+    },
+    {
+      "name": "paper-b",
+      "viewBox": "0 0 149 147",
+      "width": 149,
+      "height": 147,
+      "origin": [
+        746,
+        236
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 2,
+      "bytes": 3253
+    },
+    {
+      "name": "paper-c",
+      "viewBox": "0 0 138 139",
+      "width": 138,
+      "height": 139,
+      "origin": [
+        746,
+        441
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 2,
+      "bytes": 3438
+    },
+    {
+      "name": "plate-cracked",
+      "viewBox": "0 0 372 373",
+      "width": 372,
+      "height": 373,
+      "origin": [
+        417,
+        579
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 2,
+      "bytes": 2641
+    },
+    {
+      "name": "bin",
+      "viewBox": "0 0 323 546",
+      "width": 323,
+      "height": 546,
+      "origin": [
+        68,
+        84
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 3,
+      "bytes": 5683
+    },
+    {
+      "name": "plaster",
+      "viewBox": "0 0 103 334",
+      "width": 103,
+      "height": 334,
+      "origin": [
+        842,
+        620
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 4,
+      "bytes": 2952
+    }
+  ]
+}

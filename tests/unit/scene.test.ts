@@ -1,7 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { buses, flights } from "@/content";
-import { characterLayout, PLATE_COLOURS, rackLayout } from "@/illustrations/compose";
-import { hasArt, SCENE, SCENE_ROUTES, sceneProblems, stations } from "@/scene";
+import {
+  bikeLayout,
+  binLayout,
+  botLayout,
+  calendarLayout,
+  characterLayout,
+  chalkLayout,
+  kitLayout,
+  lampLayout,
+  phoneLayout,
+  PLATE_COLOURS,
+  rackLayout,
+  whiteboardLayout,
+  type PartNode,
+} from "@/illustrations/compose";
+import { manifest } from "@/illustrations/generated/manifest";
+import { decor, hasArt, SCENE, SCENE_ROUTES, sceneProblems, stations } from "@/scene";
 import { stationSchema } from "@/schema";
 import { hexToRgb } from "../../scripts/illustrations/color";
 import { snapColour } from "../../scripts/illustrations/snap";
@@ -47,13 +62,65 @@ describe("scene", () => {
     }
   });
 
+  const layouts: Record<string, { asset?: string; width: number; height: number; nodes?: PartNode[] }> = {
+    rack: rackLayout(),
+    character: characterLayout(),
+    whiteboard: whiteboardLayout(),
+    bot: botLayout(),
+    bike: bikeLayout(),
+    chalk: chalkLayout(),
+    calendar: calendarLayout(),
+    bin: binLayout(),
+    phone: phoneLayout(),
+    kit: kitLayout(),
+    lamp: lampLayout(),
+  };
+
   it("gives traced objects a footprint with the object's own proportions", () => {
-    const layouts: Record<string, { width: number; height: number }> = { rack: rackLayout(), character: characterLayout() };
     const traced = stations.filter(hasArt);
-    expect(traced.map((station) => station.id).sort()).toEqual(["character", "rack"]);
+    // the desk (a04) is the one sheet without art: its parts map rejects it
+    expect(stations.filter((station) => !hasArt(station)).map((station) => station.id)).toEqual(["desk"]);
+    expect(traced.map((station) => station.id).sort()).toEqual(Object.keys(layouts).sort());
     for (const station of traced) {
       const layout = layouts[station.id]!;
       expect(station.w / station.h, station.id).toBeCloseTo(layout.width / layout.height, 1);
+    }
+  });
+
+  it("composes objects only from parts that are in the manifest, with unique group ids", () => {
+    for (const [id, layout] of Object.entries(layouts)) {
+      if (!layout.nodes || !layout.asset) continue;
+      const names = new Set(manifest[layout.asset]!.parts.map((entry) => entry.name));
+      const ids: string[] = [];
+      const walk = (node: PartNode) => {
+        ids.push(node.id);
+        if (node.name) expect(names.has(node.name), `${id}/${node.name}`).toBe(true);
+        node.children?.forEach(walk);
+      };
+      layout.nodes.forEach(walk);
+      expect(new Set(ids).size, id).toBe(ids.length);
+    }
+  });
+
+  it("lays live text inside the object it belongs to", () => {
+    const boxes = [
+      [whiteboardLayout(), whiteboardLayout().grid],
+      [calendarLayout(), calendarLayout().page],
+      [kitLayout(), kitLayout().display],
+    ] as const;
+    for (const [layout, box] of boxes) {
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.w).toBeLessThanOrEqual(layout.width);
+      expect(box.y + box.h).toBeLessThanOrEqual(layout.height);
+    }
+    expect(whiteboardLayout().underlines).toHaveLength(6);
+  });
+
+  it("keeps the wall decor inside the scene", () => {
+    for (const item of decor) {
+      expect(item.x + item.w, item.id).toBeLessThanOrEqual(SCENE.width);
+      expect(item.y + item.h, item.id).toBeLessThanOrEqual(SCENE.height);
     }
   });
 

@@ -1,0 +1,137 @@
+{
+  "id": "a06",
+  "source": "a06-bike-sheet.png",
+  "format": "svg",
+  "bytes": 64865,
+  "gzipBytes": 25853,
+  "parts": [
+    {
+      "name": "speed-line-a",
+      "viewBox": "0 0 173 13",
+      "width": 173,
+      "height": 13,
+      "origin": [
+        136,
+        143
+      ],
+      "pivot": [
+        1,
+        0.5
+      ],
+      "z": 0,
+      "bytes": 333
+    },
+    {
+      "name": "speed-line-b",
+      "viewBox": "0 0 188 13",
+      "width": 188,
+      "height": 13,
+      "origin": [
+        79,
+        172
+      ],
+      "pivot": [
+        1,
+        0.5
+      ],
+      "z": 0,
+      "bytes": 345
+    },
+    {
+      "name": "speed-line-c",
+      "viewBox": "0 0 151 13",
+      "width": 151,
+      "height": 13,
+      "origin": [
+        158,
+        201
+      ],
+      "pivot": [
+        1,
+        0.5
+      ],
+      "z": 0,
+      "bytes": 327
+    },
+    {
+      "name": "kickstand",
+      "viewBox": "0 0 75 164",
+      "width": 75,
+      "height": 164,
+      "origin": [
+        866,
+        554
+      ],
+      "pivot": [
+        0.75,
+        0.06
+      ],
+      "z": 1,
+      "bytes": 1324
+    },
+    {
+      "name": "wheel-front",
+      "viewBox": "0 0 333 326",
+      "width": 333,
+      "height": 326,
+      "origin": [
+        995,
+        50
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 1,
+      "bytes": 18003
+    },
+    {
+      "name": "wheel-rear",
+      "viewBox": "0 0 342 337",
+      "width": 342,
+      "height": 337,
+      "origin": [
+        988,
+        394
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 1,
+      "bytes": 17349
+    },
+    {
+      "name": "frame",
+      "viewBox": "0 0 702 555",
+      "width": 702,
+      "height": 555,
+      "origin": [
+        209,
+        60
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 2,
+      "bytes": 24639
+    },
+    {
+      "name": "helmet",
+      "viewBox": "0 0 152 153",
+      "width": 152,
+      "height": 153,
+      "origin": [
+        668,
+        578
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 3,
+      "bytes": 2545
+    }
+  ]
+}

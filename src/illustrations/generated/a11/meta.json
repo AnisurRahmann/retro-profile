@@ -1,0 +1,121 @@
+{
+  "id": "a11",
+  "source": "a11-gym-kit-sheet.png",
+  "format": "svg",
+  "bytes": 18862,
+  "gzipBytes": 7828,
+  "parts": [
+    {
+      "name": "timer",
+      "viewBox": "0 0 333 196",
+      "width": 333,
+      "height": 196,
+      "origin": [
+        551,
+        114
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 1,
+      "bytes": 569
+    },
+    {
+      "name": "bag",
+      "viewBox": "0 0 447 294",
+      "width": 447,
+      "height": 294,
+      "origin": [
+        88,
+        394
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 2,
+      "bytes": 3891
+    },
+    {
+      "name": "rope",
+      "viewBox": "0 0 322 255",
+      "width": 322,
+      "height": 255,
+      "origin": [
+        972,
+        88
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "z": 2,
+      "bytes": 6307
+    },
+    {
+      "name": "bottle",
+      "viewBox": "0 0 100 280",
+      "width": 100,
+      "height": 280,
+      "origin": [
+        876,
+        408
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 3,
+      "bytes": 1287
+    },
+    {
+      "name": "kettlebell-blue",
+      "viewBox": "0 0 198 258",
+      "width": 198,
+      "height": 258,
+      "origin": [
+        92,
+        84
+      ],
+      "pivot": [
+        0.5,
+        0.06
+      ],
+      "z": 3,
+      "bytes": 2870
+    },
+    {
+      "name": "kettlebell-yellow",
+      "viewBox": "0 0 136 182",
+      "width": 136,
+      "height": 182,
+      "origin": [
+        314,
+        160
+      ],
+      "pivot": [
+        0.5,
+        0.06
+      ],
+      "z": 3,
+      "bytes": 2268
+    },
+    {
+      "name": "towel",
+      "viewBox": "0 0 226 241",
+      "width": 226,
+      "height": 241,
+      "origin": [
+        1068,
+        428
+      ],
+      "pivot": [
+        0.5,
+        1
+      ],
+      "z": 3,
+      "bytes": 1670
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { buses, metrics, profile, ui } from "../../src/content";
+import { buses, goals, metrics, profile, ui } from "../../src/content";
 import { stations } from "../../src/scene";
 
 const order = stations.map((station) => station.id);
@@ -119,9 +119,69 @@ test.describe("garage content", () => {
       await expect(node.locator(".station-label .plain")).toHaveText(entry.plain);
       await expect(node.locator(".station-label")).toHaveCSS("font-family", /IBM Plex Mono/);
     }
-    await expect(page.locator('[data-station][data-art="svg"]')).toHaveCount(2);
-    await expect(page.locator('a[data-station][data-art="pending"]')).toHaveCount(9);
-    await expect(station(page, "whiteboard").locator(".station-obj")).toHaveCSS("border-top-style", "dashed");
+    // eleven objects are drawn. The desk sheet was rejected, so it is still a dashed box, and still a link.
+    await expect(page.locator('[data-station][data-art="svg"]')).toHaveCount(11);
+    await expect(page.locator('a[data-station][data-art="pending"]')).toHaveCount(1);
+    await expect(station(page, "desk").locator(".station-obj")).toHaveCSS("border-top-style", "dashed");
+  });
+
+  test("live text on blank surfaces: six numbers, the first goal, a clock placeholder that becomes Dhaka time", async ({ page }) => {
+    await page.goto("/");
+    const numbers = station(page, "whiteboard").locator(".wb-n");
+    await expect(numbers).toHaveCount(6);
+    for (const [index, metric] of metrics.entries()) await expect(numbers.nth(index)).toHaveText(metric.value);
+    // decorative copies: the same numbers are in the header list, with their labels
+    await expect(station(page, "whiteboard").locator(".wb")).toHaveAttribute("aria-hidden", "true");
+
+    const shown = station(page, "calendar").locator("[data-goal]:not([hidden])");
+    await expect(station(page, "calendar").locator("[data-goal]")).toHaveCount(goals.length);
+    await expect(shown).toHaveCount(1);
+    await expect(shown).toContainText(goals[0]!.lift);
+    await expect(shown).toContainText(goals[0]!.target);
+
+    const clock = station(page, "kit").locator("[data-clock]");
+    await expect(clock).toHaveText(/^\d{2}:\d{2}:\d{2}$/);
+    const dhaka = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Dhaka", hour: "2-digit", hour12: false }).format(new Date());
+    expect([dhaka, String((Number(dhaka) + 23) % 24).padStart(2, "0")]).toContain((await clock.textContent())!.slice(0, 2));
+    // no text is baked into a drawing
+    expect(await page.locator("[data-garage] svg text").count()).toBe(0);
+  });
+
+  test("the bot says the plain label of the station in focus, silently for assistive tech", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    const say = page.locator("[data-say]");
+    await expect(say).toHaveAttribute("aria-live", "off");
+    await expect(say).toBeHidden();
+    for (const id of ["rack", "bin", "bot"]) {
+      const entry = links.find((link) => link.id === id)!;
+      await station(page, id).hover();
+      await expect(say).toHaveText(entry.plain);
+      await expect(say).toBeVisible();
+    }
+    await page.mouse.move(2, 2);
+    await expect(say).toBeHidden();
+    await station(page, "calendar").focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect(say).toHaveText(links.find((link) => link.id === "calendar")!.plain);
+    // the speech is not inside any link, so it never changes a link's name
+    expect(await say.evaluate((node) => node.closest("a, button"))).toBeNull();
+  });
+
+  test("the calendar tears a page per interaction and wraps after the last goal", async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
+    const page = await context.newPage();
+    await page.goto("/");
+    const shown = station(page, "calendar").locator("[data-goal]:not([hidden])");
+    for (let turn = 1; turn <= goals.length; turn += 1) {
+      await page.mouse.move(2, 2);
+      await station(page, "calendar").hover();
+      await expect(shown).toHaveCount(1);
+      await expect(shown.locator("b")).toHaveText(goals[turn % goals.length]!.lift);
+      await expect(shown.locator("span")).toHaveText(goals[turn % goals.length]!.target);
+    }
+    await context.close();
   });
 
   test("the rack carries six plates a side, each titled with its category", async ({ page }) => {
@@ -163,6 +223,15 @@ test.describe("garage without JavaScript", () => {
     await expect(station(page, "rack").locator('[data-rk="plate"]').first()).toHaveCSS("opacity", "1");
     await expect(station(page, "character").locator('[data-ch="idle"]')).toHaveCSS("opacity", "1");
     await expect(station(page, "character").locator('[data-ch="wave"]')).toHaveCSS("opacity", "0");
+    // all six numbers, the first goal and the clock placeholder are in the markup
+    await expect(station(page, "whiteboard").locator(".wb-n").last()).toBeVisible();
+    await expect(station(page, "whiteboard").locator(".wb-row").first()).toHaveCSS("opacity", "1");
+    await expect(station(page, "calendar").locator("[data-goal]:not([hidden])")).toContainText(goals[0]!.lift);
+    await expect(station(page, "kit").locator("[data-clock]")).toHaveText(ui.garage.clockPlaceholder);
+    // parts that only show in motion stay out of the final pose
+    for (const [id, part] of [["chalk", "page"], ["calendar", "tear"], ["bot", "head-happy"], ["whiteboard", "line"], ["phone", "rings"]]) {
+      await expect(station(page, id!).locator(`[data-p="${part}"]`)).toHaveCSS("opacity", "0");
+    }
   });
 });
 
@@ -174,10 +243,11 @@ test.describe("garage keyboard", () => {
     for (let index = 0; index < order.length; index += 1) {
       await page.keyboard.press("Tab");
       const focused = await page.evaluate(() => {
+        // the focused element is the station itself, or for the lamp the pull cord inside it
         const node = document.activeElement as HTMLElement;
         const style = getComputedStyle(node);
         const label = getComputedStyle(node.querySelector(".station-label b")!);
-        return { id: node.dataset.station ?? "", outline: style.outlineStyle, width: parseFloat(style.outlineWidth), underline: label.textDecorationLine };
+        return { id: node.closest<HTMLElement>("[data-station]")?.dataset.station ?? "", outline: style.outlineStyle, width: parseFloat(style.outlineWidth), underline: label.textDecorationLine };
       });
       seen.push(focused.id);
       // a ring and an underline: focus never depends on colour alone
@@ -215,6 +285,15 @@ test.describe("garage motion", () => {
     await expect(rack.locator('[data-rk="bowed"]')).toHaveCSS("opacity", "0");
     await expect(character.locator('[data-ch="idle"]')).toHaveCSS("opacity", "1");
     await expect(character.locator("[data-ch-body]").first()).toHaveCSS("animation-name", "none");
+    // the new objects: final poses, numbers on the board, kickstand up, nothing mid-sequence
+    await expect(station(page, "whiteboard").locator(".wb-row").first()).toHaveCSS("opacity", "1");
+    await expect(station(page, "whiteboard").locator(".wb-row").first()).toHaveCSS("clip-path", "none");
+    await expect(station(page, "bike").locator('[data-p="stand"]')).toHaveCSS("transform", "none");
+    await expect(station(page, "bot").locator('[data-p="head-open"]')).toHaveCSS("opacity", "1");
+    await expect(station(page, "phone").locator('[data-p="handset"]')).toHaveCSS("transform", "none");
+    await station(page, "phone").hover();
+    await expect(station(page, "phone").locator('[data-p="handset"]')).not.toHaveCSS("transform", "none");
+    await expect(station(page, "bot").locator('[data-p="head-happy"]')).toHaveCSS("opacity", "1");
 
     // hover and focus swap the state with no tween
     await character.hover();
@@ -257,6 +336,72 @@ test.describe("garage motion", () => {
     await context.close();
   });
 
+  test("with motion: the whiteboard wipes in once and every number ends on its real value", async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    await page.goto("/");
+    const board = station(page, "whiteboard");
+    await board.scrollIntoViewIfNeeded();
+    await expect(board).toHaveAttribute("data-entered", "");
+    const running = () =>
+      page.evaluate(() => document.querySelector('[data-station="whiteboard"]')!.getAnimations({ subtree: true }).filter((animation) => animation.playState === "running").length);
+    await expect.poll(running).toBe(0);
+    for (const [index, metric] of metrics.entries()) await expect(board.locator(".wb-n").nth(index)).toHaveText(metric.value);
+    await expect(board.locator('[data-p="marker-at"]')).toHaveCSS("transform", "none");
+
+    // hovering a number: the marker underlines that one, and lets go when the pointer leaves
+    await board.locator(".wb-n").nth(4).hover();
+    const line = board.locator('[data-p="line"]');
+    await expect(line).toHaveCSS("opacity", "1");
+    await expect.poll(running).toBe(0);
+    const under = await board.locator(".wb-n").nth(4).boundingBox();
+    const drawn = await line.boundingBox();
+    expect(Math.abs(drawn!.x + drawn!.width / 2 - (under!.x + under!.width / 2))).toBeLessThan(12);
+    expect(drawn!.y).toBeGreaterThan(under!.y);
+    await page.mouse.move(2, 2);
+    await expect(line).toHaveCSS("opacity", "0");
+    await context.close();
+  });
+
+  test("with motion: only transform, opacity and the whiteboard's clip-path are animated", async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    await page.goto("/");
+    await page.locator("[data-garage]").scrollIntoViewIfNeeded();
+    const seen = new Set<string>();
+    for (const id of ["-", ...order]) {
+      if (id !== "-") await station(page, id).hover();
+      const properties = await page.evaluate(() =>
+        document
+          .querySelector("[data-garage]")!
+          .getAnimations({ subtree: true })
+          .flatMap((animation) => (animation.effect as KeyframeEffect).getKeyframes().flatMap((frame) => Object.keys(frame)))
+          .filter((key) => !["offset", "computedOffset", "easing", "composite"].includes(key)),
+      );
+      properties.forEach((property) => seen.add(property));
+    }
+    expect([...seen].sort()).toEqual(["clipPath", "opacity", "transform"]);
+    await context.close();
+  });
+
+  test("idle loops: the bot, the phone and the lamp run on screen only", async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 700 } });
+    const page = await context.newPage();
+    await page.goto("/");
+    await station(page, "rack").scrollIntoViewIfNeeded();
+    const loops = [
+      station(page, "bot").locator('[data-p="antenna-bob"]'),
+      station(page, "phone").locator('[data-p="handset"]'),
+      station(page, "lamp").locator('[data-p="sway"]'),
+      station(page, "lamp").locator('[data-p="cord-sway"]'),
+    ];
+    for (const loop of loops) await expect(loop).toHaveCSS("animation-play-state", "running");
+    await page.locator("footer").scrollIntoViewIfNeeded();
+    await page.mouse.wheel(0, 4000);
+    for (const loop of loops) await expect(loop).toHaveCSS("animation-play-state", "paused");
+    await context.close();
+  });
+
   test("idle loop runs on screen only", async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1440, height: 700 } });
     const page = await context.newPage();
@@ -291,21 +436,33 @@ test.describe("garage motion", () => {
 });
 
 test.describe("garage lights", () => {
-  test("the lamp toggles the lights, the choice persists and applies before paint", async ({ page }) => {
+  const cord = (page: Page) => station(page, "lamp").locator("button[data-lights-toggle]");
+
+  test("the pull cord toggles the lights, the choice persists and applies before paint", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("html")).not.toHaveAttribute("data-lights", "off");
+    await expect(cord(page)).toHaveAttribute("aria-pressed", "false");
+    await expect(cord(page)).toHaveAccessibleName(new RegExp(`${ui.topbar.lightsOut}.*${ui.topbar.lightsOutPlain}`));
+    // the light cone is there while the lights are on
+    const cone = station(page, "lamp").locator('[data-p="cone"]');
+    expect(Number(await cone.evaluate((node) => getComputedStyle(node).opacity))).toBeGreaterThan(0);
     const wall = () => page.evaluate(() => getComputedStyle(document.querySelector(".room-wall")!).fill);
     const lit = await wall();
-    await station(page, "lamp").click();
+    await cord(page).click();
     await expect(page.locator("html")).toHaveAttribute("data-lights", "off");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(cord(page)).toHaveAttribute("aria-pressed", "true");
+    await expect(cone).toHaveCSS("opacity", "0");
     expect(await wall()).not.toBe(lit);
-    await expect(station(page, "lamp").locator("b.when-dark")).toBeVisible();
     await page.goto("/", { waitUntil: "commit" });
     await expect(page.locator("html")).toHaveAttribute("data-lights", "off");
-    await station(page, "lamp").click();
+    await expect(cord(page)).toHaveAttribute("aria-pressed", "true");
+    // keyboard: the cord is a real button
+    await cord(page).focus();
+    await page.keyboard.press("Enter");
     await expect(page.locator("html")).not.toHaveAttribute("data-lights", "off");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(cord(page)).toHaveAttribute("aria-pressed", "false");
   });
 
   test("a first visit follows the system colour scheme, a stored choice wins", async ({ browser }) => {
@@ -313,7 +470,7 @@ test.describe("garage lights", () => {
     const page = await context.newPage();
     await page.goto("/");
     await expect(page.locator("html")).toHaveAttribute("data-lights", "off");
-    await station(page, "lamp").click();
+    await cord(page).click();
     await page.reload();
     await expect(page.locator("html")).not.toHaveAttribute("data-lights", "off");
     await context.close();
