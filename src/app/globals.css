@@ -2178,6 +2178,23 @@ details > summary {
   padding-block: 0.625rem 0;
 }
 
+/* Phones and tablets: mono labels go from 11px to 12px so most of the page's text is legible without zoom
+   (accessibility over the 11px label rule, logged in docs/DECISIONS.md). */
+@media (max-width: 63.999rem) {
+  .garage-header .label,
+  .garage .label,
+  .garage .plain,
+  .garage-list .label,
+  .garage-list .plain,
+  .station-label {
+    font-size: 0.75rem;
+  }
+
+  .station-label b {
+    font-size: 0.8125rem;
+  }
+}
+
 /* Below 64rem the room is not scaled down: stations stack in section order, object left, label right. */
 .station,
 .js .station.js-only {

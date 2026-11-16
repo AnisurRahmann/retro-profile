@@ -2,6 +2,16 @@
 
 Each has a default already built in. Nothing here blocks the build.
 
+## Garage Gym (2026-11-16), answer before Prompt 2
+1. **JS budget.** `/` ships 134.8 kB gzipped of first-load JS against a budget of 90. The floor on Next 16 App Router is 133 kB for an empty page. Options: (a) accept and set the budget at 140, (b) strip the Next and React scripts from `out/index.html` after export and load the 1.6 kB garage runtime and the lights toggle as plain scripts, about 5 kB total, at the cost of a custom post-build step, (c) move the home page off Next. Default now: nothing done, number reported.
+2. **A01 puppet sheet.** Rejected, the site uses pose swaps. To get the rig, blink and head tracking, regenerate `a01-character-sheet.png`. Contact sheet: `.illustrations/contact/a01.png`. Gemini request: "Regenerate the puppet sheet. Every limb must be two separate pieces with a clear magenta gap between them: upper arm and forearm apart, forearm and hand apart, thigh and shin apart, torso and hips as one piece. 16 separate parts in total, nothing touching."
+3. **A02 has three surplus plates** (second red, blue and chalk face-on plates). Ignored in the map. Nothing to do unless you want a clean sheet.
+4. **Bike target.** No About section exists. The bike links to `/log/#actual-log` with the flight 07 label, the gym kit links to `/gym/`. Two gym-flavoured stations. Alternative: write the bike line (`offPlatform`) and an About anchor, and point the bike there.
+5. **Bot target.** The bot is the tooltip narrator in the motion table and has no section. It links to `/notes/` so the notes have a station. Alternative: the logbook takes `/notes/` and the bot is not a link.
+6. **Pending sheets that do not match the spec count:** a03 (13 components, 10 listed), a04 (13, 16), a05 (16, 10), a09 (8, 7), a10 (9, 8). Extra components are usually loose strokes that can share a name, fewer means merged parts. Check the contact sheets in `.illustrations/contact/` first.
+7. **`/log/` has no link back to `/`** except the monogram on other pages. Its own monogram still jumps to the top of the log, because nothing on that page was to change.
+8. **Social preview image** is still the Training Log card. `a00-anchor-room.png` is the candidate named in the illustration spec.
+
 ## Placeholders left unfilled in the prompt
 | What | Default now | Where to fill |
 | --- | --- | --- |

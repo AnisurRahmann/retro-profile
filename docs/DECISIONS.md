@@ -36,3 +36,48 @@
 - **Gym photos:** originals untouched, the page uses grayscale WebP derivatives in `public/images/gym/opt/`. Day headers are always dark with light text so contrast holds in both themes.
 - **Canonical host is `https://www.arshakil.com`** because the live apex redirects there.
 - **`/fb-privacy` and `/fb-data-deletion` were ported** from the local `fb-legal-pages` branch (content unchanged). They were not on `main`, but Meta app review depends on them and the rebuild would otherwise have dropped them.
+
+## Garage Gym (2026-11-16)
+
+### Routes
+- **The Training Log moved to `/log/` as one file move.** Same components, ids and CSS. The top bar's flight links and the 0 to 8 shortcuts point at `/log/#id` from every other page. The monogram and the "back to the portfolio" links go to `/`.
+- **`/` has no top bar.** The text block is the header. The 0 to 8, L and G shortcuts still work there because the layout-level runtime is shared.
+- **Lights follow the system colour scheme on a first visit, site-wide.** The boot script is shared, so `/log/`, `/gym/` and `/notes/` now also open dark for a visitor whose system is dark and who never chose. A stored choice always wins. `data-lights="off"` (illustration palette) and `data-theme="dark"` (interface tokens) are always set together.
+
+### Pipeline
+- **Tracer: Potrace, not VTracer.** Compared on A02 with the same masks (`scripts/illustrations/compare.ts`):
+
+  | Tracer | Nodes | Bytes after SVGO | Area-weighted IoU against the masks | Worst layer |
+  | --- | --- | --- | --- | --- |
+  | Potrace (npm `potrace` 2.1.8) | 1021 | 23,185 | 0.9929 | 0.9596 |
+  | VTracer (`@neplex/vectorizer` 0.1.0, spline mode) | 1825 | 30,189 | 0.9783 | 0.9118 |
+
+  Potrace has 44% fewer nodes and is closer to the source. On a01b the result is the same shape: 2238 against 3419 nodes. VTracer stays as a devDependency for the comparison script only. Potrace is GPL-2.0: it is a build tool here, its output is not a derived work, nothing of it ships.
+- **Snap runs on pixels before the geometry is traced,** not on traced paths afterwards as the prompt orders it (d then e). Every pixel gets its nearest palette class by CIEDE2000, then each class is traced. "Merge adjacent paths that land on the same colour" then happens for real: one region, one path, no seams between a colour and its shade tone. Snapping traced paths would only allow concatenating path data.
+- **Stacking:** the first path of every part is its whole silhouette in iron. Fills are stacked on it from the largest to the smallest, and each fill grows 3 px (at 3x) under the fills above it. Iron pixels are never traced on their own: the outline is what shows of the silhouette between the fills.
+- **Parts are enlarged 3x (cubic) before classification,** so Potrace fits curves on more than a few pixels. Sheets are only 1376 x 768. Path data is scaled back to source pixels.
+- **Key distance is CIELAB with lightness at half weight,** soft band 28 to 60. Gemini drew a darker magenta ground shadow under the poses: it is still background, and it keys out cleanly this way.
+- **Rim colours are dissolved.** A palette class that has no solid core in a part (under 60 px, or a thousandth of the part, after a 2 px erosion) is a rim of blended edge pixels. Its pixels go to the neighbouring classes.
+- **A part map may ignore a component, with a reason,** and several components may share one name. A02 has three surplus face-on plates (duplicates of red, blue and chalk): ignored, all 17 spec parts are present. The map also states the component count, so a regenerated sheet that splits differently fails.
+- **A sheet without a map is pending, not an error.** A03 to A12 arrived in `raw/` during this run and are out of its scope.
+- **The raw files are JPEG data with a `.png` name.** The pipeline decodes by content.
+- **No WebP fallback was needed.** The code path exists (over 40 kB gzipped per object) and has never fired.
+- **Generated output is three things per object:** `generated/aNN/*.svg` (one optimised file per part, classes only), `generated/aNN.ts` (the same paths as a module, so server components inline them) and `manifest.ts`. The manifest also records each part's origin on the sheet.
+
+### Character
+- **A01 is built from whole poses (a01b), not a puppet.** The puppet sheet has merged limbs (14 components, 16 parts in the spec). Per the spec's own fallback: idle, wave and chalk poses are swapped with no tween. Poses share one anchor, the point between the feet.
+- **Kept from the puppet spec:** breathing (scaleY 1 to 1.015 over 4 s, on the whole idle pose, anchored at the feet), the entry (wave, then chalk with two loose puffs fading), wave on hover.
+- **Dropped, because the parts do not exist:** blink (needs a second head), head tracking toward the pointer (needs a head), three separate forearm waves (the wave pose is held for 900 ms instead).
+
+### Scene
+- **Eleven links and one button.** The lamp is the lights control, not a destination, so it is a `<button>`. It is hidden without JS. The plain list therefore has eleven links.
+- **Targets the prompt did not assign:** the character goes to `/log/#platform` (intro), the bike to `/log/#actual-log` (flight 07 is where the bike line belongs once it is written), the bot to `/notes/`. See OPEN_QUESTIONS.
+- **Stations carry `w` and `h`** besides x, y and scale: placeholders need a footprint. For traced objects the footprint is computed from the composed parts.
+- **Six plates fit on the sleeve at 0.7 scale with overlap.** At sheet scale they are 36 px wide and the sleeve is 100 px.
+- **Plates wait off the bar (opacity 0) until the runtime starts the entry,** otherwise they would show seated and then jump out. Only with JS and with motion allowed. A CSS fallback shows them after 3 s if the runtime never arrives.
+- **Touch:** the character's wave is 900 ms, so the first tap plays it and the second follows the link. The rack's rattle is 240 ms, so a tap navigates at once.
+- **Below the fold objects are not lazy chunks.** Both traced objects together are 19 kB gzipped and one is above the fold at desktop sizes. Revisit when all twelve are traced.
+- **Lights off is a dimmed room, not an inverted one.** Every `--i-*` colour is darkened, the wall is `#30343C`. Interface text keeps the existing dark tokens. Label contrast is checked in e2e against wall, band, platform and page in both states.
+
+### Accessibility over design
+- **Mono labels are 12px, not 11px, in the stacked layout (below 1024px).** With 11px labels Lighthouse measured 23% legible text on a phone.

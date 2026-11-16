@@ -18,7 +18,7 @@ export const SCENE = { width: 1600, height: 900 } as const;
 export const ROOM = {
   bandY: 590,
   floorY: 722,
-  platform: { x: 500, y: 730, w: 800, h: 58 },
+  platform: { x: 500, y: 730, w: 770, h: 58 },
 } as const;
 
 function flightLabel(id: string) {
