@@ -2003,6 +2003,463 @@ details > summary {
 
 }
 
+/* ─────────────────────────────────────────────────────────────
+   THE GARAGE GYM (home page)
+   Flat vector objects with an iron outline. Every traced fill is one of nine palette classes,
+   each class resolves through a variable, so lights off is a variable swap and nothing else.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  --i-chalk: #f4f1ea;
+  --i-iron: #17181a;
+  --i-grey: #b9b4a8;
+  --i-tan: #c89b6d;
+  --i-red: #d62828;
+  --i-blue: #1d4e89;
+  --i-yellow: #f2b705;
+  --i-green: #2a9d5c;
+  --i-skin: #b9794f;
+  --room-wall: var(--i-chalk);
+  --room-band: var(--i-grey);
+  --room-platform: var(--i-tan);
+  --room-line: var(--i-iron);
+}
+
+[data-lights="off"] {
+  --i-chalk: #9a988f;
+  --i-iron: #0a0a0b;
+  --i-grey: #6c6962;
+  --i-tan: #7a5e42;
+  --i-red: #8f1d1d;
+  --i-blue: #163a66;
+  --i-yellow: #9c7604;
+  --i-green: #1c6a3e;
+  --i-skin: #774d32;
+  --room-wall: #30343c;
+  --room-band: #25282e;
+  --room-platform: #5d4833;
+  --room-line: #0a0a0b;
+}
+
+@keyframes ill-late {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ch-breathe {
+  to {
+    transform: scaleY(1.015);
+  }
+}
+
+@layer components {
+.i-chalk { fill: var(--i-chalk); }
+.i-iron { fill: var(--i-iron); }
+.i-grey { fill: var(--i-grey); }
+.i-tan { fill: var(--i-tan); }
+.i-red { fill: var(--i-red); }
+.i-blue { fill: var(--i-blue); }
+.i-yellow { fill: var(--i-yellow); }
+.i-green { fill: var(--i-green); }
+.i-skin { fill: var(--i-skin); }
+
+.ill {
+  display: block;
+  overflow: visible;
+  fill-rule: evenodd;
+}
+
+/* ── Header: the text block, complete without JS or images ── */
+
+.garage-header {
+  position: relative;
+  padding-block: 1.75rem 1.25rem;
+}
+
+.garage-name {
+  font-size: clamp(3.25rem, 15vw, 8.5rem);
+  line-height: 0.82;
+}
+
+.garage-role {
+  margin-top: 0.875rem;
+  font-size: 1.1875rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.garage-metrics {
+  margin-top: 1.125rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  background: var(--iron);
+  border: 2px solid var(--iron);
+}
+
+.garage-metrics li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.625rem 0.625rem;
+  background: var(--chalk);
+}
+
+.garage-metrics .display {
+  font-size: 1.875rem;
+  line-height: 0.9;
+}
+
+@media (min-width: 48rem) {
+  .garage-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 72rem) {
+  .garage-metrics {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.garage-actions {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+}
+
+.garage-email {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  font-size: 0.8125rem;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+/* ── The room ─────────────────────────────────────────────── */
+
+.garage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding-block: 0.5rem;
+}
+
+.garage-frame {
+  border-block: 2px solid var(--iron);
+}
+
+.garage-room {
+  position: relative;
+  container-type: inline-size;
+  max-width: 100rem;
+  margin-inline: auto;
+}
+
+.garage-backdrop {
+  display: none;
+}
+
+.room-wall { fill: var(--room-wall); }
+.room-band { fill: var(--room-band); }
+.room-platform { fill: var(--room-platform); }
+.room-line { fill: var(--room-line); }
+
+.garage-note {
+  padding-block: 0.625rem 0;
+}
+
+/* Below 64rem the room is not scaled down: stations stack in section order, object left, label right. */
+.station,
+.js .station.js-only {
+  position: relative;
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.75rem var(--gutter);
+  border: 0;
+  border-bottom: 2px solid var(--iron);
+  background: none;
+  color: var(--iron);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.station.js-only {
+  display: none;
+}
+
+.station:last-child {
+  border-bottom: 0;
+}
+
+.station-obj {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 6rem;
+}
+
+.station[data-art="pending"] .station-obj {
+  border: 2px dashed var(--iron);
+}
+
+.station-obj .ill {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+}
+
+.station-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.station-label b {
+  font-weight: 600;
+}
+
+.station-label .plain {
+  margin-left: 0;
+}
+
+.station-label .plain::before {
+  content: none;
+}
+
+.station .when-dark,
+[data-theme="dark"] .station .when-light {
+  display: none;
+}
+
+[data-theme="dark"] .station .when-dark {
+  display: inline;
+}
+
+/* hover and focus: never colour alone. The label is underlined, focus adds a ring. */
+.station:hover .station-label b,
+.station:focus-visible .station-label b {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+.station:hover {
+  background: var(--chalk-2);
+}
+
+.station:focus-visible {
+  outline: 3px solid var(--iron);
+  outline-offset: -3px;
+}
+
+@media (min-width: 64rem) {
+  .garage-room {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+  }
+
+  .garage-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* one scene unit is 1/1600 of the room's width: 0.0625cqw */
+  .station,
+  .js .station.js-only {
+    position: absolute;
+    display: block;
+    left: calc(var(--x) * 0.0625cqw);
+    top: calc(var(--y) * 0.0625cqw);
+    width: calc(var(--w) * 0.0625cqw);
+    height: calc(var(--h) * 0.0625cqw);
+    z-index: var(--z);
+    padding: 0;
+    border: 0;
+  }
+
+  .station.js-only {
+    display: none;
+  }
+
+  .station:hover {
+    background: none;
+  }
+
+  .station-obj {
+    position: absolute;
+    inset: 0;
+    height: auto;
+  }
+
+  .station-obj .ill {
+    width: 100%;
+    height: 100%;
+  }
+
+  .station-label {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    align-items: center;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .station[data-art="pending"]:hover .station-obj,
+  .station[data-art="pending"]:focus-visible .station-obj {
+    border-style: solid;
+    background: var(--chalk);
+  }
+
+  .station[data-art="svg"] .station-label {
+    padding: 0.1875rem 0.4375rem;
+    border: 2px solid var(--iron);
+    background: var(--chalk);
+  }
+
+  .station[data-art="svg"]:hover .station-label,
+  .station[data-art="svg"]:focus-visible .station-label {
+    background: var(--iron);
+    color: var(--chalk);
+  }
+
+  /* the rack's label hangs inside the frame, the character's sits over his head */
+  .station[data-station="rack"] .station-label {
+    top: 64%;
+  }
+
+  .station[data-station="character"] .station-label {
+    top: 0;
+    left: 46%;
+    transform: translate(-50%, -115%);
+  }
+
+  .station:focus-visible {
+    outline-offset: 3px;
+  }
+}
+
+/* ── Motion: transform and opacity on SVG groups, origins from the manifest pivots ── */
+
+[data-rk="plate"],
+[data-rk="load"],
+[data-ch-body],
+[data-ch="puffs"] {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+/* parts that only show during a sequence */
+[data-rk="bowed"],
+[data-ch="wave"],
+[data-ch="chalk"],
+[data-ch="puffs"] {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* plates wait off the bar until the runtime slides them in. If it never arrives, they appear on their own. */
+  .js .station[data-station="rack"]:not([data-entered]) [data-rk="plate"] {
+    animation: ill-late 1ms 3s both;
+  }
+
+  .station [data-ch="idle"] [data-ch-body] {
+    animation: ch-breathe 4s ease-in-out infinite alternate paused;
+  }
+
+  .station[data-onscreen] [data-ch="idle"] [data-ch-body] {
+    animation-play-state: running;
+  }
+
+  [data-tab-hidden] .station[data-onscreen] [data-ch="idle"] [data-ch-body] {
+    animation-play-state: paused;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* no sequences: the state swaps instantly while the station is hovered or focused */
+  .station[data-active] [data-rk="straight"],
+  .station[data-active] [data-ch="idle"] {
+    opacity: 0;
+  }
+
+  .station[data-active] [data-rk="bowed"],
+  .station[data-active] [data-ch="wave"] {
+    opacity: 1;
+  }
+}
+
+/* ── The same links as a plain list ───────────────────────── */
+
+.garage-list {
+  padding-block: 2rem 3rem;
+}
+
+.garage-list ol {
+  margin-top: 0.75rem;
+  border-top: 2px solid var(--iron);
+}
+
+.garage-list li {
+  break-inside: avoid;
+  border-bottom: 2px solid var(--iron);
+  padding-block: 0.25rem;
+}
+
+.garage-list li a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.25rem;
+  min-height: 2.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.garage-list li p {
+  padding-bottom: 0.5rem;
+}
+
+@media (min-width: 48rem) {
+  .garage-list ol {
+    columns: 2;
+    column-gap: 2rem;
+  }
+}
+
+@media print {
+  .garage,
+  .garage-header .sr-only-focusable {
+    display: none !important;
+  }
+}
+}
+
 /* print palette: unlayered so it beats the theme tokens above */
 @media print {
   :root,

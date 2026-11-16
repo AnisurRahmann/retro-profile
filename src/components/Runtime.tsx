@@ -18,6 +18,9 @@ export function Runtime({ flightIds }: { flightIds: string[] }) {
     const toggleTheme = () => {
       const next = root.dataset.theme === "dark" ? "light" : "dark";
       root.dataset.theme = next;
+      // the illustration palette follows the same switch
+      if (next === "dark") root.dataset.lights = "off";
+      else delete root.dataset.lights;
       try {
         localStorage.setItem(THEME_KEY, next);
       } catch {

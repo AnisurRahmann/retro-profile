@@ -1,14 +1,35 @@
-import { profile, ui } from "@/content";
+import { meta, profile } from "@/content";
+import { Footer } from "@/components/Footer";
+import { GarageHeader } from "@/components/garage/GarageHeader";
+import { GarageRuntime } from "@/components/garage/GarageRuntime";
+import { Scene } from "@/components/garage/Scene";
+import { SectionList } from "@/components/garage/SectionList";
 
-/** Temporary home while the garage scene is built: the full portfolio lives at /log/. */
+const personJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: profile.name,
+  alternateName: profile.alias,
+  jobTitle: meta.jobTitle,
+  description: profile.summary,
+  url: profile.site,
+  email: profile.links.email.href,
+  address: { "@type": "PostalAddress", addressLocality: "Sylhet", addressCountry: "BD" },
+  sameAs: [profile.links.github.href, profile.links.linkedin.href],
+};
+
+/** The garage gym: text block first, then the room, then the same links as a plain list. */
 export default function Home() {
   return (
-    <main id="main" className="wrap pb-24 pt-16">
-      <h1 className="display text-7xl">{profile.name}</h1>
-      <p className="prose-line mt-3 text-xl font-semibold">{profile.line}</p>
-      <a href="/log/" className="btn btn-solid mt-6">
-        {ui.notFound.back}
-      </a>
-    </main>
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }} />
+      <main id="main">
+        <GarageHeader />
+        <Scene />
+        <SectionList />
+      </main>
+      <Footer now={new Date()} />
+      <GarageRuntime />
+    </>
   );
 }
