@@ -147,6 +147,22 @@ test.describe("garage content", () => {
     expect(await page.locator("[data-garage] svg text").count()).toBe(0);
   });
 
+  test("objects after the rack and the character are drawn from sprite files that exist", async ({ page, request }) => {
+    await page.goto("/");
+    await expect(page.locator("[data-garage] use[data-href]:not([href])")).toHaveCount(0);
+    const hrefs = await page.locator("[data-garage] use").evaluateAll((uses) => [...new Set(uses.map((use) => use.getAttribute("href")!))]);
+    expect(hrefs.length).toBeGreaterThan(40);
+    const files = [...new Set(hrefs.map((href) => href.split("#")[0]!))];
+    expect(files.map((file) => file.split("?")[0]).sort()).toEqual(["a03", "a05", "a06", "a07", "a08", "a09", "a10", "a11", "a12"].map((id) => `/illustrations/${id}.svg`));
+    for (const file of files) {
+      const body = await (await request.get(file)).text();
+      for (const href of hrefs.filter((entry) => entry.startsWith(file))) expect(body, href).toContain(`<g id="${href.split("#")[1]}">`);
+    }
+    // drawn, not empty: the bike's frame has a size on screen
+    const frame = await station(page, "bike").locator('[data-p="frame"]').boundingBox();
+    expect(frame!.width).toBeGreaterThan(20);
+  });
+
   test("the bot says the plain label of the station in focus, silently for assistive tech", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
@@ -229,9 +245,12 @@ test.describe("garage without JavaScript", () => {
     await expect(station(page, "calendar").locator("[data-goal]:not([hidden])")).toContainText(goals[0]!.lift);
     await expect(station(page, "kit").locator("[data-clock]")).toHaveText(ui.garage.clockPlaceholder);
     // parts that only show in motion stay out of the final pose
+    // without JS the drawing is the copy inside <noscript>, with its sprite references already attached
     for (const [id, part] of [["chalk", "page"], ["calendar", "tear"], ["bot", "head-happy"], ["whiteboard", "line"], ["phone", "rings"]]) {
-      await expect(station(page, id!).locator(`[data-p="${part}"]`)).toHaveCSS("opacity", "0");
+      await expect(station(page, id!).locator(`noscript [data-p="${part}"]`)).toHaveCSS("opacity", "0");
     }
+    await expect(station(page, "bike").locator('noscript [data-p="frame"] use')).toHaveAttribute("href", /^\/illustrations\/a06\.svg\?v=\d+#frame$/);
+    expect((await station(page, "bike").locator('noscript [data-p="frame"]').boundingBox())!.width).toBeGreaterThan(20);
   });
 });
 

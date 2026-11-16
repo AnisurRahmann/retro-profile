@@ -81,3 +81,40 @@
 
 ### Accessibility over design
 - **Mono labels are 12px, not 11px, in the stacked layout (below 1024px).** With 11px labels Lighthouse measured 23% legible text on a phone.
+
+## Garage Gym, objects A03 to A12 (2026-11-16)
+
+### Sheets
+- **A04 desk is rejected, the desk stays a dashed placeholder.** 13 components against 16 parts in the spec. The laptop lid and base are not separate (the sheet has two whole laptops), the mic head and arm are one piece, two of the three steam wisps have no outline and fall under the speck threshold. The lid cannot tilt. Regeneration request in OPEN_QUESTIONS.
+- **A03, A05, A09 and A10 were accepted with surplus components,** on the A02 precedent: every part in the spec is present and separate, the extras are ignored in the map with a reason. A03: two extra capped markers, and the writing marker's cap as its own piece. A05: a third arm, two feet, a second loose set of arcs. A09: a fourth paper ball. A10: a second note. The rule applied: missing or merged parts stop an asset, surplus parts do not.
+- **A06, A07, A08, A11 and A12 match the spec count.**
+- **Parts that are traced but not on the page:** A03 iron marker, cap and tick. A07 closed logbook and pencil. A08 flat page, pushpin and flag. A09 third paper ball. A10 note and fourth ring line. A11 rope and towel. A12 socket. They cost nothing until a layout uses them.
+- **The A12 light cone was drawn as a slanted wedge,** not a symmetric triangle. It is sheared upright with one SVG matrix and shown at 35% opacity, so its heavy outline reads as light and not as a second shade.
+- **The A11 timer stands on the floor with the kit.** The sheet draws it wall-mounted, but a station is one box, and a box from the wall to the floor would cover other stations.
+
+### Composition and delivery
+- **Objects are a tree of placed parts** (`PartNode` in `compose.ts`): each part is put with its map pivot on a point, and that point is the group's transform origin. One renderer (`Parts.tsx`) draws all nine. `scripts/illustrations/preview.ts` renders any layout to PNG without a build.
+- **A03 to A12 are not inlined. Each part is a `<use>` into a sprite file per sheet** (`public/illustrations/aNN.svg`, written by the pipeline). Inlined, the nine objects took the HTML from 49 kB to 224 kB gzipped (Next writes every path twice, as markup and in the RSC payload) and Lighthouse performance fell to 92. With sprites the HTML is 59 kB. The rack and the character stay inline, as before.
+- **Sprite fills are inline styles with a variable and a hex fallback** (`style="fill:var(--i-red,#D62828)"`), not classes. WebKit does not apply a `<style>` block or page CSS inside a file drawn through `<use>`: with classes every part was black in Safari. Custom properties do inherit through `<use>`, so lights off is still a variable swap. This is the one place a traced path carries a hex value, and only as the fallback. Checked in Chromium, Firefox and WebKit.
+- **Sprite references are attached one task after the first frame** by a 300 byte inline script after the room (`spriteScript` in `lib/boot.ts`): the markup has `data-href`, the script copies it to `href`. Requested at parse time, the nine files counted against the simulated LCP (94 to 98 across runs). Attached after paint it is 95 to 98. Each object also has the same drawing inside `<noscript>` with real `href`s, so the room is complete without JavaScript.
+- **The Open Graph image is a committed file** (`public/og.png`, `pnpm og`), no longer a `next/og` route. It is rendered in headless Chromium, because the display font only exists as WOFF2 and `next/og` cannot read it.
+
+### Motion
+- **Interactions are one-shot timelines, except two held poses:** the phone's handset stays lifted and the whiteboard's underline stays drawn while the pointer or focus is there (`hold` in the runtime: the timeline is dropped on leave).
+- **Whiteboard: the wipe is `clip-path` on the two rows of HTML numbers.** It is the only animated property besides `transform` and `opacity`, as the asset's own requirement asks, and an e2e test pins that list. The marker crosses each row in step with the wipe, each number counts up as the marker passes it.
+- **Count-up: `src/lib/derive.ts` has no counter.** The existing one was inside `Runtime.tsx` (the log page). It moved to `src/lib/countup.ts` and both runtimes use it.
+- **The marker underlines the number under the pointer.** Keyboard focus and touch have no pointer position: they underline the first number.
+- **The bot's speech sits outside every link,** as a sibling in the room. Inside the bot's link it would have become part of that link's accessible name. It shows from 1024px only: in the stacked layout each label already sits beside its object and there is no free wall.
+- **The bot also talks (happy eyes, arcs) when another station takes focus,** since that is when it speaks.
+- **The calendar advances once per activation,** before the page falls, so reduced motion gets the same change as an instant swap. All goals are in the markup, one is shown.
+- **The lamp's cord pull plays on hover and focus, the lights only switch on click or Enter.** Switching the theme on hover would be hostile. The pull is 20 px in the cord's own units, which is 10 px at the cord's drawn size.
+- **The lamp's label no longer changes with the state.** It always reads "Lights out · dark theme" and the button carries `aria-pressed`. A name that changes and a pressed state together say the same thing twice, in conflict.
+- **The lamp and its cord are two drawings** (the cord is inside the button). Both sway around the same point, the lamp's hanging point, so they stay attached.
+- **Idle keyframes start and end on the final pose,** so a paused loop (off screen, hidden tab, no JS) is the final pose. One variable, `--idle`, runs or pauses every new loop.
+- **The bot blinks every 6 s** (the spec gives no interval for A05). **The kickstand entry** starts down and flicks up: before the entry it is held down in CSS, like the plates.
+
+### Accessibility
+- **Text on blank surfaces is `aria-hidden`:** the six whiteboard numbers repeat the header list (which has their labels), the calendar goal is a preview of the link's target, the clock is decoration. All of it is live HTML, none is in a drawing.
+- **The timer's time is light text with the lights out.** Its display is grey, and iron on the dark grey is 3.6 to 1.
+- **Whiteboard and gym kit take a full row in the stacked layout,** the calendar a taller one: at 120 px wide their text would be 3 to 5 px.
+

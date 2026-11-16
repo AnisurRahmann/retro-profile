@@ -17,6 +17,17 @@ export function pivotOrigin(entry: IllustrationPart): string {
   return `${Math.round(entry.pivot[0] * 1000) / 10}% ${Math.round(entry.pivot[1] * 1000) / 10}%`;
 }
 
+/**
+ * Where a part lives in its object's sprite file (public/illustrations, written by the pipeline).
+ * The byte count in the query makes a redrawn sheet a new URL.
+ */
+export function spriteHref(asset: string, name: string): string {
+  const sheet = manifest[asset];
+  if (!sheet) throw new Error(`illustration "${asset}" is not in the manifest. Run pnpm illustrations.`);
+  part(asset, name);
+  return `/illustrations/${asset}.svg?v=${sheet.bytes}#${name}`;
+}
+
 export interface Placed {
   name: string;
   x: number;

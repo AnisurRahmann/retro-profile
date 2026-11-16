@@ -4,16 +4,20 @@ Last updated: 2026-11-16. Branch: `redesign/garage-gym` (from `redesign/training
 
 ## State
 - The home page `/` is the Garage Gym: text block, a 1600 x 900 room of twelve stations, the same links as a plain list.
-- The previous home (The Training Log) lives unchanged at `/log/`. `/gym/`, `/notes/`, `/fb-privacy`, `/fb-data-deletion` are untouched.
-- Illustration pipeline works end to end (`pnpm illustrations`). Traced and live: A02 rack (17 parts, 9.0 kB gzipped) and A01 character from the pose sheet a01b (6 parts, 19.7 kB gzipped).
-- Ten stations (A03 to A12) are dashed placeholders that already link. Their raw sheets are in `assets/illustrations/raw/` and key and split cleanly, but have no parts map yet.
-- Lights: the lamp placeholder toggles `data-lights="off"` and `data-theme="dark"` together.
+- Eleven of the twelve stations are drawn and animated: A01 character, A02 rack, A03 whiteboard, A05 bot, A06 bike, A07 chalk and logbook, A08 calendar, A09 miss bin, A10 phone, A11 gym kit, A12 lamp. Pegboard and window from A12 hang on the wall as decoration.
+- **A04 desk is still a dashed placeholder.** Its sheet was rejected (merged laptop and mic, lost steam wisps). It works as a link.
+- Live HTML on blank surfaces: six numbers on the whiteboard, the goals on the calendar, Asia/Dhaka time on the timer.
+- Lights: the lamp's pull cord is the button (`aria-pressed`), the light cone shows only with the lights on.
+- Rack and character are inline SVG. A03 to A12 are `<use>` references into `public/illustrations/aNN.svg`, attached after first paint, with a `<noscript>` copy.
+- `/log/`, `/gym/`, `/notes/`, `/fb-privacy`, `/fb-data-deletion` are untouched. Social image is `public/og.png`, made from the anchor room.
 
-**Exact next task:** Prompt 2 in docs/GARAGE_GYM_BUILD_PROMPTS.md (objects A03 to A12). For each sheet: open `.illustrations/contact/aNN.png` after `pnpm illustrations`, write `assets/illustrations/parts/aNN.json`, run again, add the object component, register it in `OBJECTS` in `src/components/garage/Scene.tsx`. Before that, answer the open questions at the top of docs/OPEN_QUESTIONS.md (JS budget, A01 puppet sheet, bike and bot targets).
+**Exact next task:** regenerate the A04 desk sheet with the request in docs/OPEN_QUESTIONS.md (item 1), then build the desk station. After that, decide the JS budget (item 2).
 
 ## Not met, reported instead of worked around
-- **First-load JS for `/` is 134.8 kB gzipped, the budget was 90.** A page with only an `<h1>` on this stack ships 133 kB (React 19 plus the Next 16 App Router runtime). The garage runtime adds 1.6 kB. Meeting 90 means removing the framework runtime from `/`, which is a stack decision. See OPEN_QUESTIONS.
-- **A01 puppet rig is not built.** `a01-character-sheet.png` splits into 14 components against 16 in the spec: arms and legs are single pieces, so there is no elbow, wrist or knee. The site uses whole-pose swaps from `a01b`. No blink and no head tracking: they need separate head parts.
+- **First-load JS for `/` is 136.7 kB gzipped, the budget is 90.** A page with only an `<h1>` on this stack ships 133 kB. The garage runtime and the clock are 3.5 kB. Meeting 90 means removing the framework runtime from `/`, a stack decision. See OPEN_QUESTIONS.
+- **A04 desk:** no station art, no lid tilt, no typed lines, no steam or waveform. Blocked on the sheet.
+- **A01 puppet rig is not built** (unchanged): pose swaps, no blink, no head tracking.
+- **Not on the page though on the sheets:** tick mark, pushpin, flag, note, rope, towel, socket, closed logbook, pencil. None is in the motion table.
 
 ## Commands
 ```bash
@@ -27,17 +31,21 @@ pnpm serve               # serve ./out on :4173
 pnpm illustrations       # every raw sheet: contact sheets into .illustrations/contact/, SVG parts and manifest into src/illustrations/generated/
 pnpm illustrations a02   # one sheet
 pnpm exec tsx scripts/illustrations/compare.ts a02   # tracer comparison, previews in .illustrations/compare/
+pnpm exec tsx scripts/illustrations/preview.ts bike  # one composed object as PNG, rest pose and all parts, in .illustrations/preview/
+pnpm og                  # public/og.png from the anchor room (committed, the build never runs it)
 ```
 
-## Verification record (2026-11-16)
+## Verification record (2026-11-16, after A03 to A12)
 - `pnpm typecheck`, `pnpm lint`: clean.
-- `pnpm test`: 48 passed (content 16, pipeline 23, scene 9).
-- `pnpm e2e`: 46 passed. The 26 earlier tests now run against `/log/`, 20 new ones cover `/`.
-- Lighthouse, mobile preset, production export:
-  - `/`: performance 99, accessibility 100, best practices 100, SEO 100. CLS 0. LCP 2.1 s, the element is the `<h1>` name.
-  - `/log/`: performance 95 to 96, accessibility 100. `/gym/`: 93, unchanged.
-- Budgets for `/`: inline illustration SVG 19.1 kB gzipped (budget 250). No object over 40 kB, so no WebP fallback was needed. First-load JS 134.8 kB gzipped (budget 90, not met, see above). HTML is 49 kB gzipped: the SVG paths are in it twice, once as markup and once in the React payload.
-- Pipeline sheet status: a01 rejected in its map, a01b and a02 emitted, a03 to a12 pending (no map). Component counts seen for the pending sheets against the parts listed in the spec: a03 13 of 10, a04 13 of 16, a05 16 of 10, a06 8 of 8, a07 12 of 12, a08 5 of 5, a09 8 of 7, a10 9 of 8, a11 7 of 7, a12 10 of 10. The ones that differ need a look at the contact sheet before a map is written.
+- `pnpm test`: 53 passed (content 16, pipeline 25, scene 12).
+- `pnpm e2e`: 53 passed. 27 cover `/`, 26 cover the preserved pages.
+- Lighthouse, mobile preset, production export, `/`, five runs: performance 95 to 98, accessibility 100, best practices 100, SEO 100. CLS 0. LCP 2.4 to 3.0 s, the element is the `<h1>` name. `/log/` 98, `/gym/` 93 (unchanged, see OPEN_QUESTIONS).
+- Budgets for `/`:
+  - Illustration SVG 120.1 kB gzipped (budget 250): 21.5 inline (rack, character) plus 98.6 in nine sprite files. Largest object: bike, 25.2 kB. No object over 40 kB, no WebP fallback.
+  - First-load JS 136.7 kB gzipped (budget 90, **not met**, see above).
+  - HTML 58.8 kB gzipped.
+- Sprites checked in Chromium, Firefox and WebKit (Playwright builds), lights on and off.
+- Pipeline sheet status: a01 and a04 rejected in their maps, the other eleven emitted.
 
 ## Garage review log
 Round 1 (found on screenshots at 1440, 1024 and 360, all fixed):
@@ -48,9 +56,25 @@ Round 1 (found on screenshots at 1440, 1024 and 360, all fixed):
 - Lights off: the iron rack sank into the wall. Wall and lower band lightened one step.
 - Lighthouse flagged 77% of phone text under 12px. Mono labels are 12px in the stacked layout.
 
+Round 2, objects A03 to A12 (1440 and 1024 from the live page, 768 and 360 from `pnpm shots`, both light states):
+- Calendar drew small and its goal text ran outside the pad: a stacked-layout height rule also applied in the room. Reset there.
+- At 1024 the labels of the calendar, the chalk stool and the bin overlapped, the lamp's label covered the rack's top bar and the bot's label covered the desk's. Calendar label moved above the pad, bin label shifted right, cord shortened, bot label and speech moved to the empty wall on its left.
+- The light cone read as a second lampshade (thick outline at half opacity). Widened to the shade, shortened to end behind the rack's top, opacity 35%.
+- Bot's sound arcs were stacked upside down (smallest on top). Reordered.
+- Bike helmet floated above the saddle. Seated.
+- Pegboard: tape measure overlapped the hex keys. Moved.
+- Phone ring lines showed in the paused idle pose (a keyframe at 0% with opacity 1). The no-JS e2e caught it.
+- All parts black in WebKit when drawn from sprites with classes. Fills are inline styles now.
+
+Round 3, mid-motion frames (hover at 250 to 400 ms): underline under the hovered number with the marker at its end, bot speech and arcs, calendar page falling over the next goal, paper ball in flight over the plate, handset lifted with lights out. All as intended.
+
 Checked and fine: plate order and overlap, bar on the hooks, pose alignment on the feet across idle, wave and chalk, mid-entry and mid-hover frames, no seams between stacked fills.
 
 Known and accepted:
+- The bike's label sits on its lower frame: there is no free floor around it. At 1024 it covers most of the wheels.
+- The bike overlaps the feet of the stool and the bin by a few units. It reads as depth.
+- Stacked layout with the lights out: iron parts lose their edge on the near-black page (OPEN_QUESTIONS).
+- The whiteboard's writing marker hangs past the board's right edge by design.
 - The rack is one flat iron shape. Its inner lines and holes are the same colour as its outline, so they do not survive palette snapping.
 - The bowed bar was drawn shorter and thicker than the straight one. It is stretched to length and shows for 160 ms.
 - Side-on plates are drawn at 0.7 scale and overlap, so six fit on the sleeve. The outline is a little lighter than on the rack.
@@ -94,7 +118,7 @@ Known and accepted:
 The live site is on Vercel and the apex redirects to `https://www.arshakil.com`.
 1. Fill or confirm docs/OPEN_QUESTIONS.md. Decide on `/hire` and the canonical host.
 2. `pnpm install && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm e2e`.
-3. Open a PR from `redesign/garage-gym` into `main`. Vercel builds a preview for the branch: check `/`, `/log/`, `/gym#friday`, `/notes/`, `/fb-privacy`, `/fb-data-deletion`, `/og.png` on the preview URL.
+3. Open a PR from `redesign/garage-gym` into `main`. Vercel builds a preview for the branch: check `/` (in Safari too: the objects are sprite files), `/log/`, `/gym#friday`, `/notes/`, `/fb-privacy`, `/fb-data-deletion`, `/og.png` on the preview URL.
 4. In the Vercel project settings: Framework Preset Next.js, Install Command `pnpm install`, Build Command `pnpm build`. The old CRA settings (output directory `build`, `npm run build`) must be cleared. With `output: "export"` Vercel serves `out/` on its own.
 5. Merge the PR. Production deploys from `main`.
 6. After deploy: open `https://www.arshakil.com/gym#friday` (old URL shape, must land on Friday), re-run Meta's URL check on both `fb-*` pages, and paste the home URL into a link preview checker for `/og.png`.

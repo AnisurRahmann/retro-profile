@@ -5,7 +5,8 @@ Personal portfolio. The home page is one illustrated garage gym where every obje
 ## Commands
 - Gate: `pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm e2e`
 - Screenshots: `pnpm shots`. Lighthouse: `node scripts/lighthouse.mjs`.
-- Illustrations: `pnpm illustrations` or `pnpm illustrations a02`. Outputs are committed, `pnpm build` never runs it.
+- Illustrations: `pnpm illustrations` or `pnpm illustrations a02`. Outputs are committed, `pnpm build` never runs it. One composed object as PNG: `pnpm exec tsx scripts/illustrations/preview.ts bike`.
+- Social image: `pnpm og` writes `public/og.png` from the anchor room. Committed.
 - Never commit a red build. Do not deploy or change DNS without being asked.
 
 ## Where things live
@@ -14,9 +15,10 @@ Personal portfolio. The home page is one illustrated garage gym where every obje
 - `src/scene.ts`: the twelve stations of the room (placement in a 1600 x 900 space, target, label). Station order is DOM, Tab and phone order.
 - `src/lib/derive.ts`: every counter and derived label. `src/lib/notes.ts`, `src/lib/legal.ts`: markdown content readers.
 - `src/app/page.tsx`: the garage home. `src/app/log/page.tsx`: the training log (the previous home, unchanged).
-- `src/components/`: server components, except `Runtime.tsx`, `Register.tsx`, `LoadTheBarShell.tsx`, `LoadTheBarGame.tsx`, `garage/GarageRuntime.tsx`.
-- `src/components/garage/`: header, scene, objects (`RackObject`, `CharacterObject`), plain list, animation runtime.
-- `src/illustrations/compose.ts`: how the parts of one object are put together. `src/illustrations/generated/`: pipeline output, do not edit.
+- `src/components/`: server components, except `Runtime.tsx`, `Register.tsx`, `LoadTheBarShell.tsx`, `LoadTheBarGame.tsx`, `garage/GarageRuntime.tsx`, `garage/DhakaClock.tsx`.
+- `src/components/garage/`: header, scene, objects (`RackObject`, `CharacterObject` inline, A03 to A12 in `Objects.tsx` through the generic `Parts.tsx`), plain list, animation runtime (one act per station id).
+- `src/illustrations/compose.ts`: how the parts of one object are put together (a tree of `PartNode`, `data-p` ids are the hooks for CSS and the runtime). `src/illustrations/generated/`: pipeline output, do not edit. `public/illustrations/aNN.svg`: sprite files, also pipeline output.
+- `src/lib/countup.ts`: the count-up, shared by both runtimes. `src/lib/boot.ts`: the inline head script and the script that attaches sprites after first paint.
 - `assets/illustrations/raw/`: Gemini sheets on magenta. `assets/illustrations/parts/aNN.json`: hand-written part maps (name, pivot, z).
 - `scripts/illustrations/`: the pipeline (key, split, name, snap, trace, optimise, manifest). Contact sheets and reports go to `.illustrations/`.
 - `src/app/globals.css`: the whole design system. The garage block and the `--i-*` palette are at the end.
@@ -29,7 +31,10 @@ Personal portfolio. The home page is one illustrated garage gym where every obje
 - Links are plain `<a>`, not `next/link`. Internal page links end with a slash (`/gym/`). Flight links from other pages go to `/log/#id`.
 - Runtime dependencies, allowed only: next, react, tailwind, clsx, zod, gray-matter, marked. No UI kits, animation, icon, physics or drag libraries.
 - Server-render the final state first. JS only enhances. Anything interactive needs keyboard support and a reduced-motion fallback.
-- A new object: drop the sheet in `raw/`, run `pnpm illustrations <id>`, read the contact sheet, write the parts map, run again, add a component and register it in `OBJECTS` in `garage/Scene.tsx`.
+- A new object: drop the sheet in `raw/`, run `pnpm illustrations <id>`, read the contact sheet, write the parts map, run again, add a layout in `compose.ts` (check it with the preview script), a component in `Objects.tsx`, register it in `OBJECTS` in `garage/Scene.tsx`, add its footprint in `scene.ts`, its act in `GarageRuntime.tsx` and its label position in `globals.css`.
+- A parts map stops an asset when a spec part is missing or merged (`rejected`). Surplus components are ignored with a reason.
+- Objects after the rack and the character are `<use data-href>` into sprite files, plus a `<noscript>` copy. Sprite fills are inline styles (`fill:var(--i-red,#D62828)`): WebKit ignores classes there. Check any change to this in Safari.
+- Idle keyframes start and end on the final pose and use `animation-play-state: var(--idle)`. Text over a drawing is `aria-hidden`, sized in `cqw` of `.ill-box`.
 
 ### Build-time only (devDependencies, never imported from `src/app` or `src/components`)
 - Tests and tooling: vitest, @playwright/test, eslint, typescript, tsx.
@@ -37,11 +42,11 @@ Personal portfolio. The home page is one illustrated garage gym where every obje
 
 ## Design rules, short form
 - One garage gym, drawn flat: vector objects with a uniform iron outline `#17181A`, flat fills, rounded joins allowed on illustrations. Interface panels, buttons and labels keep square corners and 2px iron borders.
-- Eight colours plus skin, as CSS variables `--i-chalk`, `--i-iron`, `--i-grey`, `--i-tan`, `--i-red`, `--i-blue`, `--i-yellow`, `--i-green`, `--i-skin`. Traced paths carry a class (`i-red`), never a hex value. Lights off is a variable swap (`data-lights="off"` on `<html>`).
+- Eight colours plus skin, as CSS variables `--i-chalk`, `--i-iron`, `--i-grey`, `--i-tan`, `--i-red`, `--i-blue`, `--i-yellow`, `--i-green`, `--i-skin`. Traced paths carry a class (`i-red`), never a hex value (sprite files carry the variable with the hex as fallback only). Lights off is a variable swap (`data-lights="off"` on `<html>`).
 - Plate colours encode the six project categories and nothing else. Every plate also carries its category name.
 - No gradients, no shadows, no emoji. No text inside an illustration: all text is live HTML.
 - Every object is a link with a visible label, and every metaphor label is paired with its plain meaning: "LOAD THE BAR · projects". Use `<span className="plain">`.
-- Objects without art yet are dashed iron boxes at the object's footprint. They are real links.
+- Objects without art yet are dashed iron boxes at the object's footprint. They are real links. Today that is the desk (A04, sheet rejected).
 - Nothing invented: no metrics, links, dates or clients that are not in the content. A missing link renders as no link.
 - Fast first: name, role, six metrics and the call button are text above the room and need no JS or images. The same links follow the room as a plain list.
 - From 1024px the room scales as one 16:9 scene. Below that, stations stack in one column. Never a scaled-down room, never sideways scroll.

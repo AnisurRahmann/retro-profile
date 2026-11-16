@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { writeContactSheet } from "./contact";
 import { toSharp } from "./io";
-import { assetMeta, manifestModule, pathsModule, type AssetMeta, type PartMeta } from "./manifest";
+import { assetMeta, manifestModule, pathsModule, spriteFile, type AssetMeta, type PartMeta } from "./manifest";
 import { optimise } from "./optimise";
 import { keyAndSplit, listSources, MAP_DIR, partsFor, preparePart, readMap, UPSCALE, type Source } from "./sheet";
 import { trace, transformPath } from "./trace";
@@ -76,6 +76,9 @@ async function processSheet(source: Source): Promise<"done" | "skipped" | "pendi
   } else {
     metas.forEach((part, index) => writeFileSync(join(dir, `${part.name}.svg`), svgs[index]!));
     writeFileSync(join(OUT_DIR, `${source.id}.ts`), pathsModule(source.id, modules));
+    // the same parts as a sprite, for objects the page loads with <use> instead of inlining
+    mkdirSync(PUBLIC_DIR, { recursive: true });
+    writeFileSync(join(PUBLIC_DIR, `${source.id}.svg`), spriteFile(modules));
     meta = assetMeta(source.id, source.file, "svg", metas, svgs);
   }
   writeFileSync(join(dir, "meta.json"), `${JSON.stringify(meta, null, 2)}\n`);

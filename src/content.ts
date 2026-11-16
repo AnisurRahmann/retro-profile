@@ -50,8 +50,6 @@ export const profile = profileSchema.parse({
 
 export const meta = {
   title: "Anisur Rahman (Shakil): Fullstack AI Engineer, Voice Agents and Agentic Systems",
-  ogKicker: "The Training Log",
-  ogTagline: "Fullstack AI Engineer. Voice agents and agentic systems.",
   jobTitle: "Fullstack AI Engineer",
 } as const;
 

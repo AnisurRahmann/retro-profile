@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { buses, goals, metrics, ui } from "@/content";
 import { GYM_UI } from "@/gym";
+import { spriteScript } from "@/lib/boot";
 import { decor, hasArt, ROOM, SCENE, stations } from "@/scene";
 import type { Station } from "@/schema";
 import { CharacterObject } from "./CharacterObject";
@@ -92,6 +93,7 @@ export function Scene() {
           {bot ? <span className="bot-say" data-say="" aria-live="off" style={{ "--x": bot.x + 12, "--y": bot.y + 40 } as CSSProperties} /> : null}
         </div>
       </div>
+      <script dangerouslySetInnerHTML={{ __html: spriteScript }} />
       <p className="wrap label garage-note">{g.pending}</p>
     </section>
   );

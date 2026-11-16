@@ -2447,7 +2447,7 @@ details > summary {
   container-type: inline-size;
 }
 
-.ill-box > .ill {
+.ill-box .ill {
   position: absolute;
   inset: 0;
   width: 100%;

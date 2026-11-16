@@ -1,8 +1,10 @@
+import { existsSync, readFileSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { ciede2000, hexToRgb, rgbToLab } from "../../scripts/illustrations/color";
 import { contactOverlay } from "../../scripts/illustrations/contact";
 import { key } from "../../scripts/illustrations/key";
-import { assetMeta, manifestModule, pathsModule } from "../../scripts/illustrations/manifest";
+import { assetMeta, manifestModule, pathsModule, spriteFile } from "../../scripts/illustrations/manifest";
 import { nameParts, partsMapSchema } from "../../scripts/illustrations/name";
 import { optimise } from "../../scripts/illustrations/optimise";
 import { snap, snapColour } from "../../scripts/illustrations/snap";
@@ -256,6 +258,28 @@ describe("g. manifest", () => {
     const json = JSON.parse(source.slice(source.indexOf("parse(") + 6, source.lastIndexOf(")")));
     expect(illustrationManifestSchema.parse(json).a99!.parts[0]!.name).toBe("plate");
     expect(pathsModule("a99", [{ name: "plate", paths: [["i-red", "M0 0"]] }])).toContain('"plate": [\n    ["i-red", "M0 0"],');
+  });
+
+  it("writes a sprite whose fills are inline palette variables, one group per part", () => {
+    const sprite = spriteFile([{ name: "plate", paths: [["i-iron", "M0 0"], ["i-red", "M1 1"]] }]);
+    expect(sprite).toContain('<g id="plate"><path style="fill:var(--i-iron,#17181A)" d="M0 0"/><path style="fill:var(--i-red,#D62828)" d="M1 1"/></g>');
+    // no <style> block and no class: WebKit ignores both in a file drawn through <use>
+    expect(sprite).not.toMatch(/<style|class=/);
+  });
+
+  it("the committed sprites hold every part of every object, and the page's share stays in budget", () => {
+    let total = 0;
+    for (const asset of Object.values(manifest)) {
+      const path = `public/illustrations/${asset.id}.svg`;
+      expect(existsSync(path), path).toBe(true);
+      const sprite = readFileSync(path, "utf8");
+      for (const entry of asset.parts) expect(sprite, `${asset.id}/${entry.name}`).toContain(`<g id="${entry.name}">`);
+      const fills = [...sprite.matchAll(/style="fill:var\(--(i-[a-z]+),/g)].map((match) => match[1]);
+      expect(fills.length, asset.id).toBe([...sprite.matchAll(/<path /g)].length);
+      for (const fill of fills) expect(PALETTE_CLASSES as readonly string[], asset.id).toContain(fill);
+      total += gzipSync(sprite).byteLength;
+    }
+    expect(total).toBeLessThan(250 * 1024);
   });
 
   it("the schema rejects a broken manifest", () => {

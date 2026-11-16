@@ -1,4 +1,5 @@
 import { gzipSync } from "node:zlib";
+import { PALETTE } from "./types";
 
 export interface PartMeta {
   name: string;
@@ -48,4 +49,19 @@ export function pathsModule(id: string, parts: { name: string; paths: [string, s
     .map(({ name, paths }) => `  ${JSON.stringify(name)}: [\n${paths.map(([cls, d]) => `    [${JSON.stringify(cls)}, ${JSON.stringify(d)}],`).join("\n")}\n  ],`)
     .join("\n");
   return `${HEADER}import type { IllustrationPaths } from "@/schema";\n\nexport const ${id}: IllustrationPaths = {\n${lines}\n};\n`;
+}
+
+/**
+ * The same layers as one sprite file per object, served from /illustrations/. Each part is a group with its name as id,
+ * drawn on the page with <use href="/illustrations/a06.svg#frame">. The page's palette variables are inherited
+ * through <use>, so lights off still works. The hex values are only the fallback when the file is opened on its own.
+ */
+export function spriteFile(parts: { name: string; paths: [string, string][] }[]): string {
+  // the fill is an inline style on every path: WebKit does not apply a <style> block inside a file that is drawn through <use>
+  const fill = (cls: string) => {
+    const name = cls.replace(/^i-/, "") as keyof typeof PALETTE;
+    return `fill:var(--i-${name},${PALETTE[name]})`;
+  };
+  const groups = parts.map(({ name, paths }) => `<g id="${name}">${paths.map(([cls, d]) => `<path style="${fill(cls)}" d="${d}"/>`).join("")}</g>`).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" fill-rule="evenodd"><defs>${groups}</defs></svg>\n`;
 }

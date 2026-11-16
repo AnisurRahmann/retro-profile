@@ -13,7 +13,8 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "shots": "playwright test --config playwright.shots.config.ts",
-    "illustrations": "tsx scripts/illustrations/run.ts"
+    "illustrations": "tsx scripts/illustrations/run.ts",
+    "og": "tsx scripts/og.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
