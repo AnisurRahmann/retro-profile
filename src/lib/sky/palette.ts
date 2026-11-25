@@ -9,8 +9,8 @@ export const SKY_KEYFRAMES: SkyKeyframe[] = [
   { elev: -18, zenith: "#060B16", mid: "#0A1120", dawn: "#0F1A2E", dusk: "#0F1A2E" }, // night
   { elev: -12, zenith: "#070D1A", mid: "#0D162A", dawn: "#16223C", dusk: "#16223C" }, // astronomical
   { elev: -6, zenith: "#0A1426", mid: "#13223F", dawn: "#2A3766", dusk: "#352B52" }, // nautical
-  { elev: 0, zenith: "#0F2042", mid: "#22396A", dawn: "#B9786A", dusk: "#D9813A" }, // sunrise / sunset
-  { elev: 8, zenith: "#132B55", mid: "#284C82", dawn: "#C99A70", dusk: "#D99A55" }, // golden
+  { elev: 0, zenith: "#0F2042", mid: "#22396A", dawn: "#A96253", dusk: "#C86800" }, // sunrise / sunset (tuned, see DECISIONS)
+  { elev: 8, zenith: "#132B55", mid: "#284C82", dawn: "#B68253", dusk: "#C6812D" }, // golden (tuned)
   { elev: 25, zenith: "#10264A", mid: "#1C3D70", dawn: "#2E5A92", dusk: "#2E5A92" }, // day, deep blue
 ];
 

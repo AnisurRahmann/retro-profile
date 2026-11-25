@@ -14,7 +14,11 @@
  * - Fog: desaturated sky lifted +6% L, alpha uFog × 0.55, strongest across the bottom 40%.
  * - Moon glow: radial halo, illumination × up × night × (1 − 0.7 cover).
  * - Horizon glow: ellipse on the bottom edge under the sun (0.9 × width), horizon colour +10% L.
+ * Clouds and the glow are damped to COLUMN_DAMP behind the 768px column (ramping out over 96px), which the scrim
+ * solver mirrors.
  */
+import { COLUMN_DAMP, MOON_COLUMN_PX } from "@/lib/sky/scrim";
+
 export const OCTAVES = 5;
 
 export const VERT = `#version 300 es
@@ -43,6 +47,7 @@ vec2 vp=uRes/uScale;
 vec2 uv=css/vp;
 vec3 base=sky(uv.y);
 vec4 acc=vec4(0.);
+float col=1.-${COLUMN_DAMP}*(1.-smoothstep(${MOON_COLUMN_PX / 2}.,${MOON_COLUMN_PX / 2 + 96}.,abs(css.x-vp.x*.5)));
 float cloudA=0.;
 if(uCloudCover>.005){
 vec2 q=(css-uWind*uTime)/vec2(400.,190.+210.*(1.-uv.y));
@@ -67,7 +72,7 @@ c=mix(c,vec3(luma(c)),.4*uRainDark)*(1.-.32*uRainDark*thick);
 float L=pow(max(luma(c),1e-5),1./3.);
 c*=pow((L+.12*uLightning)/L,3.);
 cloudA=dens*mix(.55,.85,thick)*mix(1.,1.08,uRainDark);
-cloudA=min(cloudA,.85)*(1.-.6*uFog);
+cloudA=min(cloudA,.85)*(1.-.6*uFog)*col;
 over(acc,c,cloudA);
 }
 }
@@ -83,7 +88,7 @@ over(acc,vec3(.62,.66,.76),mg*.16*exp(-r*r*.9));
 if(uGlow>.001){
 vec2 e=(css-vec2(uSunX*vp.x,vp.y))/vec2(.9*vp.x,.42*vp.y);
 float g=exp(-dot(e,e)*2.2);
-over(acc,uHorizon*1.331,uGlow*.75*g);
+over(acc,uHorizon*1.331,uGlow*.75*g*col);
 }
 o=acc.a>0.?vec4(toGamma(acc.rgb/acc.a)*acc.a,acc.a):vec4(0.);
 }`;

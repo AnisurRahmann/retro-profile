@@ -10,7 +10,7 @@ export function Closer() {
   return (
     <section
       aria-labelledby="closer-heading"
-      className="section rounded-[10px] border border-hairline bg-surface p-7 shadow-[inset_0_1px_0_var(--highlight)]"
+      className="section rounded-[10px] glass border border-hairline p-7 shadow-[inset_0_1px_0_var(--highlight)]"
     >
       <h2 id="closer-heading" className="text-[22px] leading-7 font-medium text-text">
         {closer.heading}

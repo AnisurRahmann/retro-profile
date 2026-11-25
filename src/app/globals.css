@@ -15,6 +15,8 @@
   --mention-text: #f5c46b;
   --signal: #f5a524;
   --highlight: rgba(255, 255, 255, 0.04);
+  /* Surfaces over the sky: --surface at 86%, blurred, so the sky tints them slightly. */
+  --surface-glass: rgba(17, 26, 43, 0.86);
 
   /* Glyph tiles: muted mid-tones, all ≥ 4.5:1 against --text */
   --tile-slate: #3e4c63;
@@ -149,6 +151,86 @@ html[data-sky-scrub] .sky-gradient {
   opacity: 1;
 }
 
+/* Column scrim: --ink behind the 768px column, its alpha solved per height (stops at 0/25/50/75/100%,
+   src/lib/sky/scrim.ts) so it darkens only where the sky is bright, fading out over the outer 96px each side so
+   it never reads as a stripe. 0.82 (the maximum) is the no-JS default. */
+@property --scrim-0 {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.82;
+}
+@property --scrim-1 {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.82;
+}
+@property --scrim-2 {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.82;
+}
+@property --scrim-3 {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.82;
+}
+@property --scrim-4 {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.82;
+}
+.sky-scrim {
+  position: fixed;
+  inset: 0 auto 0 50%;
+  z-index: -1;
+  width: calc(768px + 2 * 96px);
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--ink) calc(var(--scrim-0) * 100%), transparent),
+    color-mix(in srgb, var(--ink) calc(var(--scrim-1) * 100%), transparent) 25%,
+    color-mix(in srgb, var(--ink) calc(var(--scrim-2) * 100%), transparent) 50%,
+    color-mix(in srgb, var(--ink) calc(var(--scrim-3) * 100%), transparent) 75%,
+    color-mix(in srgb, var(--ink) calc(var(--scrim-4) * 100%), transparent)
+  );
+  transition:
+    --scrim-0 4s ease,
+    --scrim-1 4s ease,
+    --scrim-2 4s ease,
+    --scrim-3 4s ease,
+    --scrim-4 4s ease;
+  /* Eased (smoothstep-like) 96px fades: a linear ramp leaves visible Mach bands at its ends. */
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    rgb(0 0 0 / 0.16) 24px,
+    rgb(0 0 0 / 0.5) 48px,
+    rgb(0 0 0 / 0.84) 72px,
+    rgb(0 0 0 / 1) 96px,
+    rgb(0 0 0 / 1) calc(100% - 96px),
+    rgb(0 0 0 / 0.84) calc(100% - 72px),
+    rgb(0 0 0 / 0.5) calc(100% - 48px),
+    rgb(0 0 0 / 0.16) calc(100% - 24px),
+    transparent
+  );
+}
+html[data-sky-scrub] .sky-scrim {
+  transition-duration: 150ms;
+}
+
+/* Glass: cards, the closer, receipts, chat composer and bubbles over the sky. Opaque where blur is unsupported. */
+.glass {
+  background: var(--surface);
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .glass {
+    background: var(--surface-glass);
+    -webkit-backdrop-filter: blur(10px) saturate(1.1);
+    backdrop-filter: blur(10px) saturate(1.1);
+  }
+}
+
 /* ── Grain ──────────────────────────────────────────────────
    Fixed, above the background, below content. Breaks up gradient banding. */
 .grain {
@@ -194,7 +276,6 @@ html[data-sky-scrub] .sky-gradient {
   padding: 14px 16px;
   border-radius: 8px;
   border: 1px solid transparent;
-  background: var(--surface);
   transition:
     background-color 150ms ease,
     border-color 150ms ease;

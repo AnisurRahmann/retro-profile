@@ -71,7 +71,7 @@ export default async function CaseStudyPage({ params }: Props) {
                   <span className="hidden sm:inline">→</span>
                 </span>
               ) : null}
-              <span className="rounded-md border border-hairline bg-surface px-2.5 py-1 font-mono text-xs text-text">
+              <span className="rounded-md glass border border-hairline px-2.5 py-1 font-mono text-xs text-text">
                 {step}
               </span>
             </li>
@@ -106,7 +106,7 @@ export default async function CaseStudyPage({ params }: Props) {
         <Heading>{ui.work.stack}</Heading>
         <ul className="flex flex-wrap gap-1.5">
           {study.stack.map((s) => (
-            <li key={s} className="rounded-md bg-surface px-2 py-1 font-mono text-xs text-graphite">
+            <li key={s} className="glass rounded-md px-2 py-1 font-mono text-xs text-graphite">
               {s}
             </li>
           ))}

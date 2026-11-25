@@ -2,8 +2,11 @@
 
 import { useEffect } from "react";
 import { skyModel } from "@/lib/sky/model";
+import { MOON_COLUMN_PX, scrimProfile } from "@/lib/sky/scrim";
 import { effectiveWeather, parseOverrides, skyStore, skyTime } from "@/lib/sky/store";
 import { isWeather } from "@/lib/sky/weather";
+
+const TEST = process.env.NEXT_PUBLIC_E2E === "1";
 
 export const WEATHER_POLL_MS = 15 * 60_000;
 const ASTRO_TICK_MS = 60_000;
@@ -16,7 +19,19 @@ function paint() {
   html.style.setProperty("--sky-zenith", m.css.zenith);
   html.style.setProperty("--sky-mid", m.css.mid);
   html.style.setProperty("--sky-horizon", m.css.horizon);
+  // How much of the moon disc sits behind the column (it's dimmed there, and the scrim accounts for it).
+  const vw = window.innerWidth;
+  const mx = m.moon.x * vw;
+  const inColumn = m.moon.up && Math.abs(mx - vw / 2) < MOON_COLUMN_PX / 2 + 14;
+  const moon = inColumn ? m.night * Math.max(0, 1 - 1.05 * m.cloudCover) ** 0.7 * (1 - 0.6 * m.fog) : 0;
+  const profile = scrimProfile(m, moon, m.moon.y);
+  profile.forEach((a, i) => html.style.setProperty(`--scrim-${i}`, String(a)));
+  const scrim = Math.max(...profile);
   html.dataset.sky = m.astro.state;
+  if (TEST) {
+    const w = window as Window & { __sky?: Record<string, unknown> };
+    w.__sky = { ...w.__sky, state: m.astro.state, elevation: m.astro.elevation, scrimA: scrim, condition: m.condition, fps: w.__sky?.fps ?? 0 };
+  }
   if (s.scrubbing) html.dataset.skyScrub = "";
   else delete html.dataset.skyScrub;
   return m;

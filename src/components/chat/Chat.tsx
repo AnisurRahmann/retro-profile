@@ -213,7 +213,7 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
         e.preventDefault();
         void send(draft);
       }}
-      className="composer relative bg-surface"
+      className="composer glass relative"
     >
       <label htmlFor="chat-input" className="sr-only">
         {copy.inputLabel}
@@ -311,7 +311,7 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
           m.role === "user" ? (
             <li key={m.id} className="flex justify-end">
               <p className="sr-only">{copy.you}:</p>
-              <div className="max-w-[85%] rounded-xl bg-surface-2 px-4 py-2.5 text-base leading-6 break-words whitespace-pre-wrap text-text">
+              <div className="max-w-[85%] glass rounded-xl px-4 py-2.5 text-base leading-6 break-words whitespace-pre-wrap text-text">
                 {m.text}
               </div>
             </li>

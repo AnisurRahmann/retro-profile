@@ -37,7 +37,7 @@ export function ReceiptCard({ receipt }: { receipt: Receipt }) {
   );
 
   return (
-    <article className="rounded-lg bg-surface px-4 py-3.5">
+    <article className="glass rounded-lg px-4 py-3.5">
       <p className="font-mono text-xs text-graphite">{meta}</p>
       <div className="mt-2.5 flex gap-2.5">
         {avatar}

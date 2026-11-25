@@ -32,16 +32,16 @@ export function ProjectCard({ project, labels }: { project: CardProject; labels:
     </>
   );
 
-  if (!target) return <div className="card h-full">{body}</div>;
+  if (!target) return <div className="card glass h-full">{body}</div>;
   if (target.external) {
     return (
-      <a href={target.href} target="_blank" rel="noopener" className="card h-full">
+      <a href={target.href} target="_blank" rel="noopener" className="card glass h-full">
         {body}
       </a>
     );
   }
   return (
-    <Link href={target.href} className="card h-full">
+    <Link href={target.href} className="card glass h-full">
       {body}
     </Link>
   );

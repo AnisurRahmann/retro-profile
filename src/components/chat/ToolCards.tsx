@@ -13,7 +13,7 @@ const input =
 
 export function BookCard({ url, copy }: { url: string; copy: ChatCopy }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-hairline bg-surface px-4 py-3.5">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg glass border border-hairline px-4 py-3.5">
       <span className="text-sm font-medium text-text">{copy.bookTitle}</span>
       <a href={url} target="_blank" rel="noopener" className={buttonPrimary}>
         {copy.bookButton}
@@ -40,7 +40,7 @@ export function IntroForm({
 
   if (state === "sent") {
     return (
-      <p role="status" className="rounded-lg border border-hairline bg-surface px-4 py-3.5 text-sm text-text">
+      <p role="status" className="rounded-lg glass border border-hairline px-4 py-3.5 text-sm text-text">
         {copy.introSent}
       </p>
     );
@@ -76,7 +76,7 @@ export function IntroForm({
         e.preventDefault();
         void submit(e.currentTarget);
       }}
-      className="space-y-3 rounded-lg border border-hairline bg-surface px-4 py-4"
+      className="space-y-3 rounded-lg glass border border-hairline px-4 py-4"
       aria-labelledby={`${id}-title`}
     >
       <p id={`${id}-title`} className="text-sm font-medium text-text">

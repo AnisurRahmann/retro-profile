@@ -8,6 +8,7 @@ export function SkyBackdrop() {
       <div aria-hidden="true" className="sky-layer sky-gradient" data-sky-gradient="" />
       <SkyController />
       <SkyMount />
+      <div aria-hidden="true" className="sky-scrim" data-sky-scrim="" />
       <div aria-hidden="true" className="grain" />
     </>
   );

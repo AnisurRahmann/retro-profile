@@ -6,19 +6,24 @@ import type { Condition } from "./weather";
 
 export type SkyColors = { zenith: Lab; mid: Lab; horizon: Lab };
 
-const FRAMES = SKY_KEYFRAMES.map((k) => ({
-  elev: k.elev,
-  zenith: hexToLab(k.zenith),
-  mid: hexToLab(k.mid),
-  dawn: hexToLab(k.dawn),
-  dusk: hexToLab(k.dusk),
-}));
+type Frame = { elev: number; zenith: Lab; mid: Lab; dawn: Lab; dusk: Lab };
+let cache: { src: string; frames: Frame[] } | null = null;
+/** Keyframes in OKLab, rebuilt only if the palette changed (lets the tuning sweep edit it in place). */
+function frames(): Frame[] {
+  const src = JSON.stringify(SKY_KEYFRAMES);
+  if (cache?.src !== src) {
+    const f = SKY_KEYFRAMES.map((k) => ({ elev: k.elev, zenith: hexToLab(k.zenith), mid: hexToLab(k.mid), dawn: hexToLab(k.dawn), dusk: hexToLab(k.dusk) }));
+    cache = { src, frames: f };
+  }
+  return cache.frames;
+}
 
 /** Clear-sky colours for a sun elevation and a half of the day. */
 export function clearSky(elevationDeg: number, phase: Phase): SkyColors {
+  const FRAMES = frames();
   const first = FRAMES[0]!;
   const last = FRAMES[FRAMES.length - 1]!;
-  const pick = (f: (typeof FRAMES)[number]) => (phase === "morning" ? f.dawn : f.dusk);
+  const pick = (f: Frame) => (phase === "morning" ? f.dawn : f.dusk);
   if (elevationDeg <= first.elev) return { zenith: first.zenith, mid: first.mid, horizon: pick(first) };
   if (elevationDeg >= last.elev) return { zenith: last.zenith, mid: last.mid, horizon: pick(last) };
   let i = 0;
