@@ -33,10 +33,16 @@ export const ARC = {
 
 export type ArcGeom = { w: number; h: number; horizonY: number; apexY: number };
 
-/** Arc geometry for a viewport and the stage's bottom edge (document px at scroll 0, = viewport px there). */
-export function arcGeom(vw: number, vh: number, stageBottom: number): ArcGeom {
+/**
+ * Arc geometry for a viewport and the stage's bottom edge (document px at scroll 0, = viewport px there).
+ * Mobile (< 808px): the hero fills the bottom of the stage across the whole width, so the horizon sits 20px
+ * above the hero block instead (the sun sets behind the hero, never on its text).
+ */
+export function arcGeom(vw: number, vh: number, stageBottom: number, heroTop?: number): ArcGeom {
   const apexY = ARC.header + ARC.apexGap;
-  return { w: vw, h: vh, horizonY: Math.max(apexY + 80, stageBottom - ARC.horizonDrop * vh), apexY };
+  let horizon = stageBottom - ARC.horizonDrop * vh;
+  if (vw < 808 && heroTop !== undefined) horizon = Math.min(horizon, heroTop - 20);
+  return { w: vw, h: vh, horizonY: Math.max(apexY + 80, horizon), apexY };
 }
 
 /** Stage height as CSS computes it (for pages without a stage, the sun still needs a horizon). */

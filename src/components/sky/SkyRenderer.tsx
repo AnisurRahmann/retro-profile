@@ -11,7 +11,15 @@ import { dayOfYear, dhakaParts } from "@/lib/sky/time";
 import { sunColor } from "@/lib/sky/gradient";
 import { ALT_REF, nightPoint, sunPath, type ArcGeom } from "@/lib/sky/arc";
 import { columnMask, COLUMN_BREAK, rampMask, SUN_UNDER_TEXT } from "@/lib/sky/scrim";
-import { geomNow, notifyGeometry, onViewGeometry, onViewScroll, runtime, scrimTop, view } from "@/lib/sky/view";
+import {
+  geomNow,
+  notifyGeometry,
+  onViewGeometry,
+  onViewScroll,
+  runtime,
+  scrimTop,
+  view,
+} from "@/lib/sky/view";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createSun, drawArc, type SunState } from "./bodies";
 import { CLOUD_REFRESH_S, createCloudField } from "./cloud-field";
@@ -40,7 +48,11 @@ function targetsOf(m: SkyModel): Targets {
     uCloudCover: m.cloudCover,
     uFog: m.fog,
     uRainDark: m.rainDark,
-    uWind: driftVector(m.windKmh, m.windFromDeg, view.vw < COLUMN_BREAK ? MIN_DRIFT.mobile : MIN_DRIFT.desktop),
+    uWind: driftVector(
+      m.windKmh,
+      m.windFromDeg,
+      view.vw < COLUMN_BREAK ? MIN_DRIFT.mobile : MIN_DRIFT.desktop,
+    ),
     uMoonPos: [m.moon.x, m.moon.y],
     sunPos: [m.sun.x, m.sun.y],
     sunAlt: m.sun.alt,
@@ -56,7 +68,10 @@ function approach(cur: Targets, to: Targets, k: number): void {
   for (const key in to) {
     const b = to[key]!;
     const a = cur[key]!;
-    cur[key] = typeof b === "number" ? (a as number) + (b - (a as number)) * k : b.map((v, i) => (a as number[])[i]! + (v - (a as number[])[i]!) * k);
+    cur[key] =
+      typeof b === "number"
+        ? (a as number) + (b - (a as number)) * k
+        : b.map((v, i) => (a as number[])[i]! + (v - (a as number[])[i]!) * k);
   }
 }
 
@@ -73,7 +88,9 @@ export function lightningEnvelope(sinceStrike: number): number {
 }
 
 function readToken(name: string): [number, number, number] {
-  return hexToRgb(getComputedStyle(document.documentElement).getPropertyValue(name).trim() || brand.text);
+  return hexToRgb(
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim() || brand.text,
+  );
 }
 
 type Window2 = Window & {
@@ -95,13 +112,17 @@ type Window2 = Window & {
   };
 };
 
-
 const smooth01 = (e0: number, e1: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
   return t * t * (3 - 2 * t);
 };
 
-function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landCanvas: HTMLCanvasElement, onNoWebGL: () => void): () => void {
+function start(
+  atmCanvas: HTMLCanvasElement,
+  ptsCanvas: HTMLCanvasElement,
+  landCanvas: HTMLCanvasElement,
+  onNoWebGL: () => void,
+): () => void {
   let dead = false;
   const isDead = () => dead;
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
@@ -161,7 +182,12 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
     model = skyModel(skyTime(s), effectiveWeather(s), geom);
     target = targetsOf(model);
     pts?.ensureDay(dayOfYear(skyTime(s)));
-    if (TEST && w2.__sky) Object.assign(w2.__sky, { state: model.astro.state, elevation: model.astro.elevation, condition: model.condition });
+    if (TEST && w2.__sky)
+      Object.assign(w2.__sky, {
+        state: model.astro.state,
+        elevation: model.astro.elevation,
+        condition: model.condition,
+      });
   };
 
   const n = (k: string) => cur[k] as number;
@@ -175,7 +201,10 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
       const hy = h.y - view.y;
       const dx = Math.max(h.x - x, 0, x - (h.x + h.w));
       const dy = Math.max(hy - y, 0, y - (hy + h.h));
-      k = Math.min(k, SUN_UNDER_TEXT + (1 - SUN_UNDER_TEXT) * smooth01(0, 3 * r, Math.hypot(dx, dy)));
+      k = Math.min(
+        k,
+        SUN_UNDER_TEXT + (1 - SUN_UNDER_TEXT) * smooth01(0.5 * r, 2 * r, Math.hypot(dx, dy)),
+      );
     }
     return k;
   };
@@ -201,7 +230,9 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
     moonVisible:
       n("uMoonUp") *
       n("uNight") *
-      (clouds.ready ? 1 - 0.85 * clouds.at(v2("uMoonPos")[0]! * view.vw, v2("uMoonPos")[1]! * view.vh) : Math.max(0, 1 - 1.05 * n("uCloudCover")) ** 0.7) *
+      (clouds.ready
+        ? 1 - 0.85 * clouds.at(v2("uMoonPos")[0]! * view.vw, v2("uMoonPos")[1]! * view.vh)
+        : Math.max(0, 1 - 1.05 * n("uCloudCover")) ** 0.7) *
       (1 - 0.6 * n("uFog")),
     moonR: moonR(),
     moonDim: textDim(v2("uMoonPos")[0]! * view.vw, v2("uMoonPos")[1]! * view.vh, moonR(), Infinity),
@@ -240,7 +271,6 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
     }
   };
 
-
   const draw = (t: number, dt: number, still: boolean) => {
     let lightning = 0;
     if (!still && model.thunder) {
@@ -260,7 +290,14 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
       drift[1] += v2("uWind")[1]! * dt;
     }
     if (still || t - lastClouds >= CLOUD_REFRESH_S) refreshClouds(t);
-    const u: Targets = { ...cur, uTime: still ? 0 : t, uLightning: lightning, uScrimTop: scrim, uDrift: drift, uZ: 0.015 * t };
+    const u: Targets = {
+      ...cur,
+      uTime: still ? 0 : t,
+      uLightning: lightning,
+      uScrimTop: scrim,
+      uDrift: drift,
+      uZ: 0.015 * t,
+    };
     if (atm && !lost) atm.draw(u);
     if (pts) {
       const ps = particleState();
@@ -270,28 +307,38 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
       arcPaths();
       const day = dayOfYear(skyTime());
       pts.step(still ? 0 : dt, ps);
-      pts.draw(t, skyTime().getTime(), ps, !still, scrim, {
-        back: (ctx) => drawArc(ctx, dayPath, nightPath, text, nightArc),
-        front: (ctx) => {
-          sunLayer.draw(ctx, ss, still ? 0 : t, day, (a) => {
-            const px = ss.x + Math.cos(a) * 180;
-            const py = ss.y + Math.sin(a) * 180;
-            return 1 - clouds.at(px, py);
-          });
-          if (!still && ambient) {
-            const hero = view.hero;
-            ambient.sky(ctx, {
-              t,
-              w: view.vw,
-              h: view.vh,
-              birds: n("sunAlt") > 0 && model.rainDensity === 0 && model.condition !== "fog",
-              night: n("uNight") > 0.5,
-              hero: hero ? { y0: hero.y - view.y, y1: hero.y + hero.h - view.y } : null,
-              ink: land?.colorOf("L3") ?? text,
+      const hero = view.hero;
+      pts.draw(
+        t,
+        skyTime().getTime(),
+        ps,
+        !still,
+        scrim,
+        {
+          back: (ctx) => drawArc(ctx, dayPath, nightPath, text, nightArc),
+          front: (ctx) => {
+            sunLayer.draw(ctx, ss, still ? 0 : t, day, (a) => {
+              const px = ss.x + Math.cos(a) * 180;
+              const py = ss.y + Math.sin(a) * 180;
+              return 1 - clouds.at(px, py);
             });
-          }
+            if (!still && ambient) {
+              ambient.sky(ctx, {
+                t,
+                w: view.vw,
+                h: view.vh,
+                birds: n("sunAlt") > 0 && model.rainDensity === 0 && model.condition !== "fog",
+                night: n("uNight") > 0.5,
+                hero: hero ? { y0: hero.y - view.y, y1: hero.y + hero.h - view.y } : null,
+                ink: land?.colorOf("L3") ?? text,
+              });
+            }
+          },
         },
-      });
+        hero
+          ? { x0: hero.x, y0: hero.y - view.y, x1: hero.x + hero.w, y1: hero.y + hero.h - view.y }
+          : null,
+      );
       if (TEST && w2.__sky) {
         w2.__sky.sun = { x: ss.x, y: ss.y, up: ss.up, cloud: ss.cloud, dim: ss.dim };
         w2.__sky.moon = { x: ps.moon.x * view.vw, y: ps.moon.y * view.vh, up: ps.moon.up };
@@ -301,8 +348,18 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
     if (land) {
       const scrubbing = skyStore.get().scrubbing;
       if (still || t - lastLight >= (scrubbing ? 1 / 30 : 2)) {
-        const hz = rgbToOklab(v2("uHorizon").map((c) => toGamma(Math.min(1, Math.max(0, c)))) as [number, number, number]);
-        land.setLighting({ horizon: hz, rim: n("uGlow") * smooth01(-2, 1, n("sunAlt")), sunX: v2("sunPos")[0]! * view.vw });
+        const hz = rgbToOklab(
+          v2("uHorizon").map((c) => toGamma(Math.min(1, Math.max(0, c)))) as [
+            number,
+            number,
+            number,
+          ],
+        );
+        land.setLighting({
+          horizon: hz,
+          rim: n("uGlow") * smooth01(-2, 1, n("sunAlt")),
+          sunX: v2("sunPos")[0]! * view.vw,
+        });
         lastLight = t;
       }
       const world = land.world;
@@ -322,10 +379,23 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
           dark: smooth01(2, -5, alt),
           lamps: smooth01(0.5, -1.5, alt),
           glints: [
-            { x: ss.x, k: ss.up && alt < 12 ? (1 - Math.max(0, alt) / 12) * (1 - ss.cloud) * smooth01(-0.9, 0.6, alt) : 0, rgb: sunColor(alt), r: ss.r },
+            {
+              x: ss.x,
+              k:
+                ss.up && alt < 12
+                  ? (1 - Math.max(0, alt) / 12) * (1 - ss.cloud) * smooth01(-0.9, 0.6, alt)
+                  : 0,
+              rgb: sunColor(alt),
+              r: ss.r,
+            },
             {
               x: ps.moon.x * view.vw,
-              k: ps.moon.up && moonAlt < 12 ? (1 - Math.max(0, moonAlt) / 12) * ps.moonVisible * (0.3 + 0.7 * ps.moon.fraction) : 0,
+              k:
+                ps.moon.up && moonAlt < 12
+                  ? (1 - Math.max(0, moonAlt) / 12) *
+                    ps.moonVisible *
+                    (0.3 + 0.7 * ps.moon.fraction)
+                  : 0,
               rgb: tx,
               r: ps.moonR,
             },
@@ -347,12 +417,16 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
         };
         land.draw(walk, (g, layer, o) => {
           life!.between(g, layer, o, f);
-          if (!still && ambient && (layer === "L2" || layer === "L4")) ambient.land(g, layer, o, ll);
+          if (!still && ambient && (layer === "L2" || layer === "L4"))
+            ambient.land(g, layer, o, ll);
         });
         if (TEST && w2.__sky)
           w2.__sky.land = {
             offsets: [PARALLAX.L1, PARALLAX.L2, PARALLAX.L3, PARALLAX.L4].map((k) => walk * k),
-            marks: world.marks.map((m) => ({ id: m.id, x: ((m.x0 + m.x1) / 2) * world.s - walk * PARALLAX.L3 })),
+            marks: world.marks.map((m) => ({
+              id: m.id,
+              x: ((m.x0 + m.x1) / 2) * world.s - walk * PARALLAX.L3,
+            })),
           };
       }
     }
@@ -374,7 +448,14 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
     const raining = model.rainDensity > 0;
     const scrolling = t - lastScroll < 0.25;
     const busy =
-      raining || (pts?.meteorActive(t) ?? false) || (strikeAt >= 0 && t - strikeAt < 0.3) || forceBolt || s.scrubbing || scrolling || t < takeoffUntil || (ambient?.active() ?? false);
+      raining ||
+      (pts?.meteorActive(t) ?? false) ||
+      (strikeAt >= 0 && t - strikeAt < 0.3) ||
+      forceBolt ||
+      s.scrubbing ||
+      scrolling ||
+      t < takeoffUntil ||
+      (ambient?.active() ?? false);
     const cap = coarse ? (raining || scrolling || s.scrubbing ? 30 : 20) : busy ? 60 : 24;
     if (TEST && w2.__sky) w2.__sky.cap = cap;
     if (cap < 60 && dt < 1 / cap - 0.004) return;
@@ -444,6 +525,15 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
       stillTimer = window.setTimeout(still, 150);
     }
   });
+  // The landscape stays on the bottom of the visual viewport (iOS toolbars, pinch zoom).
+  const vv = window.visualViewport;
+  const onVV = () => {
+    if (!vv) return;
+    const gap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    landCanvas.style.transform = gap > 0.5 ? `translateY(${-gap}px)` : "";
+  };
+  vv?.addEventListener("resize", onVV);
+  vv?.addEventListener("scroll", onVV);
   // "Book 30 min" hovered or focused with the airport on screen: the parked plane takes off.
   const onIntent = (e: Event) => {
     if (reduce || !(e.target instanceof Element) || !e.target.closest("[data-sky-takeoff]")) return;
@@ -483,7 +573,17 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
   const relayoutLand = () => {
     if (!land) return;
     const H = Math.max(1, landCanvas.clientHeight - LIFT);
-    land.resize(view.vw, H, buildWorld(solveAnchors(view.sections, view.vw, view.vh, Math.max(0, view.docH - view.vh)), view.vw, view.vh, view.docH, H));
+    land.resize(
+      view.vw,
+      H,
+      buildWorld(
+        solveAnchors(view.sections, view.vw, view.vh, Math.max(0, view.docH - view.vh)),
+        view.vw,
+        view.vh,
+        view.docH,
+        H,
+      ),
+    );
     lastLight = -Infinity;
   };
   const resize = () => {
@@ -505,11 +605,21 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
     pts = createParticles(ptsCanvas, tx);
     land = createLandscape(landCanvas);
     life = createLife(tx);
-    ambient = createAmbient(rng, readToken("--signal"), tx, { force: SKY_DEBUG && q.get("life") === "1" });
+    ambient = createAmbient(rng, readToken("--signal"), tx, {
+      force: SKY_DEBUG && q.get("life") === "1",
+    });
     atm = await createAtmosphere(atmCanvas, SKY_DEBUG, isDead);
     if (dead) return;
     if (!atm) onNoWebGL();
-    if (TEST) w2.__sky = { state: model.astro.state, elevation: model.astro.elevation, scrimA: w2.__sky?.scrimA ?? 0, fps: 0, condition: model.condition, webgl: !!atm };
+    if (TEST)
+      w2.__sky = {
+        state: model.astro.state,
+        elevation: model.astro.elevation,
+        scrimA: w2.__sky?.scrimA ?? 0,
+        fps: 0,
+        condition: model.condition,
+        webgl: !!atm,
+      };
     resize();
     ro.observe(ptsCanvas);
     ro.observe(landCanvas);
@@ -532,6 +642,8 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
     runtime.cloudsIn = null;
     unsubGeom();
     unsubScroll();
+    vv?.removeEventListener("resize", onVV);
+    vv?.removeEventListener("scroll", onVV);
     document.removeEventListener("pointerover", onIntent);
     document.removeEventListener("focusin", onIntent);
     unsubStore();
@@ -559,8 +671,20 @@ export default function SkyRenderer() {
 
   return (
     <>
-      {webgl ? <canvas ref={atm} aria-hidden="true" className="sky-layer sky-atmosphere" data-sky-atmosphere="" /> : null}
-      <canvas ref={pts} aria-hidden="true" className="sky-layer sky-particles" data-sky-particles="" />
+      {webgl ? (
+        <canvas
+          ref={atm}
+          aria-hidden="true"
+          className="sky-layer sky-atmosphere"
+          data-sky-atmosphere=""
+        />
+      ) : null}
+      <canvas
+        ref={pts}
+        aria-hidden="true"
+        className="sky-layer sky-particles"
+        data-sky-particles=""
+      />
       <canvas ref={land} aria-hidden="true" className="sky-landscape" data-sky-landscape="" />
     </>
   );

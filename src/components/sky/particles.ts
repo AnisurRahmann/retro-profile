@@ -47,7 +47,8 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
   let w = 0,
     h = 0,
     dpr = 1,
-    seed = -1;
+    seed = -1,
+    mobile = false;
   // Stars, polar around the pivot (stand-in for the celestial pole, above the top-left).
   let nStars = 0;
   let sR = new Float32Array(0),
@@ -78,7 +79,9 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
   const buildStars = (day: number) => {
     seed = day;
     const rng = mulberry32(day * 2654435761);
-    const target = w < 640 ? 140 : 260;
+    // Mobile: at least one star per 2,200 px² of open sky (above the landscape), bigger and brighter (below).
+    mobile = w < 808;
+    const target = mobile ? Math.max(140, Math.round((w * (h - 120)) / 2200)) : 260;
     px = -0.3 * w;
     py = -0.55 * h;
     const rMin = Math.hypot(px, py);
@@ -162,10 +165,20 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
       }
     },
     /** @param scrimTop viewport y where the column scrim starts (stars and the moon are dimmed under it). */
-    draw(t: number, nowMs: number, s: ParticleState, twinkle: boolean, scrimTop: number, hooks: DrawHooks = {}) {
+    /** @param hero the hero text block in viewport px: stars behind its text are dimmed (they read as dots in the copy). */
+    draw(
+      t: number,
+      nowMs: number,
+      s: ParticleState,
+      twinkle: boolean,
+      scrimTop: number,
+      hooks: DrawHooks = {},
+      hero: { x0: number; y0: number; x1: number; y1: number } | null = null,
+    ) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      const under = (x: number, y: number) => columnMask(x, w) * rampMask(y, scrimTop);
+      const under = (x: number, y: number) =>
+        hero && x > hero.x0 - 6 && x < hero.x1 + 6 && y > hero.y0 - 6 && y < hero.y1 + 6 ? 1 : columnMask(x, w) * rampMask(y, scrimTop);
       hooks.back?.(ctx);
 
       // Stars.
@@ -178,9 +191,9 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
           const y = py + sR[i]! * Math.sin(a);
           if (x < -2 || y < -2 || x > w + 2 || y > h + 2) continue;
           const tw = twinkle ? 0.85 + 0.15 * Math.sin(t * sF[i]! + sPh[i]!) : 1;
-          ctx.globalAlpha = sA[i]! * vis * tw * (1 - 0.5 * under(x, y));
+          ctx.globalAlpha = (mobile ? Math.max(0.35, sA[i]!) : sA[i]!) * vis * tw * (1 - 0.5 * under(x, y));
           ctx.fillStyle = sWarm[i] ? warm : cool;
-          const r = sSize[i]!;
+          const r = sSize[i]! * (mobile ? 1.25 : 1);
           if (r < 0.9) ctx.fillRect(x - r, y - r, r * 2, r * 2);
           else {
             ctx.beginPath();

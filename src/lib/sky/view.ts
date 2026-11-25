@@ -41,7 +41,8 @@ const docRect = (el: Element | null): Rect | null => {
 
 function measure() {
   view.vw = window.innerWidth;
-  view.vh = window.innerHeight;
+  // The fixed layers are 100lvh: the URL bar collapsing on iOS doesn't move the sky.
+  view.vh = document.querySelector("[data-sky-gradient]")?.clientHeight || window.innerHeight;
   view.y = window.scrollY;
   const stage = document.querySelector("[data-sky-stage]");
   const s = docRect(stage);
@@ -80,10 +81,16 @@ export function startView(): () => void {
     pending = true;
     raf = requestAnimationFrame(frame);
   };
+  let last = "";
   const relayout = () => {
     measure();
     applyScrim();
-    geometry.forEach((l) => l());
+    // Only real layout changes reach the listeners (the iOS URL bar resizes the window, not the layout).
+    const key = JSON.stringify([view.vw, view.vh, view.stage, view.hero, view.head, view.sections, view.docH]);
+    if (key !== last) {
+      last = key;
+      geometry.forEach((l) => l());
+    }
     scrolls.forEach((l) => l());
   };
   let t = 0;
@@ -111,4 +118,4 @@ export const runtime: { cloudsIn: ((x0: number, y0: number, x1: number, y1: numb
 export const notifyGeometry = () => geometry.forEach((l) => l());
 
 /** The arc's geometry from the live layout (the stage at scroll 0; a stage-sized horizon on pages without one). */
-export const geomNow = (v: View = view): ArcGeom => arcGeom(v.vw, v.vh, v.stage || stageHeightFor(v.vw, v.vh));
+export const geomNow = (v: View = view): ArcGeom => arcGeom(v.vw, v.vh, v.stage || stageHeightFor(v.vw, v.vh), v.stage ? v.hero?.y : undefined);

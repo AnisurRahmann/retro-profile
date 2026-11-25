@@ -156,14 +156,14 @@ export function createSun(dpr: () => number) {
         const n = 6 + Math.floor(rng() * 5);
         for (let i = 0; i < n; i++) {
           const a = -Math.PI / 2 + (rng() - 0.5) * 2.2; // fanning upward
-          const len = 0.35 + rng() * 0.3;
+          const len = 0.22 + rng() * 0.2;
           const alpha = 0.05 * s.glow * rayGap(a) * s.dim;
           if (alpha < 0.002) continue;
           ctx.globalAlpha = alpha;
           ctx.save();
           ctx.translate(s.x, s.y);
           ctx.rotate(a + Math.PI / 2);
-          const L = len * 900;
+          const L = len * ctx.canvas.clientHeight;
           ctx.drawImage(wedge, -L * 0.12, -L, L * 0.24, L);
           ctx.restore();
         }

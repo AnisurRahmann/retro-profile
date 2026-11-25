@@ -41,7 +41,8 @@ function paint() {
   const block = (r: typeof view.hero) => {
     if (!r) return 0;
     const clouds = cloudsIn ? Math.max(0, cloudsIn(r.x - 200, r.y - 200, r.x + r.w + 200, r.y + r.h + 200)) : undefined;
-    const near = sunDisc && m.sun.x * vw > r.x - 60 && m.sun.x * vw < r.x + r.w + 60 ? sunDisc : null;
+    // Near the block the disc is dimmed but its bloom (3× and 8×) reaches the text edge at up to ~0.2.
+    const near = sunDisc && m.sun.x * vw > r.x - 60 && m.sun.x * vw < r.x + r.w + 60 ? { ...sunDisc, alpha: 0.2 } : null;
     return regionScrim({ ...m, clouds }, r.y / vh, (r.y + r.h) / vh, HERO_TARGETS, near);
   };
   html.style.setProperty("--hero-a", String(block(view.hero)));
