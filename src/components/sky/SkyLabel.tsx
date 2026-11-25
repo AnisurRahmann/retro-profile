@@ -14,12 +14,39 @@ import { SylhetClock } from "./SylhetClock";
 
 type Copy = Content["ui"]["sky"];
 
-const PLACES: (PlaceId | "default")[] = ["default", "tea", "bridge", "city", "airport"];
+/** A separator dot: decoration, hidden from screen readers (the button has one aria-label). */
+const Sep = ({ className = "" }: { className?: string }) => (
+  <span aria-hidden="true" className={`sky-sep ${className}`}>
+    ·
+  </span>
+);
+
+/** The place name, fading in when it changes (the old one is simply replaced: it's at the end of the line). */
+const PlaceName = ({ text }: { text: string }) => <span className="sky-place-name">{text}</span>;
 
 /**
- * "07:52 near Keane Bridge, Sylhet · 24°C · light rain": a button that opens the sky popover (sun times, weather
- * details, attribution), then the sun-path strip. The place name follows the landscape as you scroll; every
- * variant is stacked in one grid cell so the line's width never changes (no layout shift).
+ * The aria-label, updated politely: at most once a minute (the clock changes that often anyway), never on every
+ * scroll change of the place name.
+ */
+function usePolite(value: string): string {
+  const [shown, setShown] = useState(value);
+  const last = useRef(0);
+  useEffect(() => {
+    if (value === shown) return;
+    const wait = shown ? Math.max(0, last.current + 60_000 - Date.now()) : 0;
+    const t = window.setTimeout(() => {
+      last.current = Date.now();
+      setShown(value);
+    }, wait);
+    return () => window.clearTimeout(t);
+  }, [value, shown]);
+  return shown;
+}
+
+/**
+ * "07:52 · 24°C · light rain · near Keane Bridge, Sylhet": a button that opens the sky popover (sun times, weather
+ * details, attribution), then the sun-path strip. The place name follows the landscape as you scroll; it's last,
+ * so a new width moves nothing. Phones get two designed lines: time and weather, then the place.
  */
 export function SkyLabel({ copy }: { copy: Copy }) {
   const snap = useSky();
@@ -88,7 +115,19 @@ export function SkyLabel({ copy }: { copy: Copy }) {
   };
 
   const scrubbing = hydrated && snap.preview !== null;
-  const place = hydrated ? (snap.place ?? "default") : "default";
+  // The place shows once the weather has answered (or failed), so arriving weather never pushes it along the line.
+  const place: PlaceId | "default" = hydrated ? (snap.place ?? "default") : "default";
+  const showPlace = hydrated && snap.loaded;
+  const clock = formatHM(now);
+  const word = showWx ? copy.words[weatherWord(w)] : "";
+  const temp = showWx ? Math.round(w.tempC!) : 0;
+  const spoken = [
+    showWx ? fill(copy.aria, { time: clock, temp, weather: word }) : fill(copy.ariaNoWeather, { time: clock }),
+    copy.placesSpoken[place],
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const aria = usePolite(showPlace ? spoken : "");
 
   return (
     <div className="relative mt-2">
@@ -98,38 +137,43 @@ export function SkyLabel({ copy }: { copy: Copy }) {
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? `${id}-pop` : undefined}
+        aria-label={aria || undefined}
         onClick={() => (open ? close() : setOpen(true))}
-        className="sky-label inline-flex flex-wrap items-center gap-x-1.5 text-left font-mono text-xs leading-5 whitespace-nowrap text-on-sky transition-colors duration-150 hover:text-text"
-        data-wraps=""
+        className="sky-label font-mono text-xs leading-5 whitespace-nowrap text-on-sky transition-colors duration-150 hover:text-text"
         data-testid="sky-label"
         data-on-sky="label"
       >
-        {hydrated ? <SkyGlyph kind={glyph} fraction={m.fraction} waxing={m.waxing} amber={amber} /> : <span className="size-2.5 flex-none" />}
-        {/* While scrubbing, "preview 18:40" is laid over the clock and the place (they keep their space, hidden),
-            so nothing on the line moves. */}
-        <span className="relative inline-flex items-center gap-x-1.5">
-          <span className={scrubbing ? "invisible" : undefined}>
+        {/* Line 1: glyph, clock and weather. While scrubbing, "preview 18:40" is laid over it (the line keeps its
+            content, hidden), so nothing moves. */}
+        <span className="sky-label-line relative">
+          {hydrated ? <SkyGlyph kind={glyph} fraction={m.fraction} waxing={m.waxing} amber={amber} /> : <span className="size-2.5 flex-none" />}
+          <span className={`sky-label-line${scrubbing ? " invisible" : ""}`}>
             <SylhetClock />
-          </span>
-          <span className={`sky-place${scrubbing ? " invisible" : ""}`} data-testid="sky-place">
-            {PLACES.map((p) => (
-              <span key={p} aria-hidden={p !== place} data-active={p === place ? "" : undefined}>
-                {copy.places[p]}
+            {showWx ? (
+              <span className="sky-label-line" data-testid="sky-weather">
+                <Sep />
+                <span>{fill(copy.temp, { temp })}</span>
+                <Sep />
+                <span>{word}</span>
               </span>
-            ))}
+            ) : null}
           </span>
           {scrubbing ? (
-            <span className="absolute top-0 left-0 text-signal" data-testid="sky-preview">
+            <span className="absolute top-0 left-4 text-signal" data-testid="sky-preview">
               {fill(copy.preview, { time: minutesLabel(snap.preview!) })}
             </span>
           ) : null}
         </span>
-        {showWx ? (
-          <span data-testid="sky-weather">
-            {"· "}
-            {fill(copy.weather, { temp: Math.round(w.tempC!), weather: copy.words[weatherWord(w)] })}
-          </span>
-        ) : null}
+        {/* The place, last: it changes as you scroll, and at the end of the line a new width moves nothing. On
+            phones it's the second line (no leading separator). */}
+        <span className="sky-label-place" data-testid="sky-place">
+          {showPlace ? (
+            <>
+              <Sep className="sky-label-sep-place" />
+              <PlaceName key={place} text={copy.places[place]} />
+            </>
+          ) : null}
+        </span>
       </button>
 
       {open ? (

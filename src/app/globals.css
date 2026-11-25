@@ -236,7 +236,7 @@ html {
     display: none;
   }
   /* The hero floats over the lower sky, its bottom at the far hills' tops. */
-  .sky-stage {
+  html .sky-stage {
     padding-bottom: calc(0.8 * var(--band-h));
   }
 }
@@ -567,23 +567,42 @@ a.card:hover {
 }
 
 /* ── Sky label ──────────────────────────────────────────────── */
-/* The place name: every variant stacked in one cell, so the label's width never changes; 200ms cross-fade. */
-.sky-place {
-  display: inline-grid;
+/* "16:45 · 22°C · clear · near Keane Bridge, Sylhet": the place is last, so its changing width moves nothing.
+   Phones: two designed lines (time and weather; the place, its line reserved so the bottom-anchored hero never
+   moves). */
+.sky-label,
+.sky-label-line,
+.sky-label-place {
+  display: inline-flex;
+  align-items: center;
+  column-gap: 6px;
 }
-.sky-place > * {
-  grid-area: 1 / 1;
-  opacity: 0;
-  transition: opacity 200ms ease;
+.sky-label {
+  text-align: left;
 }
-.sky-place > [data-active] {
-  opacity: 1;
+.sky-place-name {
+  animation: sky-fade-in 200ms ease;
 }
-/* On narrow screens the label wraps to two lines once the weather arrives; reserve them so the bottom-anchored
-   hero never moves (CLS 0). */
-@media (max-width: 479px) {
-  .sky-label[data-wraps] {
-    min-height: 40px;
+@keyframes sky-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (max-width: 639px) {
+  .sky-label {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .sky-label-place {
+    min-height: 20px;
+  }
+  .sky-label-sep-place {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sky-place-name {
+    animation: none;
   }
 }
 /* The sun-path strip: a slider; 44px tall touch target on mobile. Heights are fixed in CSS (the SVG fills them)

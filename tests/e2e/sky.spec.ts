@@ -26,7 +26,7 @@ const sky = (page: Page) => page.evaluate(() => window.__sky);
 const dhaka = (d: Date) =>
   new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
 const label = (page: Page) => page.getByTestId("sky-label");
-const place = (page: Page) => page.locator("[data-testid=sky-place] [data-active]");
+const place = (page: Page) => page.locator("[data-testid=sky-place] .sky-place-name");
 const preview = (page: Page) => page.getByTestId("sky-preview");
 const strip = (page: Page) => page.getByRole("slider", { name: "Preview a day in Sylhet" });
 /** Scroll so a section's top sits at 40% of the viewport (its landmark centred). */
@@ -46,7 +46,38 @@ test("the label shows HH:mm in Asia/Dhaka, whatever the visitor's zone", async (
   await page.goto("/");
   await expect(page.getByTestId("sylhet-clock")).toHaveText(dhaka(t));
   await expect(page.getByTestId("sylhet-clock")).toHaveText("02:00");
-  await expect(place(page)).toHaveText("· tea gardens, Sylhet");
+  await expect(place(page)).toHaveText("tea gardens, Sylhet");
+  await ctx.close();
+});
+
+test("the label reads time · temperature · weather · place, with no gap, and one spoken label", async ({ page }) => {
+  await page.goto("/?sky=2026-12-15T16:45&wx=clear");
+  await expect(page.getByTestId("sky-weather")).toBeVisible();
+  await expect(place(page)).toHaveText("tea gardens, Sylhet");
+  const text = (await label(page).innerText()).replace(/\s+/g, " ").trim();
+  expect(text).toMatch(/^\d\d:\d\d · \d+°C · clear · tea gardens, Sylhet$/);
+  // Separators are decoration; the button has one aria-label.
+  for (const sep of await label(page).locator(".sky-sep").all()) await expect(sep).toHaveAttribute("aria-hidden", "true");
+  await expect(label(page)).toHaveAttribute("aria-label", /^\d\d:\d\d in Sylhet, \d+ degrees, clear, by the tea gardens$/);
+  // No reserved width: the place follows the weather after one separator.
+  const w = (await page.getByTestId("sky-weather").boundingBox())!;
+  const p = (await place(page).boundingBox())!;
+  expect(p.x - (w.x + w.width)).toBeLessThan(24);
+  expect(Math.abs(p.y - w.y)).toBeLessThan(2);
+});
+
+test("on a phone the label is two designed lines: no leading separator on the second", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 375, height: 812 } });
+  const page = await ctx.newPage();
+  await page.goto("/?sky=2026-12-15T16:45&wx=clear");
+  await expect(page.getByTestId("sky-weather")).toBeVisible();
+  await expect(place(page)).toBeVisible();
+  const w = (await page.getByTestId("sky-weather").boundingBox())!;
+  const p = (await place(page).boundingBox())!;
+  expect(p.y).toBeGreaterThan(w.y + 10);
+  const clock = (await page.getByTestId("sylhet-clock").boundingBox())!;
+  expect(Math.abs(p.x - clock.x)).toBeLessThan(24);
+  expect((await page.getByTestId("sky-place").innerText()).trim()).toMatch(/^[A-Za-z]/);
   await ctx.close();
 });
 
@@ -242,16 +273,16 @@ test("the place name follows the landmarks as you walk down the page, without mo
   await page.goto("/?sky=2026-12-15T20:30&wx=clear");
   await page.waitForFunction(() => (window.__sky?.frames ?? 0) >= 1);
   const weatherX = async () => (await page.getByTestId("sky-weather").boundingBox())?.x;
-  await expect(place(page)).toHaveText("· tea gardens, Sylhet");
+  await expect(place(page)).toHaveText("tea gardens, Sylhet");
   const x0 = await weatherX();
   await walkTo(page, "shipped");
   await expect(place(page)).toHaveText("near Keane Bridge, Sylhet");
   await walkTo(page, "bench");
-  await expect(place(page)).toHaveText("· city rooftops, Sylhet");
+  await expect(place(page)).toHaveText("city rooftops, Sylhet");
   await walkTo(page, "closer");
-  await expect(place(page)).toHaveText("· Osmani Airport, Sylhet");
+  await expect(place(page)).toHaveText("Osmani Airport, Sylhet");
   await page.evaluate(() => window.scrollTo(0, 0));
-  await expect(place(page)).toHaveText("· tea gardens, Sylhet");
+  await expect(place(page)).toHaveText("tea gardens, Sylhet");
   expect(await weatherX()).toBe(x0);
   // Desktop: each landmark reaches its gutter, never the middle of the column.
   await walkTo(page, "shipped");
@@ -315,7 +346,7 @@ test("reduced motion: a static frame (fps 0) and no parallax on scroll; the plac
   await page.waitForTimeout(1000);
   expect((await sky(page))!.frames).toBe(frames);
   await walkTo(page, "closer");
-  await expect(place(page)).toHaveText("· Osmani Airport, Sylhet");
+  await expect(place(page)).toHaveText("Osmani Airport, Sylhet");
   await page.waitForTimeout(600);
   expect((await sky(page))!.land!.offsets).toEqual([0, 0, 0, 0]);
   expect((await sky(page))!.fps).toBe(0);

@@ -171,7 +171,6 @@ export const uiSchema = z.object({
   }),
   notFound: z.object({ heading: text, body: text, home: text }),
   sky: z.object({
-    weather: text,
     preview: text,
     sun: text,
     details: text,
@@ -185,6 +184,12 @@ export const uiSchema = z.object({
     hint: text,
     hintTouch: text,
     places: z.object({ default: text, tea: text, bridge: text, city: text, airport: text }),
+    /** The place as spoken in the label's aria-label ("near Keane Bridge"); empty for the default. */
+    placesSpoken: z.object({ default: z.string(), tea: text, bridge: text, city: text, airport: text }),
+    /** Screen-reader label: "{time} in Sylhet, {temp} degrees, {weather}" (+ ", {place}"). */
+    aria: text,
+    ariaNoWeather: text,
+    temp: text,
     words: z.object({
       clear: text,
       mostlyClear: text,

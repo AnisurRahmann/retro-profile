@@ -28,6 +28,6 @@ for (const id of (process.argv[3] ?? "shipped,closer").split(",")) {
   const file = `.shots/sky/walk${process.env.HIDE ? "-bare" : ""}-${q.replace(/[^a-z0-9]+/gi, "_")}-${id.replace(/\W/g, "")}-${w}.png`;
   // BAND=1: only the bottom 240px (the landscape band).
   await p.screenshot({ path: file, clip: process.env.BAND ? { x: 0, y: h - 240, width: w, height: 240 } : undefined });
-  console.log(file, await p.locator("[data-testid=sky-place] [data-active]").innerText().catch(() => ""));
+  console.log(file, await p.locator("[data-testid=sky-place] .sky-place-name").innerText().catch(() => ""));
 }
 await b.close();
