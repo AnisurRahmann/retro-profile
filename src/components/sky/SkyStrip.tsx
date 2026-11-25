@@ -29,9 +29,9 @@ function useDayCurve(now: Date) {
 }
 
 /**
- * The sun-path strip under the label: horizon, today's day arc (the sky arc's shape, scaled), sunrise and sunset
- * ticks with their times, the night dip in --hairline, a "now" tick and a handle (the sun by day, the moon in its
- * phase by night). It's a slider: drag it (pointer or touch) and the whole sky follows; let go and the sky eases
+ * The sun-path strip under the label (260×40): horizon, today's day arc (the sky arc's shape, scaled), 8px sunrise
+ * and sunset ticks with their times (11px --graphite, loose text), the night below the horizon at half strength,
+ * a 2px "now" dot and a 12px handle (the sun by day, the moon in its phase by night). It's a slider: drag it (pointer or touch) and the whole sky follows; let go and the sky eases
  * back to now over 1.6 s. Keys: arrows ±5 min, PageUp/PageDown ±1 h, Home/End 00:00/23:55; Escape or leaving
  * the slider returns to now.
  */
@@ -39,7 +39,7 @@ export function SkyStrip({ copy, sunrise, sunset }: { copy: Copy; sunrise: strin
   const snap = useSky();
   const hydrated = useHydrated();
   const box = useRef<HTMLDivElement>(null);
-  const [w, setW] = useState(200);
+  const [w, setW] = useState(260);
   const [mobile, setMobile] = useState(false);
   const drag = useRef<number | null>(null);
 
@@ -56,10 +56,10 @@ export function SkyStrip({ copy, sunrise, sunset }: { copy: Copy; sunrise: strin
 
   const now = liveNow(snap);
   const curve = useDayCurve(now);
-  const H = mobile ? 36 : 32;
-  const y0 = H - 14; // horizon
-  const top = 3;
-  const dip = 5;
+  const H = mobile ? 36 : 40;
+  const y0 = H - 17; // horizon; the tick labels sit under it
+  const top = 6;
+  const dip = 6;
   const nowMin = dhakaParts(now).minutes;
   const value = snap.preview ?? nowMin;
   const shown = ((value % DAY) + DAY) % DAY;
@@ -68,12 +68,20 @@ export function SkyStrip({ copy, sunrise, sunset }: { copy: Copy; sunrise: strin
   const yAt = (alt: number) => (alt >= 0 ? y0 - (y0 - top) * k * (alt / Math.max(1, curve.max)) : y0 + dip * Math.min(1, alt / Math.min(-1, curve.min)));
   const pts = curve.alts.map((a, i) => [x(i * 20), yAt(a)] as const);
   const day = pts.filter((_, i) => curve.alts[i]! >= 0 || curve.alts[i + 1]! >= 0 || curve.alts[i - 1]! >= 0);
+  // The night segments: below the horizon, split where the day is.
+  const nights: (readonly [number, number])[][] = [[]];
+  curve.alts.forEach((a, i) => {
+    if (a < 0 || curve.alts[i - 1]! < 0 || curve.alts[i + 1]! < 0) nights[nights.length - 1]!.push(pts[i]!);
+    else if (nights[nights.length - 1]!.length) nights.push([]);
+  });
   const path = (p: readonly (readonly [number, number])[]) => p.map(([px, py], i) => `${i ? "L" : "M"}${px.toFixed(1)} ${py.toFixed(1)}`).join("");
   const at = skyTime(snap);
   const alt = sun(at).elevationDeg;
   const m = moonAt(at);
   const hx = x(shown);
-  const hy = Math.max(top + 2, Math.min(y0 + dip, yAt(alt)));
+  const hy = Math.max(top, Math.min(y0 + dip, yAt(alt)));
+  const nowAlt = sun(now).elevationDeg;
+  const ny = Math.max(top, Math.min(y0 + dip, yAt(nowAlt)));
   const phase = copy.phases[skyState(alt)];
 
   const minuteAt = (clientX: number) => {
@@ -128,31 +136,44 @@ export function SkyStrip({ copy, sunrise, sunset }: { copy: Copy; sunrise: strin
       className="sky-strip mt-2"
       data-testid="sky-strip"
     >
-      <svg width={w} viewBox={`0 0 ${w} ${H}`} preserveAspectRatio="none" aria-hidden="true" className="block overflow-visible">
+      <svg width={w} height={H} viewBox={`0 0 ${w} ${H}`} preserveAspectRatio="none" aria-hidden="true" className="block overflow-visible">
         <line x1={PAD} x2={w - PAD} y1={y0} y2={y0} className="stroke-hairline" strokeWidth={1} />
         {hydrated ? (
           <>
-            <path d={path(pts)} fill="none" className="stroke-hairline" strokeWidth={1} />
-            <path d={path(day)} fill="none" stroke="currentColor" strokeOpacity={0.5} strokeWidth={1} />
-            {[
-              [curve.rise, sunrise],
-              [curve.set, sunset],
-            ].map(([mm, label], i) => (
-              <g key={i}>
-                <line x1={x(mm as number)} x2={x(mm as number)} y1={y0 - 2} y2={y0 + 3} stroke="currentColor" strokeOpacity={0.6} />
-                <text x={x(mm as number)} y={H - 1} textAnchor={i ? "end" : "start"} className="fill-current font-mono text-[10px]" fillOpacity={0.75}>
-                  {label}
-                </text>
-              </g>
+            {/* Night: under the horizon, at half strength. */}
+            {nights
+              .filter((n) => n.length > 1)
+              .map((n, i) => (
+                <path key={i} d={path(n)} fill="none" stroke="currentColor" strokeOpacity={0.25} strokeWidth={1} />
+              ))}
+            <path d={path(day)} fill="none" stroke="currentColor" strokeOpacity={0.6} strokeWidth={1} />
+            {[curve.rise, curve.set].map((mm, i) => (
+              <line key={i} x1={x(mm)} x2={x(mm)} y1={y0 - 4} y2={y0 + 4} stroke="currentColor" strokeOpacity={0.7} />
             ))}
-            <line x1={x(nowMin)} x2={x(nowMin)} y1={y0 - 5} y2={y0 + 5} stroke="currentColor" strokeWidth={1} data-testid="sky-strip-now" />
+            {/* Now: a 2px dot on the path, visible while the handle is dragged elsewhere. */}
+            <circle cx={x(nowMin)} cy={ny} r={1} fill="currentColor" data-testid="sky-strip-now" />
             <g transform={`translate(${(hx - 5).toFixed(1)} ${(hy - 5).toFixed(1)})`} data-testid="sky-strip-handle">
-              <circle cx={5} cy={5} r={7} className="fill-ink" fillOpacity={0.6} />
+              <circle cx={5} cy={5} r={6} className="fill-ink" fillOpacity={0.7} />
               <SkyGlyph kind={alt < -6 ? "moon" : "sun"} fraction={m.fraction} waxing={m.waxing} amber={alt >= -6 && alt < 8} />
             </g>
           </>
         ) : null}
       </svg>
+      {hydrated
+        ? [
+            [curve.rise, sunrise, "strip-rise"],
+            [curve.set, sunset, "strip-set"],
+          ].map(([mm, label, sky], i) => (
+            <span
+              key={sky as string}
+              className="sky-strip-tick"
+              style={{ left: x(mm as number), top: y0 + 5, transform: i ? "translateX(-100%)" : undefined }}
+              data-on-sky={sky as string}
+            >
+              {label}
+            </span>
+          ))
+        : null}
     </div>
   );
 }

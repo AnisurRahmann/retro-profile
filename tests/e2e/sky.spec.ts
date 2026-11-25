@@ -81,6 +81,28 @@ test("on a phone the label is two designed lines: no leading separator on the se
   await ctx.close();
 });
 
+test("the strip is 260×40 with 11px graphite tick labels; the now dot stays while the handle is dragged away", async ({ page }) => {
+  await page.goto("/?sky=2026-12-15T11:00&wx=clear");
+  await expect(page.getByTestId("sky-strip-now")).toBeAttached();
+  const box = (await strip(page).boundingBox())!;
+  expect(Math.round(box.width)).toBe(260);
+  expect(Math.round(box.height)).toBe(40);
+  const tick = page.locator("[data-on-sky=strip-rise]");
+  await expect(tick).toHaveText(/^\d\d:\d\d$/);
+  expect(await tick.evaluate((el) => getComputedStyle(el).fontSize)).toBe("11px");
+  const handle = (await page.getByTestId("sky-strip-handle").boundingBox())!;
+  expect(Math.round(handle.width)).toBe(12);
+  const dot0 = (await page.getByTestId("sky-strip-now").boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.9, box.y + 20);
+  await page.mouse.down();
+  await expect(preview(page)).toBeVisible();
+  const dot1 = (await page.getByTestId("sky-strip-now").boundingBox())!;
+  expect(dot1.x).toBeCloseTo(dot0.x, 0);
+  const h = (await page.getByTestId("sky-strip-handle").boundingBox())!;
+  expect(h.x - dot1.x).toBeGreaterThan(40);
+  await page.mouse.up();
+});
+
 test("the label ticks over on the minute boundary", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-12-15T20:00:50Z") });
   await page.goto("/");
