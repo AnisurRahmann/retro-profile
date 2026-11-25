@@ -103,6 +103,13 @@ At 03:30 clear, 375×812 and 1440×900:
 - About "the desktop take-off doesn't fire": not reproduced. The old trigger's own e2e test passed at 1440×900 before this change. It is replaced as the brief asks: the plane now takes off once at least half the airport is on screen and the page is within 400px of its bottom, re-armed under a tenth visible. On 1440×900 that is about 300px of scroll earlier than before (at about y 924 of 1321), so the take-off happens while the airport is coming into view rather than only in the last 110px. The phone trigger is unchanged (closing scene 60% visible, re-armed under 15%) and re-fires after leaving and coming back (the 3-visit test and the new test).
 - How: the lights are drawn in every state from sunset to sunrise (`LifeFrame.lamps`, fading in over 0.5° to −1.5°), 3px dots with 10px and 14px glows in screen px whatever the plane's scale; the rim is the city glow at 0.5; `planePx` 90 / 100; `bandArrival` and `visibleShare` in `plane.ts` carry the new trigger. DECISIONS #113.
 
+#### T6 · the desktop footer over the landscape band
+
+- PASS: at 1440×900 at max scroll the footer text has 32px of clear sky under it before the band (needs 16). The footer's bottom edge is at y = 738, exactly the band's top (900 − 162); its icons and "Privacy" end at y = 706. Checked at 1920×1080 too: footer bottom 886 = 1080 − 194.4, text to 854, 32px. No silhouette rises above the band (the tallest, the control tower's mast, is 25 band units down), so the band's top is the top of what lies below.
+- The band stays fixed. The page just ends `--band-h` higher: the footer gets a bottom margin of the band's height from 1100px up (max scroll went from 1321 to 1483 at 1440×900).
+- Shots: `.shots/v5.1/T6/t6-0330-after-1440x900-bottom.png` (before: `.shots/v5.1/baseline/base-0330-clear-1440x900-bottom.png`; together in `sheet-before-after.png`), `t6-1920x1080-maxscroll.png`.
+- Not in scope, left alone: the chat dock button (bottom-left) still sits over the band, and the plane's take-off still climbs through the sky just under the footer for its 4.6 s. DECISIONS #114.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.
