@@ -10,7 +10,8 @@ export const SF = {
   pitch: 22,
   rBase: 1.0,
   rGain: 1.1,
-  aa: 0.75,
+  aa: 0.75, // CSS px
+  maxScale: 1.5, // backing-store scale cap (CSS px × min(DPR, maxScale)); see DECISIONS #58
   aMin: 0.16,
   aMax: 0.62,
   idleAmp: 0.09,

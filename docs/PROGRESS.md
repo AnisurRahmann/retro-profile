@@ -144,3 +144,30 @@ SignalField chunk: 3.6 kB gzip (budget 6 kB). It loads via `next/dynamic` after 
 There is no `.env.local` in the repo, so the dev server had no `ANTHROPIC_API_KEY` and no `CHAT_MOCK`. In `src/app/api/chat/route.ts`, `getAdapter()` returned null and the route returned 503 `unavailable` on line 56, before rate limiting. Adding only the key would have hit the second wall: `consume()` in `src/server/limits.ts` returned `unavailable` because Supabase wasn't configured outside mock mode. The page only checked `CHAT_ENABLED` (unset → enabled), so it rendered a working input.
 Fixed with `getChatAvailability()`, shared by the page and the route (DECISIONS #49–53). With the current env, `/chat` now renders the kill-switch state, and `pnpm dev` logs at startup: `[chat] unavailable (missing_env): ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RATE_SALT`.
 To run the real agent locally, `.env.local` needs `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `RATE_SALT` (≥ 16 chars), with the migrations applied to that Supabase project. Optional: `CHAT_MODEL`, `CHAT_DAILY_TOKEN_BUDGET`, plus `RESEND_API_KEY`, `INTRO_NOTIFY_EMAIL`, `INTRO_FROM_EMAIL` for intros. To try the UI without any services: `CHAT_MOCK=1 pnpm dev`.
+
+### 2. Focus rings
+Mouse focus on the composer changes only its border (`color-mix(graphite 45%, hairline)`). The amber 2px ring appears only for keyboard focus, gated by an input-modality flag because browsers match `:focus-visible` on text fields even on click (DECISIONS #54). Playwright covers mouse vs Tab on the composer, a button and the intro fields.
+
+### 3–4. Signal Field tuning and idle modes
+Constants before → after: aMin 0.16 → 0.16 (already raised last round; reads clearly, not busy), rBase 0.9 → 1.0, idle 0.06 → 0.09. The column mask stays 0.25 (the contrast guard fails at 0.35). Ambient/interactive emitters with per-emitter τ, plus the activity rule A·e^(−Δt/τ) > 0.02: the home page now runs ambient at 30fps and drops to idle (15fps) between status lines; /lifts settles to idle. Review shots at 1440/1920 idle (pointer never entered): the gutter grid is clearly perceptible and stays behind the cards.
+
+### 5. GPU at Retina (1920×1080, DPR 2, Apple M2, ANGLE Metal, dev timer query)
+| backing scale | busy (8 ripples) | rest |
+|---|---|---|
+| 2.0 (before) | 0.75–0.89 ms | 0.90–1.10 ms |
+| **1.5 (shipped)** | **0.54–0.75 ms** | **0.53–0.61 ms** |
+| 1.0 | 0.68–0.98 ms (GPU down-clocked) | 0.34–0.40 ms |
+1.5 chosen: 1.0 visibly softens bright dots at 400%, 1.5 doesn't (DECISIONS #58). The review's projection of 2–5 ms assumed the full-screen fragment shader; the instanced renderer (DECISIONS #42) already kept DPR 2 near 1 ms.
+
+### Lighthouse, mobile, production build (3 runs each)
+| page | before (perf · TBT ms) | after (perf · TBT ms) |
+|---|---|---|
+| `/` | 99/100/100 · 107/30/32 (median 32) | 100/100/100 · 56/37/40 (median 40) |
+| `/chat` | 100/100/100 · 48/33/59 (median 48) | 100/100/100 · 35/44/45 (median 44) |
+Accessibility, best practices and SEO are 100 on every after-run; CLS 0. `/chat` is now rendered per request (DECISIONS #50) with no measurable cost.
+
+### Review shots (375 / 1440 / 1920)
+`/`, `/chat` empty, kill-switch (`CHAT_ENABLED=false`) and mid-stream with the mock: no horizontal scroll, the kill-switch state always offers the book card and email, and the mid-stream list no longer flashes an empty bullet. One false alarm in the first pass: a stale `next start` kept serving the old build's chunks (404s, no hydration), so the streaming shot showed the empty state. Restarted cleanly and reshot.
+
+### Unchanged
+Card titles align per row (e2e), the status line rotates about every 3.2 s, click ripples render, the canvas is aria-hidden / pointer-events none / z-index −1 (e2e), no horizontal scroll at 375px (e2e), theme-color `#0B1220` (e2e). `public/shakil.jpg` is still missing; the fallback stays (OPEN_QUESTIONS #1).

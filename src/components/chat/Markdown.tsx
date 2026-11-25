@@ -63,6 +63,8 @@ export function parseBlocks(text: string): Block[] {
       para = [];
     };
     for (const line of lines) {
+      // A list marker with no text yet (mid-stream "- ") renders nothing rather than an empty bullet.
+      if (/^\s*([-*•]|\d+[.)])\s*$/.test(line)) continue;
       const bullet = line.match(/^\s*[-*•]\s+(.*)$/);
       const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
       const kind = bullet ? "ul" : numbered ? "ol" : null;

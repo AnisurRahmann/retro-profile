@@ -24,6 +24,10 @@ describe("chat markdown renderer", () => {
     expect(out).toContain("&lt;img");
     expect(out).toContain("<strong");
   });
+  it("ignores a list marker that has no text yet (mid-stream)", () => {
+    expect(parseBlocks("Also on the bench:\n\n- ")).toEqual([{ kind: "p", text: "Also on the bench:" }]);
+    expect(parseBlocks("Intro\n- a\n- ")).toEqual([{ kind: "p", text: "Intro" }, { kind: "ul", items: ["a"] }]);
+  });
   it("parses paragraphs and lists", () => {
     expect(parseBlocks("Intro\n\n- a\n- b\n\n1. one\n2. two").map((b) => b.kind)).toEqual(["p", "ul", "ol"]);
   });

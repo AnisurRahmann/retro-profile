@@ -7,11 +7,12 @@ import fs from "node:fs";
 import { chromium, type Page } from "@playwright/test";
 
 const BASE = process.env.SHOTS_URL ?? "http://localhost:3100";
-const WIDTHS = [360, 768, 1440];
+const WIDTHS = (process.env.WIDTHS ?? "360,768,1440").split(",").map(Number);
+const DISABLED = process.env.SHOTS_DISABLED_URL ?? "http://localhost:3103";
 const OUT = ".shots";
 const only = process.argv.slice(2);
 
-type Shot = { name: string; path: string; prepare?: (page: Page) => Promise<void> };
+type Shot = { name: string; path: string; base?: string; prepare?: (page: Page) => Promise<void> };
 
 const shots: Shot[] = [
   { name: "home", path: "/" },
@@ -24,6 +25,16 @@ const shots: Shot[] = [
     },
   },
   { name: "chat-empty", path: "/chat" },
+  // Needs a second server with CHAT_ENABLED=false (SHOTS_DISABLED_URL, default :3103).
+  { name: "chat-killswitch", path: "/chat", base: DISABLED },
+  {
+    name: "chat-streaming",
+    path: "/chat",
+    prepare: async (page) => {
+      await page.getByRole("button", { name: "What's he building right now?" }).click();
+      await page.waitForTimeout(250);
+    },
+  },
   {
     name: "chat-mid",
     path: "/chat",
@@ -50,7 +61,7 @@ async function main() {
     if (only.length && !only.includes(shot.name)) continue;
     for (const width of WIDTHS) {
       const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: "reduce" });
-      await page.goto(BASE + shot.path, { waitUntil: "networkidle" });
+      await page.goto((shot.base ?? BASE) + shot.path, { waitUntil: "networkidle" });
       if (shot.prepare) await shot.prepare(page);
       const file = `${OUT}/${shot.name}-${width}.png`;
       await page.screenshot({ path: file, fullPage: true });

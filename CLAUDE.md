@@ -8,6 +8,7 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
 - `pnpm typecheck && pnpm lint && pnpm test && pnpm build` — must be green before any commit
 - `pnpm shots` — screenshots at 360/768/1440 into `.shots/` (needs `CHAT_MOCK=1 pnpm start -p 3100`)
 - `pnpm e2e` — builds a separate test build (`NEXT_PUBLIC_E2E=1`, `.next-e2e`) and runs Playwright on :3101 with `CHAT_MOCK=1`. `pnpm e2e:only` reuses the last test build.
+- `WIDTHS=375,1440,1920 pnpm shots` — page shots; `chat-killswitch` needs a second server: `CHAT_MOCK=1 CHAT_ENABLED=false pnpm start -p 3103`
 - `pnpm shots:signal` — Signal Field review shots (viewport-sized) into `.shots/signal-field/`
 - `pnpm eval:live` — real-model evals. Shakil runs this himself. Never in CI or tests.
 
@@ -43,7 +44,7 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
   cursor. The column is damped to 25%, and a Playwright guard keeps text ≥ 4.5:1 over the brightest dot at a ripple
   peak. Emit ripples through `emitSignal`/`emitFrom` (`src/lib/signal-bus.ts`), never on scroll. Background chatter uses
   `kind: "ambient"` (short τ, lets the loop drop to 30fps); anything the visitor does is interactive (default). Budget: ≤ 6 kB gzip,
-  no TBT increase, GPU time near the surface floor.
+  no TBT increase, GPU ≤ 1 ms at 1920×1080 DPR 2 (backing scale capped at 1.5, `SF.maxScale`).
 - Accessibility beats design when they conflict; log it.
 
 ## Docs

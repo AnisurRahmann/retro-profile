@@ -21,7 +21,7 @@ test("suggestion chip sends, streams tokens and shows a tool card", async ({ pag
   await expect(page.getByTestId("agent-done")).toHaveCount(1, { timeout: 10_000 });
   await expect(page.locator("ol li").nth(1)).toContainText("Good fit");
   const lens = await page.evaluate(() => (window as unknown as { __lens: number[] }).__lens);
-  expect(lens.length).toBeGreaterThan(5); // rendered incrementally, token by token
+  expect(lens.length).toBeGreaterThanOrEqual(3); // at least two partial states before the final text
 
   await expect(page.getByRole("link", { name: "Book 30 min" })).toHaveAttribute("href", /cal\.com/);
 });

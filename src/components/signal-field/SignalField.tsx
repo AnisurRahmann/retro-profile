@@ -15,7 +15,7 @@ declare global {
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
 const DEV = process.env.NODE_ENV === "development";
-const UNIFORMS = ["uRes", "uDpr", "uT", "uGain", "uVw", "uCols", "uC", "uE", "uE0", "uG", "uX", "uS"] as const;
+const UNIFORMS = ["uRes", "uDpr", "uT", "uGain", "uVw", "uCols", "uC", "uN", "uE", "uE0", "uG", "uX", "uS"] as const;
 const NO_EMITTERS = new Float32Array(SF.maxEmitters).fill(-1e6);
 
 /** full: interactive ripple, recent pointer or fading cursor · ambient: only status-line ripples (30fps)
@@ -32,6 +32,16 @@ function token(name: string): [number, number, number] {
   }
   const [r = 0, g = 0, b = 0] = (v.match(/[\d.]+/g) ?? []).map(Number);
   return [r / 255, g / 255, b / 255];
+}
+
+/** Backing-store scale. Dev and test builds accept ?sfscale= to compare scales without rebuilding. */
+function backingScale(): number {
+  const dpr = window.devicePixelRatio || 1;
+  if (DEV || TEST) {
+    const q = Number(new URLSearchParams(window.location.search).get("sfscale"));
+    if (q > 0 && q <= 3) return q;
+  }
+  return Math.min(dpr, SF.maxScale);
 }
 
 const nextTask = (ms = 0) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
@@ -133,7 +143,7 @@ async function setup(canvas: HTMLCanvasElement, fallback: () => void, isDead: ()
   if (DEV && !timer) console.info("[signal-field] EXT_disjoint_timer_query_webgl2 unavailable");
 
   const resize = () => {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    dpr = backingScale();
     vw = canvas.clientWidth;
     canvas.width = Math.round(vw * dpr);
     canvas.height = Math.round(canvas.clientHeight * dpr);
@@ -165,8 +175,10 @@ async function setup(canvas: HTMLCanvasElement, fallback: () => void, isDead: ()
     gl.uniform1f(u.uT, t);
     gl.uniform1f(u.uGain, still ? 0 : gain);
     gl.uniform2f(u.uC, cx, cy);
-    gl.uniform4fv(u.uE, ring.pos);
-    gl.uniform1fv(u.uE0, still ? NO_EMITTERS : ring.t0);
+    const n = still ? 0 : ring.compact(t);
+    gl.uniform1i(u.uN, n);
+    gl.uniform4fv(u.uE, ring.packedPos);
+    gl.uniform1fv(u.uE0, still ? NO_EMITTERS : ring.packedT0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, cols * rows);
     if (timer && timing) gl.endQuery(timer.TIME_ELAPSED_EXT);
