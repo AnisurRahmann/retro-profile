@@ -1,2 +1,17 @@
 node_modules
+.next
+out
 build
+next-env.d.ts
+*.tsbuildinfo
+.env*.local
+.env
+.shots
+.lighthouse
+.illustrations
+test-results
+playwright-report
+.DS_Store
+.vercel
+.next-e2e
+.scratch/

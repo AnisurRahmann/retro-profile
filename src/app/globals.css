@@ -1,0 +1,837 @@
+@import "tailwindcss";
+
+/* ── Design tokens ─────────────────────────────────────────────
+   The ONLY colour values in the codebase. Everything else reads
+   these variables (directly or through the Tailwind theme below). */
+:root {
+  color-scheme: dark;
+  --ink: #0b1220;
+  --surface: #111a2b;
+  --surface-2: #172236;
+  --hairline: #22304a;
+  --text: #e6eaf2;
+  --graphite: #8a96ad;
+  --mention-bg: rgba(245, 165, 36, 0.14);
+  --mention-text: #f5c46b;
+  --signal: #f5a524;
+  --highlight: rgba(255, 255, 255, 0.04);
+  /* Surfaces over the sky: --surface at 86%, blurred, so the sky tints them slightly. */
+  --surface-glass: rgba(17, 26, 43, 0.86);
+  /* Secondary text over the open sky stage (the hero): lighter than --graphite so it needs less backing.
+     src/lib/sky/backing.ts mirrors the mix (ON_SKY_TEXT). */
+  --on-sky: color-mix(in srgb, var(--text) 82%, var(--graphite));
+
+  /* Glyph tiles: muted mid-tones, all ≥ 4.5:1 against --text */
+  --tile-slate: #3e4c63;
+  --tile-teal: #2c5958;
+  --tile-plum: #563f60;
+  --tile-olive: #4b5232;
+  --tile-rust: #6a4231;
+  --tile-steel: #355273;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-hairline: var(--hairline);
+  --color-text: var(--text);
+  --color-graphite: var(--graphite);
+  --color-on-sky: var(--on-sky);
+  --color-signal: var(--signal);
+  --color-mention-bg: var(--mention-bg);
+  --color-mention-text: var(--mention-text);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+html {
+  /* With html's overflow set, body's own overflow-x: clip applies to body (it isn't propagated to the viewport):
+     the full-bleed stage and the chips' overhang never cause a horizontal scroll. */
+  overflow-x: clip;
+  background: var(--ink);
+  color: var(--text);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  /* The full-bleed sky stage is 100vw wide; never let a scrollbar turn that into a horizontal scroll. */
+  overflow-x: clip;
+  /* Transparent so the fixed background layers (negative z-index) show through; --ink is painted by <html>. */
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--mention-bg);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Amber rings are for keyboard focus only. Chrome and Safari match :focus-visible on text fields even on a
+   mouse click, so text fields get the ring only when the last input was the keyboard (data-input is set by
+   the inline script in the root layout; it defaults to "keyboard" so no-JS keyboard users keep the ring). */
+html[data-input="pointer"] :is(input, textarea, select):focus-visible {
+  outline: none;
+}
+:is(input, textarea, select):focus {
+  border-color: color-mix(in srgb, var(--graphite) 45%, var(--hairline));
+}
+
+/* Chat composer: the box is the field. Mouse focus = quieter border; keyboard focus = amber ring on the box. */
+.composer {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  transition: border-color 150ms ease;
+}
+.composer:focus-within {
+  border-color: color-mix(in srgb, var(--graphite) 45%, var(--hairline));
+}
+.composer textarea:focus-visible {
+  outline: none;
+}
+html:not([data-input="pointer"]) .composer:has(textarea:focus-visible) {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+/* ── Sylhet Sky ─────────────────────────────────────────────
+   The real sky over Sylhet (src/components/sky, src/lib/sky). Gradients are allowed only here.
+   z −4 gradient (this) · −3 atmosphere canvas · −2 particle canvas and landscape · −1 grain.
+   The three colours are set before first paint by the inline script in the root layout, then by the
+   controller. The initial values (night) are the no-JS fallback. */
+@property --sky-zenith {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #060b16;
+}
+@property --sky-mid {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0a1120;
+}
+@property --sky-horizon {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0f1a2e;
+}
+/* Sized to the large viewport (100lvh), so the iOS URL bar collapsing never resizes or redraws them. */
+.sky-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100lvh;
+  pointer-events: none;
+}
+/* The horizon line --sky-h and the return-to-mid line --sky-b (src/lib/sky/horizon.ts): the viewport bottom on desktop;
+   in scene mode the renderer moves them with the visible ground (set on this element only, so a scroll frame
+   restyles one layer, not the page). */
+.sky-gradient {
+  z-index: -4;
+  --sky-h: 100%;
+  --sky-b: 100%;
+  --sky-t: 100%;
+  --sky-a: 100%;
+  --sky-ret: var(--sky-horizon);
+  --sky-tail: var(--sky-horizon);
+  background: linear-gradient(to bottom, var(--sky-zenith), var(--sky-mid) 55%, var(--sky-horizon));
+  /* zenith → mid → horizon at --sky-h; under a scene, back to the "away" sky (horizon at --sky-a) by --sky-b. */
+  background: linear-gradient(
+    to bottom in srgb,
+    var(--sky-zenith) min(0px, var(--sky-h)),
+    var(--sky-mid) min(calc(var(--sky-h) * 0.55), var(--sky-h)),
+    var(--sky-horizon) var(--sky-h),
+    var(--sky-ret) var(--sky-b),
+    var(--sky-tail) var(--sky-t),
+    var(--sky-horizon) var(--sky-a)
+  );
+  transition:
+    --sky-zenith 4s ease,
+    --sky-mid 4s ease,
+    --sky-horizon 4s ease;
+}
+/* Scrubbing: follow the slider closely. */
+html[data-sky-scrub] .sky-gradient {
+  transition-duration: 150ms;
+}
+.sky-atmosphere {
+  z-index: -3;
+}
+.sky-particles {
+  z-index: -2;
+}
+.sky-atmosphere,
+.sky-particles {
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+.sky-atmosphere[data-ready],
+.sky-particles[data-ready],
+.sky-landscape[data-ready] {
+  opacity: 1;
+}
+/* The landscape band: fixed to the bottom, 18vh desktop / 14svh mobile, 110–200px (src/components/sky/landscape.ts
+   mirrors it). Above the particles. */
+.sky-landscape {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  z-index: -2;
+  width: 100%;
+  /* + 120px of transparent headroom for the plane taking off. */
+  height: calc(clamp(110px, 14vh, 200px) + 120px);
+  height: calc(clamp(110px, 14svh, 200px) + 120px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+@media (min-width: 808px) {
+  .sky-landscape {
+    height: calc(clamp(110px, 18vh, 200px) + 120px);
+  }
+}
+/* Scene mode (< 1100px on pages with the sky stage, src/lib/sky/landscape/anchors.ts): the landscape isn't fixed.
+   It's drawn into two slots in the page: the stage's horizon and a 200px closing band above the footer. Each
+   canvas has 120px of transparent headroom above its band (the city glow, the take-off). */
+.sky-scene {
+  display: none;
+  pointer-events: none;
+}
+/* 120px of headroom above the band, and the 48px ground fade below it (src/lib/sky/horizon.ts GROUND_FADE). */
+.sky-scene-canvas {
+  position: absolute;
+  left: 0;
+  bottom: -48px;
+  width: 100%;
+  height: calc(100% + 168px);
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+.sky-scene-canvas[data-ready] {
+  opacity: 1;
+}
+html {
+  /* The landscape band's height (src/lib/sky/landscape/anchors.ts bandHeight), and the stage scene's (sceneBand:
+     150px on phones). */
+  --band-h: clamp(110px, 14vh, 200px);
+  --band-h: clamp(110px, 14svh, 200px);
+  --scene-h: 150px;
+}
+@media (min-width: 640px) {
+  html {
+    --scene-h: var(--band-h);
+  }
+}
+@media (min-width: 808px) {
+  html {
+    --band-h: clamp(110px, 18vh, 200px);
+  }
+}
+.sky-scene-stage {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  height: var(--scene-h);
+}
+.sky-scene-closing {
+  position: relative;
+  z-index: -1;
+  width: 100vw;
+  height: 200px;
+  margin-top: 48px;
+  margin-inline: calc(50% - 50vw);
+}
+@media (max-width: 1099px) {
+  .sky-scene {
+    display: block;
+  }
+  html:has(.sky-stage) .sky-landscape {
+    display: none;
+  }
+  /* Before the renderer runs: the horizon on the stage scene's ground line (the foot of its far hills, 40% down
+     the scene), back to the mid sky at the scene's bottom. Right at scroll 0, which is where first paint is. */
+  html:has(.sky-stage) .sky-gradient {
+    --sky-h: calc(var(--stage-h) - 0.6 * var(--scene-h));
+    --sky-b: var(--stage-h);
+    --sky-t: var(--stage-h);
+    --sky-a: 145lvh;
+    --sky-ret: var(--sky-mid);
+    --sky-tail: var(--sky-mid);
+  }
+  /* The hero floats over the lower sky, its bottom at the far hills' tops. */
+  html .sky-stage {
+    padding-bottom: calc(0.8 * var(--band-h));
+  }
+}
+/* Phones: the hero starts at 44% of the stage, so the open sky above and the text balance; the 150px stage scene
+   sits under it. */
+@media (max-width: 639px) {
+  html .sky-stage {
+    padding-bottom: 0;
+  }
+  .sky-stage > .sky-stage-open {
+    flex: none;
+    height: calc(0.44 * var(--stage-h));
+  }
+}
+
+html {
+  /* Stage height, mirrored by .sky-stage (src/lib/sky/arc.ts stageHeightFor). Phones get a tall stage: the sky
+     arc needs room above the hero. */
+  --stage-h: max(540px, 76vh);
+  --stage-h: max(540px, 76svh);
+}
+@media (min-width: 640px) {
+  html {
+    --stage-h: max(460px, 70vh);
+    --stage-h: max(460px, 70svh);
+  }
+}
+@media (min-width: 808px) {
+  html {
+    --stage-h: max(460px, min(62vh, 640px));
+    --stage-h: max(460px, min(62svh, 640px));
+  }
+}
+
+/* ── Loose text ─────────────────────────────────────────────
+   Text that sits directly on the sky carries data-on-sky. It gets backing only where it needs it, and only as much
+   as it needs (src/lib/sky/backing.ts decides per element, src/components/sky/backing-runner.ts writes it):
+   none · halo (a text-shadow in --ink at --halo-a) · chip (a light glass chip, --ink at --chip-a, blur 10px).
+   Until the module runs, every element wears the conservative default: the halo at 0.5. The chip is a
+   pseudo-element outside the box (inset −1px −6px), so switching modes never moves anything. */
+@property --halo-a {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.5;
+}
+@property --chip-a {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.5;
+}
+[data-on-sky] {
+  position: relative;
+  text-shadow:
+    0 0 1px color-mix(in srgb, var(--ink) calc(var(--halo-a) * 100%), transparent),
+    0 0 6px color-mix(in srgb, var(--ink) calc(var(--halo-a) * 100%), transparent),
+    0 0 16px color-mix(in srgb, var(--ink) calc(var(--halo-a) * 60%), transparent);
+  /* Unlayered, so it wins over Tailwind's transition utilities: keep their colour fade too. */
+  transition:
+    --halo-a 600ms ease,
+    color 150ms ease;
+}
+[data-on-sky] svg {
+  filter: drop-shadow(
+      0 0 1px color-mix(in srgb, var(--ink) calc(var(--halo-a) * 100%), transparent)
+    )
+    drop-shadow(0 0 4px color-mix(in srgb, var(--ink) calc(var(--halo-a) * 100%), transparent));
+}
+/* v4: light, no border, hugging the text (1px × 6px around it), radius 5px, blur 10px. */
+[data-on-sky]::before {
+  content: "";
+  position: absolute;
+  inset: -1px -6px;
+  z-index: -1;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ink) calc(var(--chip-a) * 100%), transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transition: opacity 600ms ease;
+  pointer-events: none;
+}
+[data-on-sky][data-backing="chip"]::before {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-on-sky],
+  [data-on-sky]::before {
+    transition: none;
+  }
+}
+
+/* ── Sky stage ──────────────────────────────────────────────
+   The top of the home page: full-bleed open sky with the hero at its bottom, in the column. It starts under the
+   (transparent) header. */
+main:has(> .sky-stage) {
+  padding-top: 0;
+}
+.sky-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: var(--stage-h);
+  margin-inline: calc(50% - 50vw);
+  margin-top: -64px;
+  padding-bottom: 40px;
+}
+.sky-stage-open {
+  flex: 1;
+}
+/* Drag the sky: the open sky is the handle; vertical swipes still scroll. */
+.sky-stage {
+  touch-action: pan-y;
+}
+.sky-stage,
+.sky-stage [data-sky-open] {
+  cursor: grab;
+}
+.sky-stage [data-sky-hero] {
+  cursor: auto;
+}
+.sky-stage[data-grabbing],
+.sky-stage[data-grabbing] * {
+  cursor: grabbing;
+  user-select: none;
+}
+/* The first-visit hint, bottom-right of the stage for 4 s. */
+.sky-hint {
+  position: absolute;
+  right: max(20px, calc(50vw - 384px));
+  bottom: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--on-sky);
+  opacity: 0;
+  transition: opacity 400ms ease;
+  pointer-events: none;
+}
+.sky-hint[data-show] {
+  opacity: 1;
+}
+/* Over the open stage the header's secondary text is --on-sky, like the hero's (solved together, HERO_TARGETS). */
+html:has(.sky-stage) [data-sky-head] nav a:not(:hover) {
+  color: var(--on-sky);
+}
+
+/* Glass: cards, the closer, receipts, chat composer and bubbles over the sky. Opaque where blur is unsupported. */
+.glass {
+  background: var(--surface);
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .glass {
+    background: var(--surface-glass);
+    -webkit-backdrop-filter: blur(10px) saturate(1.1);
+    backdrop-filter: blur(10px) saturate(1.1);
+  }
+}
+
+/* ── Grain ──────────────────────────────────────────────────
+   Fixed, above the background, below content. Breaks up gradient banding. */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-size: 160px 160px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Layout ─────────────────────────────────────────────────── */
+.column {
+  width: 100%;
+  max-width: 768px;
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+@media (min-width: 808px) {
+  .column {
+    padding-inline: 0;
+  }
+}
+
+.section + .section {
+  margin-top: 48px;
+}
+@media (min-width: 640px) {
+  .section + .section {
+    margin-top: 64px;
+  }
+}
+
+/* ── Card ───────────────────────────────────────────────────── */
+.card {
+  display: flex;
+  /* Top-aligned so titles in a row share a baseline whatever the subtitle length. */
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 64px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+a.card:hover {
+  background: var(--surface-2);
+  border-color: var(--hairline);
+}
+
+.tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+/* Tile top meets the title's cap top: 20px line, Geist ascent 14 / descent 4 / cap 9.94 at 14px
+   → (20 − 18) / 2 + 14 − 9.94 ≈ 5px. */
+.card > .tile {
+  margin-top: 5px;
+}
+.tile--sm {
+  width: 28px;
+  height: 28px;
+  font-size: 10px;
+  border-radius: 6px;
+}
+.tile-slate {
+  background: var(--tile-slate);
+}
+.tile-teal {
+  background: var(--tile-teal);
+}
+.tile-plum {
+  background: var(--tile-plum);
+}
+.tile-olive {
+  background: var(--tile-olive);
+}
+.tile-rust {
+  background: var(--tile-rust);
+}
+.tile-steel {
+  background: var(--tile-steel);
+}
+
+/* ── Show more ──────────────────────────────────────────────── */
+.reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 220ms ease;
+}
+.reveal[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.reveal > .reveal-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+/* Keep the focus ring visible on cards inside the clip */
+.reveal[data-open="true"] > .reveal-inner {
+  overflow: visible;
+}
+.reveal[data-open="false"] > .reveal-inner {
+  visibility: hidden;
+  transition: visibility 0s linear 220ms;
+}
+
+/* ── Receipts masonry ───────────────────────────────────────── */
+.masonry {
+  columns: 1;
+  column-gap: 10px;
+}
+@media (min-width: 640px) {
+  .masonry {
+    columns: 2;
+  }
+}
+.masonry > * {
+  break-inside: avoid;
+  margin-bottom: 10px;
+}
+
+.mention {
+  background: var(--mention-bg);
+  color: var(--mention-text);
+  border-radius: 3px;
+  padding: 0 3px;
+  font-weight: 500;
+}
+
+/* ── Waveform glyph ─────────────────────────────────────────── */
+.wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 10px;
+  flex: none;
+}
+.wave > span {
+  display: block;
+  width: 2px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--signal);
+  transform-origin: center;
+  animation: wave var(--d) ease-in-out var(--delay) infinite alternate;
+}
+.wave > span:nth-child(1) {
+  --d: 900ms;
+  --delay: -200ms;
+  --s: 0.4;
+}
+.wave > span:nth-child(2) {
+  --d: 700ms;
+  --delay: -500ms;
+  --s: 0.8;
+}
+.wave > span:nth-child(3) {
+  --d: 1300ms;
+  --delay: -100ms;
+  --s: 1;
+}
+.wave > span:nth-child(4) {
+  --d: 1100ms;
+  --delay: -650ms;
+  --s: 0.6;
+}
+.wave > span:nth-child(5) {
+  --d: 800ms;
+  --delay: -350ms;
+  --s: 0.35;
+}
+@keyframes wave {
+  from {
+    transform: scaleY(0.25);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* ── Status line ────────────────────────────────────────────── */
+.status-line {
+  /* Inline-block so its box (and its backing) hugs the text. */
+  display: inline-block;
+  min-height: 24px;
+  transition:
+    --halo-a 600ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+@media (min-width: 640px) {
+  .status-line {
+    min-height: 28px;
+  }
+}
+.status-line[data-leaving="true"] {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* ── Sylhet clock ───────────────────────────────────────────── */
+.sky-clock {
+  display: inline-block;
+  min-width: 5ch;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sky label ──────────────────────────────────────────────── */
+/* "16:45 · 22°C · clear · near Keane Bridge, Sylhet": the place is last, so its changing width moves nothing.
+   Phones: two designed lines (time and weather; the place, its line reserved so the bottom-anchored hero never
+   moves). */
+.sky-label,
+.sky-label-line,
+.sky-label-place {
+  display: inline-flex;
+  align-items: center;
+  column-gap: 6px;
+}
+.sky-label {
+  text-align: left;
+}
+.sky-place-name {
+  animation: sky-fade-in 200ms ease;
+}
+@keyframes sky-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (max-width: 639px) {
+  .sky-label {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .sky-label-place {
+    min-height: 20px;
+  }
+  .sky-label-sep-place {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sky-place-name {
+    animation: none;
+  }
+}
+/* The sun-path strip: a slider; 44px tall touch target on mobile. Heights are fixed in CSS (the SVG fills them)
+   so nothing shifts when it hydrates. */
+.sky-strip {
+  position: relative;
+  width: 260px;
+  height: 40px;
+  color: var(--on-sky);
+  cursor: pointer;
+  touch-action: none;
+  border-radius: 4px;
+}
+.sky-strip-tick {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--graphite);
+  white-space: nowrap;
+  pointer-events: none;
+}
+@media (max-width: 807px) {
+  .sky-strip {
+    /* Not the full width: the low sun keeps open sky right of the hero. 44px tall: a touch target. */
+    width: min(100%, 260px);
+    height: 44px;
+    padding-block: 4px;
+  }
+  .sky-strip-tick {
+    margin-top: 4px;
+  }
+}
+/* Phones (< 640px): no strip (it collided with the hills). The sun or moon on the big arc is the slider: a 44×44
+   hit target centred on the disc, fixed like the sky, under the text (it takes no pointer while over text or off
+   the stage: data-off). */
+.sky-arc-handle {
+  display: none;
+}
+@media (max-width: 639px) {
+  .sky-strip {
+    display: none;
+  }
+  .sky-arc-handle {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    touch-action: none;
+    cursor: grab;
+  }
+  .sky-arc-handle:active {
+    cursor: grabbing;
+  }
+  .sky-arc-handle[data-off] {
+    pointer-events: none;
+  }
+}
+.sky-range {
+  accent-color: var(--text);
+}
+/* Header monogram dot: amber at golden hour, a dim graphite dot at night, nothing otherwise. */
+.sky-dot {
+  display: none;
+  width: 6px;
+  height: 6px;
+  margin-left: 4px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+html[data-sky="golden"] .sky-dot {
+  display: inline-block;
+  background: var(--signal);
+}
+html:is([data-sky="night"], [data-sky="astronomical"], [data-sky="nautical"]) .sky-dot {
+  display: inline-block;
+  background: color-mix(in srgb, var(--graphite) 55%, transparent);
+}
+
+/* ── Chat ───────────────────────────────────────────────────── */
+.ring-spin {
+  transform-origin: center;
+}
+.ring-spin[data-spinning="true"] {
+  animation: spin 20s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.dots {
+  display: inline-flex;
+  gap: 4px;
+  height: 24px;
+  align-items: center;
+}
+.dots > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--graphite);
+  animation: pulse 1s ease-in-out infinite;
+}
+.dots > span:nth-child(2) {
+  animation-delay: 150ms;
+}
+.dots > span:nth-child(3) {
+  animation-delay: 300ms;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.dock-fade {
+  background: linear-gradient(to bottom, transparent, var(--ink) 40%);
+}
+
+/* ── Reduced motion ─────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .wave > span {
+    animation: none;
+    transform: scaleY(var(--s));
+  }
+  .status-line,
+  .reveal,
+  .card {
+    transition: none;
+  }
+  .ring-spin[data-spinning="true"],
+  .dots > span {
+    animation: none;
+  }
+  .dots > span {
+    opacity: 0.6;
+  }
+}

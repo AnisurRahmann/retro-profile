@@ -1,0 +1,6 @@
+.next
+out
+pnpm-lock.yaml
+.shots
+src/agent/knowledge.md
+evals/report.md
