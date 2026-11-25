@@ -203,7 +203,7 @@ html[data-sky-scrub] .sky-gradient {
   }
 }
 /* Scene mode (< 1100px on pages with the sky stage, src/lib/sky/landscape/anchors.ts): the landscape isn't fixed.
-   It's drawn into two slots in the page: the stage's horizon and a 200px closing band above the footer. Each
+   It's drawn into two slots in the page: the stage's horizon and a 220px closing band above the footer. Each
    canvas has 120px of transparent headroom above its band (the city glow, the take-off). */
 .sky-scene {
   display: none;
@@ -247,17 +247,25 @@ html {
   z-index: -1;
   height: var(--scene-h);
 }
+/* The closing scene (v5.1 T7): 220px, with the footer 16px under its ground. Its band is laid out from the bank at
+   70% of the height up, so the top 30-odd units are sky above the far hills: the scene starts 48px higher and that
+   sky sits behind the bottom of the closer card (it is z −1), so the hills begin about 25px under the card instead
+   of 120px (a 48px margin and 73px of sky). */
 .sky-scene-closing {
   position: relative;
   z-index: -1;
   width: 100vw;
-  height: 200px;
-  margin-top: 48px;
+  height: 220px;
+  margin-top: -48px;
   margin-inline: calc(50% - 50vw);
 }
 @media (max-width: 1099px) {
   .sky-scene {
     display: block;
+  }
+  /* The footer sits directly under the closing scene's ground: 16px (its Tailwind margin is 64px / 96px). */
+  main:has(> .sky-scene-closing) + footer {
+    margin-top: 16px;
   }
   html:has(.sky-stage) .sky-landscape {
     display: none;

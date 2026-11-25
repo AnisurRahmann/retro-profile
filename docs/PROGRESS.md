@@ -110,6 +110,14 @@ At 03:30 clear, 375×812 and 1440×900:
 - Shots: `.shots/v5.1/T6/t6-0330-after-1440x900-bottom.png` (before: `.shots/v5.1/baseline/base-0330-clear-1440x900-bottom.png`; together in `sheet-before-after.png`), `t6-1920x1080-maxscroll.png`.
 - Not in scope, left alone: the chat dock button (bottom-left) still sits over the band, and the plane's take-off still climbs through the sky just under the footer for its 4.6 s. DECISIONS #114.
 
+#### T7 · the closing scene on mobile
+
+- PASS: at 375×812 at max scroll there is no empty band over 40px between the closer card and the footer. Measured from the scene canvas itself (rows with drawn pixels): the card ends at y 539, the hills begin at 554.5 (15.5px under it) and every row from there to the footer is drawn (hills, airport, river, ground); no empty run at all. Same at 11:00 partly cloudy and 16:45 clear.
+- PASS: the scene is already drawn 200 ms after a jump from the top of the page to the bottom: the canvas has `data-ready` and opacity 1 at that moment (`.shots/v5.1/T7/sky-2026-11-26T03-30-wx-clear-375x812-200ms-after-jump.png`, and the same for 11:00 and 16:45; sheet `sheet.png`). Before the pre-render it was drawn by then but still fading in (opacity 0.47).
+- The numbers: the scene is 220px (491–711 at max scroll); the footer starts 16px after it (727). Before: closer 415, scene 463–663, footer 727, with a 48px margin above the scene and 64px below it.
+- Shots: `.shots/v5.1/T7/sky-2026-11-26T{03-30-wx-clear,11-00-wx-partly,16-45-wx-clear}-375x812-{200ms-after-jump,maxscroll}.png`, `sheet.png`, `sheet-tablet.png` (768×1024, unchanged behaviour but the same scene).
+- How: `margin-top: -48px` on the scene and `margin-top: 16px` on the footer below 1100px; in the renderer each scene is drawn once on the first frame and then drawn ahead while within 1.5 viewport heights (`IntersectionObserver`, `rootMargin: "150% 0px"`). DECISIONS #115.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.

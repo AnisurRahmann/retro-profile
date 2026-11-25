@@ -234,6 +234,22 @@ function start(
     const top = b.docTop - view.y - b.land.lift;
     return top < view.vh && top + b.land.height + b.land.lift > 0;
   };
+  // Scenes are pre-rendered before they enter the viewport (v5.1 T7). Each is drawn once on the first frame, and
+  // drawn ahead while it is within 1.5 viewport heights of the screen, so it is already there, and no longer fading
+  // in, when it arrives: even a jump from far away (from the top of the page to the bottom) finds it drawn.
+  const approaching = new Set<Element>();
+  /** Scenes not drawn yet: each is drawn once whatever is on screen. */
+  const undrawn = new Set<Band>();
+  const approachIO = new IntersectionObserver(
+    (es) => {
+      for (const e of es) {
+        if (e.isIntersecting) approaching.add(e.target);
+        else approaching.delete(e.target);
+      }
+    },
+    { rootMargin: "150% 0px" },
+  );
+  const drawable = (b: Band) => visible(b) || undrawn.has(b) || (!!b.slot && approaching.has(b.slot));
   // The horizon tracks the visible ground in scene mode (src/lib/sky/horizon.ts): the CSS gradient (--sky-h/--sky-b
   // on its layer), the shader (uHorizonY/B) and the backing model all read it.
   const gradEl = document.querySelector<HTMLElement>("[data-sky-gradient]");
@@ -591,7 +607,8 @@ function start(
         const world = b.land.world;
         // Off screen, the closing scene can still re-arm the arrival.
         if (world?.airport && !visible(b)) arrival.update(false, closingRatio < 0.15, false);
-        if (!world || !visible(b)) continue;
+        if (!world || !drawable(b)) continue;
+        undrawn.delete(b);
         const f: LifeFrame = {
           t,
           moving: !still,
@@ -825,7 +842,16 @@ function start(
   let resizeTimer = 0;
   /** Scene slots on this page get a canvas each; bands whose slot left the page (client navigation) are dropped. */
   const ensureScenes = () => {
-    bands = bands.filter((b) => b.id === "fixed" || b.slot?.isConnected);
+    bands = bands.filter((b) => {
+      if (b.id === "fixed" || b.slot?.isConnected) return true;
+      undrawn.delete(b);
+      if (b.slot) {
+        approaching.delete(b.slot);
+        approachIO.unobserve(b.slot);
+        closingIO.unobserve(b.slot);
+      }
+      return false;
+    });
     document.querySelectorAll<HTMLElement>("[data-sky-scene]").forEach((slot) => {
       if (bands.some((b) => b.slot === slot)) return;
       const c = document.createElement("canvas");
@@ -834,15 +860,19 @@ function start(
       slot.appendChild(c);
       const stage = slot.dataset.skyScene !== "closing";
       const l = createLandscape(c, LIFT, GROUND_FADE);
-      if (l)
-        bands.push({
+      if (l) {
+        const band: Band = {
           id: stage ? "stage" : "closing",
           canvas: c,
           land: l,
           frame: null,
           slot,
           docTop: 0,
-        });
+        };
+        bands.push(band);
+        undrawn.add(band);
+      }
+      approachIO.observe(slot);
       if (!stage) closingIO.observe(slot);
     });
   };
@@ -958,6 +988,7 @@ function start(
     unsubBus();
     ro.disconnect();
     closingIO.disconnect();
+    approachIO.disconnect();
     motion.removeEventListener("change", applyMotion);
     document.removeEventListener("visibilitychange", onVisibility);
     atmCanvas.removeEventListener("webglcontextlost", onLost);

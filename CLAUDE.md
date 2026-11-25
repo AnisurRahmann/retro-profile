@@ -56,8 +56,9 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
   particles (arc, stars, moon, sun, birds, planes, meteors, rain) · z −2 landscape band (fixed bottom, 18vh / 14svh,
   110–200px + 120px headroom: four parallax silhouette layers, night lights, city glow, fireflies, rickshaw,
   take-off) · z −1 grain. Body is transparent; `<html>` paints `--ink`. **No scrims.** Below 1100px on the home
-  page the landscape isn't fixed: it's drawn into two slots in the page (z −1), the stage's horizon and a 200px
-  closing band above the footer ("scene mode").
+  page the landscape isn't fixed: it's drawn into two slots in the page (z −1), the stage's horizon and a 220px
+  closing scene that ends 16px above the footer ("scene mode"). Scenes are pre-rendered: drawn once on the first
+  frame, and ahead while within 1.5 viewport heights of the screen.
 - Loose text (text directly on the sky, `data-on-sky`) gets per-element backing, never a scrim:
   `src/lib/sky/backing.ts` estimates the brightest sky behind each box (gradient, cloud mirror, glow, fog, sun and
   moon, city glow, landscape) and picks none (≥ 7:1 `--text`, ≥ 4.8:1 secondary) · halo (text-shadow in `--ink`,
