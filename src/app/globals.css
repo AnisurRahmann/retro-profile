@@ -265,6 +265,13 @@ a.card:hover {
   transform: translateY(-4px);
 }
 
+/* ── Sylhet clock ───────────────────────────────────────────── */
+.sky-clock {
+  display: inline-block;
+  min-width: 5ch;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Chat ───────────────────────────────────────────────────── */
 .ring-spin {
   transform-origin: center;
