@@ -44,7 +44,7 @@ describe("design tokens (WCAG)", () => {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const p = `${dir}/${e.name}`;
         if (e.isDirectory()) walk(p);
-        else if (/\.(tsx?|css)$/.test(e.name) && !p.endsWith("globals.css") && !p.includes("/og/") && !p.includes("opengraph") && !p.endsWith("brand.ts")) {
+        else if (/\.(tsx?|css)$/.test(e.name) && !p.endsWith("globals.css") && !p.includes("/og/") && !p.includes("opengraph") && !p.endsWith("brand.ts") && !p.endsWith("sky/palette.ts")) {
           const src = fs.readFileSync(p, "utf8");
           if (/#[0-9a-fA-F]{6}\b/.test(src)) offenders.push(p);
         }

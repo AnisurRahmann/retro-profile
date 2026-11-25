@@ -94,6 +94,61 @@ html:not([data-input="pointer"]) .composer:has(textarea:focus-visible) {
   outline-offset: 2px;
 }
 
+/* ── Sylhet Sky ─────────────────────────────────────────────
+   The real sky over Sylhet (src/components/sky, src/lib/sky). Gradients are allowed only here.
+   z −4 gradient (this) · −3 atmosphere canvas · −2 particle canvas · −1 column scrim · −1 grain.
+   The three colours are set before first paint by the inline script in the root layout, then by the
+   controller. The initial values (night) are the no-JS fallback. */
+@property --sky-zenith {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #060b16;
+}
+@property --sky-mid {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0a1120;
+}
+@property --sky-horizon {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0f1a2e;
+}
+.sky-layer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.sky-gradient {
+  z-index: -4;
+  background: linear-gradient(to bottom, var(--sky-zenith), var(--sky-mid) 55%, var(--sky-horizon));
+  transition:
+    --sky-zenith 4s ease,
+    --sky-mid 4s ease,
+    --sky-horizon 4s ease;
+}
+/* Scrubbing: follow the slider closely. */
+html[data-sky-scrub] .sky-gradient {
+  transition-duration: 150ms;
+}
+.sky-atmosphere {
+  z-index: -3;
+}
+.sky-particles {
+  z-index: -2;
+}
+.sky-atmosphere,
+.sky-particles {
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+.sky-atmosphere[data-ready],
+.sky-particles[data-ready] {
+  opacity: 1;
+}
+
 /* ── Grain ──────────────────────────────────────────────────
    Fixed, above the background, below content. Breaks up gradient banding. */
 .grain {
