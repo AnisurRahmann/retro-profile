@@ -12,7 +12,7 @@ export const VERT = `#version 300 es
 precision highp float;
 #define N ${SF.maxEmitters}
 uniform vec2 uRes;uniform float uDpr,uT,uGain,uVw,uCols;uniform vec2 uC;
-uniform vec3 uE[N];uniform float uE0[N];
+uniform vec4 uE[N];uniform float uE0[N];
 uniform vec3 uG,uX,uS;
 out vec2 vL;out float vR,vA;out vec3 vCol;
 float h(vec2 p){return fract(sin(p.x*127.1+p.y*311.7)*43758.5453);}
@@ -21,8 +21,9 @@ return mix(mix(h(i),h(i+vec2(1,0)),u.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),u.x),u
 float idle(vec2 p){float n=vn(vec2(p.x*${f(SF.noiseScale)},p.y*${f(SF.noiseScale)}+uT*${f(SF.noiseTime)}));
 return ${f(SF.idleAmp)}*(0.5+0.5*sin(${f((2 * Math.PI) / SF.idleLambda)}*p.x-${f((2 * Math.PI) / SF.idlePeriod)}*uT+${f(SF.noiseWarp)}*n));}
 float cur(vec2 p){vec2 d=p-uC;return ${f(SF.cursorGain)}*uGain*exp(-dot(d,d)/${f(SF.sigma * SF.sigma)});}
-float rip(vec2 p){float s=0.0;for(int i=0;i<N;i++){float a=uT-uE0[i];if(a<0.0||a>${f(5 * SF.tau)})continue;
-float fr=length(p-uE[i].xy)-${f(SF.v)}*a;s+=uE[i].z*exp(-fr*fr/${f(SF.wr * SF.wr)})*exp(-a/${f(SF.tau)});}return s;}
+float rip(vec2 p){float s=0.0;for(int i=0;i<N;i++){float a=uT-uE0[i];if(a<0.0)continue;
+float A=uE[i].z*exp(-a/uE[i].w);if(A<=${f(SF.activeEps)})continue;
+float fr=length(p-uE[i].xy)-${f(SF.v)}*a;s+=A*exp(-fr*fr/${f(SF.wr * SF.wr)});}return s;}
 float mask(float x){if(uVw<${f(SF.columnBreak)})return ${f(SF.column)};
 return mix(${f(SF.column)},1.0,smoothstep(0.0,${f(SF.columnEdge)},abs(x-uVw*0.5)-${f(SF.columnHalf)}));}
 void main(){

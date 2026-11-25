@@ -41,7 +41,8 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
 - Signal Field rules: colours come from the CSS tokens at init (no hex in TS/GLSL). Constants live only in `SF`
   (`src/lib/signal-math.ts`); the GLSL is generated from them. Amber appears only on ripple crests, never for the
   cursor. The column is damped to 25%, and a Playwright guard keeps text ≥ 4.5:1 over the brightest dot at a ripple
-  peak. Emit ripples through `emitSignal`/`emitFrom` (`src/lib/signal-bus.ts`), never on scroll. Budget: ≤ 6 kB gzip,
+  peak. Emit ripples through `emitSignal`/`emitFrom` (`src/lib/signal-bus.ts`), never on scroll. Background chatter uses
+  `kind: "ambient"` (short τ, lets the loop drop to 30fps); anything the visitor does is interactive (default). Budget: ≤ 6 kB gzip,
   no TBT increase, GPU time near the surface floor.
 - Accessibility beats design when they conflict; log it.
 

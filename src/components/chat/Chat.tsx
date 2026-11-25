@@ -65,7 +65,7 @@ function Ring({ spinning, size, children }: { spinning: boolean; size: number; c
 /** Emits one ripple from its top-left corner when a tool card first renders. */
 function Emitting({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement | null>(null);
-  useEffect(() => emitFrom(ref.current, 0.5, true), []);
+  useEffect(() => emitFrom(ref.current, 0.5, { corner: true }), []);
   return <div ref={ref}>{children}</div>;
 }
 

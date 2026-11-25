@@ -72,3 +72,30 @@ test("text keeps 4.5:1 over the brightest background pixel, idle and at a ripple
     expect(contrast(hex(tokens.graphite), bg)).toBeGreaterThanOrEqual(4.5);
   }
 });
+
+const mode = (page: Page) => page.evaluate(() => window.__signalMode);
+async function fps(page: Page): Promise<number> {
+  const a = await frames(page);
+  await page.waitForTimeout(1000);
+  return (await frames(page)) - a;
+}
+
+test("home without a pointer runs ambient (≤ 30fps); a click switches to full", async ({ page }) => {
+  await page.goto("/");
+  await ready(page);
+  await page.waitForTimeout(3000);
+  await page.waitForFunction(() => window.__signalMode === "ambient", null, { timeout: 6000 });
+  expect(await fps(page)).toBeLessThanOrEqual(32);
+  expect(["ambient", "idle"]).toContain(await mode(page));
+  await page.mouse.click(60, 500);
+  await page.waitForTimeout(100);
+  expect(await mode(page)).toBe("full");
+});
+
+test("/lifts has no status line, so it settles to idle (≤ 15fps)", async ({ page }) => {
+  await page.goto("/lifts");
+  await ready(page);
+  await page.waitForTimeout(3000);
+  expect(await mode(page)).toBe("idle");
+  expect(await fps(page)).toBeLessThanOrEqual(16);
+});

@@ -4,14 +4,16 @@
  * Units: CSS px and seconds. Origin: viewport top-left.
  */
 
+import { AMBIENT_AMP } from "./signal-bus";
+
 export const SF = {
   pitch: 22,
-  rBase: 0.9,
+  rBase: 1.0,
   rGain: 1.1,
   aa: 0.75,
   aMin: 0.16,
   aMax: 0.62,
-  idleAmp: 0.06,
+  idleAmp: 0.09,
   idleLambda: 900, // px
   idlePeriod: 9, // s
   noiseScale: 0.0015,
@@ -23,7 +25,10 @@ export const SF = {
   cursorFade: 0.4,
   v: 420,
   wr: 18,
-  tau: 1.6,
+  tau: 1.6, // interactive emitters (pointer, click, chat)
+  tauAmbient: 0.9, // ambient emitters (status line)
+  ambientAmp: AMBIENT_AMP,
+  activeEps: 0.02, // an emitter is active while amp · e^(−Δt/τ) > activeEps
   maxEmitters: 8,
   column: 0.25,
   columnHalf: 384,
@@ -32,7 +37,18 @@ export const SF = {
   amberMax: 0.35,
 } as const;
 
-export type Emitter = { x: number; y: number; amp: number; t0: number };
+export type EmitterKind = "ambient" | "interactive";
+export type Emitter = { x: number; y: number; amp: number; t0: number; tau: number };
+
+export const tauFor = (kind: EmitterKind = "interactive") => (kind === "ambient" ? SF.tauAmbient : SF.tau);
+
+/** Current amplitude of an emitter, 0 before it starts. */
+export function envelope(e: Emitter, t: number): number {
+  const age = t - e.t0;
+  return age < 0 ? 0 : e.amp * Math.exp(-age / e.tau);
+}
+
+export const isActive = (e: Emitter, t: number) => envelope(e, t) > SF.activeEps;
 
 const fract = (x: number) => x - Math.floor(x);
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
@@ -77,11 +93,10 @@ export function cursor(x: number, y: number, cx: number, cy: number, gain = 1): 
 }
 
 export function ripple(x: number, y: number, t: number, e: Emitter): number {
-  const age = t - e.t0;
-  if (age < 0 || age > 5 * SF.tau) return 0;
-  const r = Math.hypot(x - e.x, y - e.y);
-  const front = r - SF.v * age;
-  return e.amp * Math.exp(-(front * front) / (SF.wr * SF.wr)) * Math.exp(-age / SF.tau);
+  const a = envelope(e, t);
+  if (a <= SF.activeEps) return 0;
+  const front = Math.hypot(x - e.x, y - e.y) - SF.v * (t - e.t0);
+  return a * Math.exp(-(front * front) / (SF.wr * SF.wr));
 }
 
 export function ripples(x: number, y: number, t: number, emitters: readonly Emitter[]): number {
@@ -131,32 +146,58 @@ export function smoothToward(current: number, target: number, dt: number, tau = 
   return current + (target - current) * (1 - Math.exp(-dt / tau));
 }
 
-/** Fixed-size emitter ring buffer, laid out for uniform upload: pos = [x, y, amp] × N, t0 × N. */
+/**
+ * Fixed-size emitter ring buffer. Upload layout: pos = [x, y, amp, tau] × N, t0 × N.
+ * compact() packs only the active emitters to the front so the shader loops over uN of them.
+ */
 export class EmitterRing {
-  readonly pos = new Float32Array(SF.maxEmitters * 3);
+  readonly pos = new Float32Array(SF.maxEmitters * 4);
   readonly t0 = new Float32Array(SF.maxEmitters).fill(-1e6);
+  readonly packedPos = new Float32Array(SF.maxEmitters * 4);
+  readonly packedT0 = new Float32Array(SF.maxEmitters);
   private head = 0;
 
-  push(x: number, y: number, amp: number, t: number): void {
+  constructor() {
+    for (let i = 0; i < SF.maxEmitters; i++) this.pos[i * 4 + 3] = SF.tau; // never divide by τ = 0 in GLSL
+  }
+
+  push(x: number, y: number, amp: number, t: number, tau: number = SF.tau): void {
     const i = this.head;
-    this.pos[i * 3] = x;
-    this.pos[i * 3 + 1] = y;
-    this.pos[i * 3 + 2] = amp;
+    this.pos.set([x, y, amp, tau], i * 4);
     this.t0[i] = t;
     this.head = (i + 1) % SF.maxEmitters;
   }
 
-  active(t: number): boolean {
-    for (let i = 0; i < SF.maxEmitters; i++) if (t - this.t0[i]! <= 5 * SF.tau) return true;
-    return false;
+  get(i: number): Emitter {
+    return { x: this.pos[i * 4]!, y: this.pos[i * 4 + 1]!, amp: this.pos[i * 4 + 2]!, tau: this.pos[i * 4 + 3]!, t0: this.t0[i]! };
   }
 
   list(): Emitter[] {
-    return Array.from({ length: SF.maxEmitters }, (_, i) => ({
-      x: this.pos[i * 3]!,
-      y: this.pos[i * 3 + 1]!,
-      amp: this.pos[i * 3 + 2]!,
-      t0: this.t0[i]!,
-    }));
+    return Array.from({ length: SF.maxEmitters }, (_, i) => this.get(i));
+  }
+
+  /** Which classes are active at t (interactive = τ ≠ ambient τ). */
+  activity(t: number): { interactive: boolean; ambient: boolean } {
+    let interactive = false;
+    let ambient = false;
+    for (let i = 0; i < SF.maxEmitters; i++) {
+      const e = this.get(i);
+      if (!isActive(e, t)) continue;
+      if (e.tau === Math.fround(SF.tauAmbient)) ambient = true;
+      else interactive = true;
+    }
+    return { interactive, ambient };
+  }
+
+  /** Packs active emitters into packedPos/packedT0 and returns how many there are. */
+  compact(t: number): number {
+    let n = 0;
+    for (let i = 0; i < SF.maxEmitters; i++) {
+      if (!isActive(this.get(i), t)) continue;
+      this.packedPos.set(this.pos.subarray(i * 4, i * 4 + 4), n * 4);
+      this.packedT0[n] = this.t0[i]!;
+      n++;
+    }
+    return n;
   }
 }

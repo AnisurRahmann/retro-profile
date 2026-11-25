@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { emitSignal, onSignal } from "@/lib/signal-bus";
-import { EmitterRing, SF, smoothToward } from "@/lib/signal-math";
+import { EmitterRing, SF, smoothToward, tauFor } from "@/lib/signal-math";
 import { FRAG, VERT } from "./shader";
 
 declare global {
   interface Window {
     __signalFrames?: number;
     __emitSignal?: typeof emitSignal;
+    __signalMode?: Mode;
   }
 }
 
@@ -16,6 +17,11 @@ const TEST = process.env.NEXT_PUBLIC_E2E === "1";
 const DEV = process.env.NODE_ENV === "development";
 const UNIFORMS = ["uRes", "uDpr", "uT", "uGain", "uVw", "uCols", "uC", "uE", "uE0", "uG", "uX", "uS"] as const;
 const NO_EMITTERS = new Float32Array(SF.maxEmitters).fill(-1e6);
+
+/** full: interactive ripple, recent pointer or fading cursor · ambient: only status-line ripples (30fps)
+ *  · idle: nothing active (15fps) · static: reduced motion, one frame. */
+type Mode = "full" | "ambient" | "idle" | "static";
+const FPS: Record<Exclude<Mode, "static">, number> = { full: 60, ambient: 30, idle: 15 };
 
 /** Reads a colour token (#rrggbb or rgb()) from :root as linear-ish 0..1 floats (sRGB, as the page paints). */
 function token(name: string): [number, number, number] {
@@ -159,7 +165,7 @@ async function setup(canvas: HTMLCanvasElement, fallback: () => void, isDead: ()
     gl.uniform1f(u.uT, t);
     gl.uniform1f(u.uGain, still ? 0 : gain);
     gl.uniform2f(u.uC, cx, cy);
-    gl.uniform3fv(u.uE, ring.pos);
+    gl.uniform4fv(u.uE, ring.pos);
     gl.uniform1fv(u.uE0, still ? NO_EMITTERS : ring.t0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, cols * rows);
@@ -171,14 +177,21 @@ async function setup(canvas: HTMLCanvasElement, fallback: () => void, isDead: ()
     }
   };
 
+  let mode: Mode = "idle";
+  const setMode = (m: Mode) => {
+    mode = m;
+    if (TEST) window.__signalMode = m;
+  };
+
   const loop = () => {
     raf = requestAnimationFrame(loop);
     const t = now();
     const dt = Math.min(t - lastDraw, 0.1);
+    const act = ring.activity(t);
     const settling = Math.abs(gain - gainTarget) > 1e-3;
-    const busy = ring.active(t) || t - lastMove < 2 || settling;
-    const minDt = busy ? (coarse ? 1 / 30 : 0) : 1 / 15;
-    if (dt < minDt - 0.004) return;
+    setMode(act.interactive || t - lastMove < 2 || settling ? "full" : act.ambient ? "ambient" : "idle");
+    const fps = coarse ? Math.min(FPS[mode as keyof typeof FPS], 30) : FPS[mode as keyof typeof FPS];
+    if (fps < 60 && dt < 1 / fps - 0.004) return;
     cx = smoothToward(cx, tx, dt);
     cy = smoothToward(cy, ty, dt);
     gain = gainTarget > gain ? Math.min(gainTarget, gain + dt / SF.cursorFade) : Math.max(gainTarget, gain - dt / SF.cursorFade);
@@ -219,7 +232,7 @@ async function setup(canvas: HTMLCanvasElement, fallback: () => void, isDead: ()
   const onDown = (e: PointerEvent) => emitSignal({ x: e.clientX, y: e.clientY, amp: 0.6 });
   const subscribe = () => {
     if (unsub) return;
-    const off = onSignal((s) => ring.push(s.x, s.y, s.amp, now()));
+    const off = onSignal((s) => ring.push(s.x, s.y, s.amp, now(), tauFor(s.kind)));
     window.addEventListener("pointermove", onMove, { passive: true });
     document.addEventListener("pointerout", onOut, { passive: true });
     document.addEventListener("pointerdown", onDown, { passive: true });
@@ -235,6 +248,7 @@ async function setup(canvas: HTMLCanvasElement, fallback: () => void, isDead: ()
   const applyMotion = () => {
     reduce = motion.matches;
     if (reduce) {
+      setMode("static");
       unsub?.();
       sync();
       still();
