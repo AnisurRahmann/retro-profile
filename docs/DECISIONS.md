@@ -19,3 +19,20 @@ Format: decision · rejected alternative · why.
 10. **Status line height reserved per breakpoint** (2 lines under 640px, 1 above) so the longest line wrapping never shifts the one-liner. Typed-in remainder is rendered `invisible` so wrapping is final from the first character.
 11. **Show-more uses `inert` on the collapsed panel** in addition to `aria-expanded`, so hidden cards can't be tabbed to.
 12. **Show-more panel class is `.reveal`, not `.collapse`.** Tailwind 4 ships a `collapse` utility (`visibility: collapse`) that silently overrode the panel. Caught by e2e.
+
+## Agent
+
+13. **No vector search.** · RAG over the content. · The whole knowledge base is ~2.3k tokens (test fails over 15k). It fits in a prompt-cached system prompt; retrieval would only add misses and latency.
+14. **Model: `claude-haiku-5-5`** (current Haiku per the Claude API skill's model table, cached 2026-11-03), overridable with `CHAT_MODEL`. Never routed to a top-tier model.
+15. **No `temperature`.** · The brief's 0.3. · Haiku 5.5 rejects non-default sampling values with a 400, and API version 2026-10-21 rejects them on every model. Determinism comes from the rules and grounding instead.
+16. **`output_config.effort: "low"`, adaptive thinking left on (the model default).** · Disabling thinking. · Chat answers are short and latency-sensitive; low effort keeps thinking small. Disabled thinking has documented failure modes (tool calls written as text). `max_tokens` stays 700 as briefed; thinking tokens count against it, so watch `stop_reason: max_tokens` in live evals.
+17. **Cache breakpoint on the single system block (rules + knowledge).** Tools render before system, so the breakpoint caches tools + system together across turns and visitors. The prompt has no per-request values. Haiku 5.5's minimum cacheable prefix is 512 tokens; ours is ~4k.
+18. **Tool loop: call 1 with `tool_choice: auto` + `disable_parallel_tool_use`; call 2 only if a tool ran and the model hadn't written any text yet (or the tool errored), with `tool_choice: none`.** · Always making the second call. · Saves a round trip on most tool turns, and hard-guarantees ≤ 2 calls and ≤ 1 tool per turn. Forced `tool_choice` (`any`/`tool`) would 400 on current models anyway.
+19. **Tools are not `strict`.** `book_call.reason` is optional, which strict mode doesn't allow; every input is zod-validated server-side instead, and a tool with a `max_tokens` or `refusal` stop never runs.
+20. **No eager input streaming on tools.** Inputs are a few words; buffering them costs nothing.
+21. **Rate limit + budget fail closed.** · Fail open on DB errors. · A broken limiter must not turn into an unbounded bill. In mock mode only, an in-memory limiter stands in so tests and e2e run without Supabase.
+22. **Logging via `after()`** (Next's post-response hook) so it never delays or breaks the stream; errors are swallowed.
+23. **Kill switch is build-time for the page, run-time for the API.** `/chat` must stay static, so it reads `CHAT_ENABLED` at build; `/api/chat` reads it per request and returns `disabled`. Flip the env var and redeploy to switch the page.
+24. **`server-only` package added** so server modules (keys, Supabase) fail the build if imported into client code. Aliased to an empty module in vitest.
+25. **Intro honeypot answers 200** so bots get no signal; rejected silently.
+26. **Retention via pg_cron** (`purge_chat_logs()` daily at 03:17 UTC): messages and sessions after 90 days, rate windows after 2 days. Intros are kept (they are leads), as the privacy page says.
