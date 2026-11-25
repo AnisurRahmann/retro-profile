@@ -3,12 +3,14 @@ import path from "node:path";
 import Image from "next/image";
 import { profile } from "@/site";
 
-const portraitExists = fs.existsSync(path.join(process.cwd(), "public", profile.portrait));
-
-/** Round portrait with a 1px hairline ring. Falls back to the "as" monogram until public/shakil.jpg exists. */
+/**
+ * Round portrait with a 1px hairline ring. Falls back to the "as" monogram (Geist Mono, like the header) until
+ * public/shakil.jpg exists. Checked per render: at build time for static pages, and live in `pnpm dev`, so adding
+ * the file needs a rebuild in production but no dev-server restart.
+ */
 export function Portrait({ size, priority = false }: { size: number; priority?: boolean }) {
   const style = { width: size, height: size };
-  if (portraitExists) {
+  if (fs.existsSync(path.join(process.cwd(), "public", profile.portrait))) {
     return (
       <Image
         src={profile.portrait}

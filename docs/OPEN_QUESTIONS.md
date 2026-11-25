@@ -4,7 +4,7 @@ Each item has the default currently shipped. Values shaped like `[[...]]` in `sr
 
 | # | Item | Where | Default now |
 |---|------|-------|-------------|
-| 1 | Portrait `public/shakil.jpg` (square, ≥400px) is missing | `public/` | Monogram "as" circle on a hairline ring. Drop the file in and rebuild; nothing else changes. |
+| 1 | Portrait `public/shakil.jpg` (square, ≥400px) is missing | `public/` | Still missing (re-checked 2026-11-25: `public/` holds only `people/`). Path, `next/image` config and the fallback condition are all correct; the fallback fires because the file isn't there. The fallback is the "as" monogram in Geist Mono (same face as the header monogram), `--surface-2` fill, 1px `--hairline` ring. Drop the file in: `pnpm dev` picks it up live; production needs a rebuild. |
 | 2 | Lift URL `[[lift url]]` | `content.shipped` id `lift` | Card renders, not a link. `/lifts` has no Lift link. |
 | 3 | create-mvpkit URL `[[create-mvpkit url]]` | `content.shipped` id `create-mvpkit` | Card renders, not a link. |
 | 4 | Callback AI URL | `content.building` id `callback-ai` | **Filled** with `https://www.usecallbackai.com` from `brain/projects/callback-ai.md` (deployed 2026-09-23). Confirm or revert to `[[callback url]]`. |

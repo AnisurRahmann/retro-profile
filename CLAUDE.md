@@ -7,7 +7,8 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
 - `pnpm dev` · `pnpm build` (prebuild regenerates `src/agent/knowledge.md`) · `pnpm start`
 - `pnpm typecheck && pnpm lint && pnpm test && pnpm build` — must be green before any commit
 - `pnpm shots` — screenshots at 360/768/1440 into `.shots/` (needs `CHAT_MOCK=1 pnpm start -p 3100`)
-- `pnpm e2e` — Playwright (starts `pnpm start` on :3100 with `CHAT_MOCK=1`; run `pnpm build` first)
+- `pnpm e2e` — builds a separate test build (`NEXT_PUBLIC_E2E=1`, `.next-e2e`) and runs Playwright on :3101 with `CHAT_MOCK=1`. `pnpm e2e:only` reuses the last test build.
+- `pnpm shots:signal` — Signal Field review shots (viewport-sized) into `.shots/signal-field/`
 - `pnpm eval:live` — real-model evals. Shakil runs this himself. Never in CI or tests.
 
 ## Rules
@@ -33,7 +34,15 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
 - No gradients, glows, glass, bento, illustrations, parallax or scroll fade-ups. **One exception:** the static
   background depth layer (`.depth` in the root layout: top light, vignette, grain). Nothing else gets a decorative
   gradient. (The chat dock fade is functional, from the original brief, and stays.)
-- Motion: waveform, status line, show-more, chat ring/dots. Every one has a reduced-motion path. Nothing else moves.
+- Motion: waveform, status line, show-more, chat ring/dots, and the Signal Field. Every one has a reduced-motion path.
+  Nothing else moves.
+- Background stack (all fixed, aria-hidden, pointer-events none): `.depth` at z −2 (top light, vignette, grain), then
+  the Signal Field canvas at z −1 (`src/components/signal-field`). Body is transparent; `<html>` paints `--ink`.
+- Signal Field rules: colours come from the CSS tokens at init (no hex in TS/GLSL). Constants live only in `SF`
+  (`src/lib/signal-math.ts`); the GLSL is generated from them. Amber appears only on ripple crests, never for the
+  cursor. The column is damped to 25%, and a Playwright guard keeps text ≥ 4.5:1 over the brightest dot at a ripple
+  peak. Emit ripples through `emitSignal`/`emitFrom` (`src/lib/signal-bus.ts`), never on scroll. Budget: ≤ 6 kB gzip,
+  no TBT increase, GPU time near the surface floor.
 - Accessibility beats design when they conflict; log it.
 
 ## Docs

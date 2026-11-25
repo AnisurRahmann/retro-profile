@@ -72,3 +72,27 @@ test("/gym redirects to /lifts", async ({ page }) => {
   await expect(page).toHaveURL(/\/lifts$/);
   await expect(page.getByRole("heading", { level: 1, name: "Lifts" })).toBeVisible();
 });
+
+test.describe("card alignment", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  test("titles in each row share a baseline and tiles meet the title cap", async ({ page }) => {
+    await page.goto("/");
+    for (const b of await page.locator("button[aria-controls]").all()) await b.click();
+    await page.waitForTimeout(300);
+    const rows = await page.evaluate(() =>
+      ["#shipped", "#bench"].map((sel) =>
+        [...document.querySelectorAll(`${sel} .card`)].map((c) => {
+          const title = c.querySelector("span.font-medium")!.getBoundingClientRect();
+          const tile = c.querySelector(".tile")!.getBoundingClientRect();
+          return { card: c.getBoundingClientRect().top, title: title.top - c.getBoundingClientRect().top, tile: tile.top - title.top };
+        }),
+      ),
+    );
+    for (const cards of rows) {
+      for (const c of cards) {
+        expect(c.title).toBeCloseTo(cards[0]!.title, 0); // same offset in every card
+        expect(c.tile).toBeCloseTo(5, 0);
+      }
+    }
+  });
+});
