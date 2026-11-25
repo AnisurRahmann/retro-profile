@@ -206,3 +206,54 @@ A11y, best practices and SEO are 100 on every run; CLS 0.000 everywhere. The LCP
 - The dusk lane (above). Options if it bothers you: accept; or lighten `--graphite` (a token change, needs the token tests); or put the bare-sky text (section heads, "Show N more", closer, footer) on small glass backings and drop the column scrim. Each is a design call, not a bug.
 - Open-Meteo commercial status (OPEN_QUESTIONS #13).
 - `pnpm eval:live` should include the 3 `availability` cases (real model; Shakil runs it).
+
+## Sylhet Sky v2 (2026-11-25)
+
+Sun on a visible day arc, the sky stage, time travel, walking through Sylhet, slow life, mobile. Nine commits from `feat(sky): sky stage layout` to `test(sky): v2 …`. Rules: CLAUDE.md "Design"; decisions #86–100.
+
+### Checks
+| Check | Result |
+|---|---|
+| typecheck / lint | clean |
+| unit (vitest) | 197 passed: arc mapping (endpoints, clamp, solstice apex), moon times, timeAtDrag + easings, window schedules, firefly counts, anchor solver, drift minimum, contrast sweep (+ sun behind the column, the mobile hero with the sun, the landscape band) |
+| e2e (Playwright) | 46 passed, two runs in a row: strip (keyboard + drag), drag the sky, phone swipe (vertical scrolls, sideways scrubs), time-lapse (once per session, cancels, skipped under reduced motion and ?sky), place names, take-off, reduced motion (fps 0, no parallax), loop caps, layers |
+| Contrast sweep | column `--graphite` worst **4.51:1** (8° fog dusk, bottom, 0.82 cap) · hero `--on-sky`/`--text` worst 6.50 / **7.50:1** · landscape band `--graphite` worst **4.50:1** |
+| Scrolling (1440×900, real GPU) | 60.0 fps, frame gap p95 16.7 ms, max 16.8 ms; 0 tasks > 50 ms (longest 23 ms) — `scripts/probe/scroll-trace.mts`, trace in `.shots/sky-v2/scroll-trace.json` |
+| Scrim edge (`scrim-edge.mts`) | side-band luminance kink with/without scrim: 11:00 partly 5.9 / 3.2 ‰L, 16:45 clear 5.3 / 4.0 ‰L: a smooth ramp, no line |
+| Sky JS | lazy renderer 22.6 kB gzip, eager 12.9 kB (budget broken, #95) |
+
+### ms/frame (Apple M2, ANGLE Metal; GPU = atmosphere pass, timer query; CPU = renderer main-thread time; two runs each)
+| state | 1920×1080 DPR 2 GPU | CPU | 375×812 DPR 3 GPU | CPU |
+|---|---|---|---|---|
+| 16:45 clear | 0.93–1.93 | 0.39–0.59 (scrolling 0.25–0.44) | 0.41–0.71 | 0.32–0.60 |
+| 21:00 thunder | 0.60–1.43 (forced bolt 0.67–1.28) | 0.69–0.95 | 0.39–0.57 | 0.55–0.96 |
+First frame after load (strip and sprite builds) up to 26 ms; worst steady frame 4.2 ms.
+
+### Lighthouse, mobile (Lighthouse 13.6, Playwright Chromium, same machine/session, production build, `WEATHER_MOCK=1`)
+| `/` | perf | LCP | TBT | CLS |
+|---|---|---|---|---|
+| before (ba931b8) | 79 (cold) · 100 · 100 · 100 · 100 · 100 | 0.76 s | 27–58 ms (947 cold) | 0 |
+| after | 98 · 100 · 100 · 100 · 100 · 100 | 0.76–0.78 s | 40–180 ms | 0 |
+`/chat` after: 97 · 100 · 100. A11y, best practices and SEO 100 on every final run. LCP element: the hero status line, before and after. Two intermediate runs found CLS 0.0015 and 0.008 (weather wrapping the label, then "preview" widening the line during the time-lapse): fixed by reserving the label's second line under 480px and overlaying the preview (#94). One intermediate run scored a11y 96: axe caught the status line mid-fade (pre-existing rotation; not reproduced in the final six).
+
+### D1–D5
+- **D1 no sun:** a limb-darkened, altitude-coloured sun with blooms, corona and breathing on a dotted arc, through cloud by the CPU cloud field, rays at golden hour, a shimmer on the river near the horizon.
+- **D2 scrim band:** the scrim starts below the stage (open sky above), its sides are a 220px smootherstep, no cloud damping band, and its alpha comes from the measured sky. Measured kinks are smooth ramps. The column is still darker than the gutters by day (graphite over the noon sky needs ~0.6 ink): a soft lane, not an edge.
+- **D3 mobile:** no column sides below 808px, open stage with a compact hero, stars ≥ 1/2,200 px² × 1.25 ≥ 0.35 alpha, the moon on the arc inside [8%, 92%] and above the hero.
+- **D4 hidden scrubber:** an always-visible sun-path strip, drag the sky, and a once-per-session time-lapse with a hint.
+- **D5 frozen clouds:** minimum drift 5/3 px/s and a field that keeps changing shape.
+
+### Constants
+Arc: east 6% / west 94% of the width at stage bottom − 8% of the viewport height (mobile: 20px above the hero), apex header + 28 = 92px, x = ½ − 0.44·cos πu, height = alt / max × sin(max) / sin(88.5°), discs in [8%, 92%]; sun r 16 / 13, moon 14 / 12. Parallax L1 0.04 · L2 0.15 · L3 0.45 · L4 0.9 · sky 0. Landmarks centre at section top = 40%. Band 18vh / 14svh, 110–200px; depths 0.25 / 0.45 / 0.7 / 0.95.
+
+### Visual review (`pnpm shots:sky` → `.shots/sky-v2/`, 8 states × 1440/375 × top / Shipped / closer, `life=1`)
+- **Round 0 (building):** hero scrims read as dark cards (box, then hard ellipse) → `--on-sky` + wide elliptical feather; the guard's golden-cloud estimate was ~2× too bright → composited like the shader; the sun was a flat disc → fatter blooms; mobile sun sat on the hero text → horizon above the hero; river read as a road → lighter, with a bank reflection; the parked rickshaw read as a "C" → redrawn with seat, hood and frame; foreground stood below the near bank → lifted onto it; landmarks overlapped when sections are close → placed left to right; the closer couldn't reach 40% → anchors clamped.
+- **Round 1:** sun and moon shone through 100% heavy-rain and storm decks → occlusion thickened by rain and full cover; night silhouettes vanished into the sky → a city glow behind the band (deep night only, in the sweep); the golden sun still read flat → hotter centre, stronger limb darkening, bloom plateau. Bridge (bowstring trusses on piers) and the clock tower (plinth, shaft, face, dome, finial) read at a glance; tea rows, shade trees, water tanks and the mobile tower read as a paper-cut skyline.
+- **Round 2:** heavy rain: the sun is a faint patch; thunder: the moon hidden; night skyline readable; sun has a hot core, limb darkening and halo (`03-1645-clear-1440-top.png`).
+- **Round 3 (final shots):** mobile heavy rain showed the sun through a gap in the rain deck (`07-1400-heavy-rain-375-top.png`) → a rain deck has no gaps (shader + mirror); reshot, fixed.
+
+### Open
+- The lane: by day and at golden hour the column is clearly darker than the gutters, now as a soft gradient. It's the cost of `--graphite` body text over a mid-blue/amber sky (#89). Lightening `--graphite`, or glass backings for the bare-sky text, would let it go.
+- On desktop a landmark is centred *behind the cards* when its section is at 40% (as briefed), so it's mostly seen passing through the gutters (`03-1645-clear-1440-shipped.png`).
+- Night: the landscape is quiet by design; silhouettes read only against the city glow (`05-2030-clear-1440-closer.png`).
+- Bundle budget (#95).

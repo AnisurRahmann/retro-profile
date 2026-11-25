@@ -9,7 +9,7 @@
  *   field), squashed toward the horizon. uZ (0.015/s) moves the warp fields' inputs in two directions, a cheap
  *   third noise dimension: clouds change shape, not just slide. src/components/sky/cloud-field.ts mirrors this. fbm (3 + 2 octaves) on a domain warped
  *   once by two 3-octave fbms; the sum is stretched (×1.9 around 0.48) so the coverage threshold
- *   mix(0.85, 0.25, cover) means what it says. Tops are where density falls off upward (one extra 3-octave sample).
+ *   mix(0.85, 0.25, cover) means what it says; rain lowers it by 0.3 × rainDark (a rain deck has no gaps). Tops are where density falls off upward (one extra 3-octave sample).
  *   Day: the sky greyed halfway, cores level, tops +12% L; golden hour leans the undersides to the horizon colour.
  *   Night: near-black silhouettes, rim-lit near the moon. Rain greys and darkens the deck. Lightning adds +0.12
  *   OKLab L to the cloud layer only. Alpha ≤ 0.85, reduced by fog (fog swallows cloud structure).
@@ -74,7 +74,7 @@ vec2 w=vec2(fbm3(q*.6+vec2(1.7,9.2)+uZ*vec2(1.,.6)),fbm3(q*.6+vec2(8.3,2.8)-uZ*v
 vec2 qw=q+1.6*(w-.5);
 float lo=fbm3(qw);
 float d=(lo+detail(qw)-.48)*1.9+.5;
-float th=mix(.85,.25,uCloudCover);
+float th=mix(.85,.25,uCloudCover)-.3*uRainDark;
 float dens=smoothstep(th,th+.22,d);
 if(dens>0.){
 float up=fbm3(qw+vec2(0.,-.09));

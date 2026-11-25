@@ -65,7 +65,10 @@ export function createSun(dpr: () => number) {
     g.scale(d, d);
     const c = R + 2;
     let grad = g.createRadialGradient(c, c, 0, c, c, R);
-    grad.addColorStop(0, rgba(col, 1));
+    // A hotter centre, limb-darkened to 82% at the edge.
+    const hot: RGB = [0, 1, 2].map((i) => col[i]! + (1 - col[i]!) * 0.35) as RGB;
+    grad.addColorStop(0, rgba(hot, 1));
+    grad.addColorStop(0.35, rgba(col, 1));
     grad.addColorStop(0.55, rgba(col, 1, 0.97));
     grad.addColorStop(0.85, rgba(col, 1, 0.9));
     grad.addColorStop(1, rgba(col, 1, 0.82));
@@ -86,10 +89,10 @@ export function createSun(dpr: () => number) {
       // A soft, roughly Gaussian falloff (a hard-edged ring reads as a sticker).
       grad = g.createRadialGradient(BR, BR, 0, BR, BR, k * R);
       grad.addColorStop(0, rgba(bc, a));
-      grad.addColorStop(0.3, rgba(bc, a * 0.9));
-      grad.addColorStop(0.5, rgba(bc, a * 0.58));
-      grad.addColorStop(0.7, rgba(bc, a * 0.26));
-      grad.addColorStop(0.85, rgba(bc, a * 0.08));
+      grad.addColorStop(0.35, rgba(bc, a * 0.95));
+      grad.addColorStop(0.5, rgba(bc, a * 0.7));
+      grad.addColorStop(0.7, rgba(bc, a * 0.32));
+      grad.addColorStop(0.85, rgba(bc, a * 0.1));
       grad.addColorStop(1, rgba(bc, 0));
       g.fillStyle = grad;
       g.fillRect(0, 0, 2 * BR, 2 * BR);
@@ -170,7 +173,8 @@ export function createSun(dpr: () => number) {
       }
       if (bloom) {
         const B = 20 * s.r * bScale;
-        ctx.globalAlpha = Math.min(1, s.dim * (1 - 0.3 * c));
+        // Thin cloud spreads the glow; a thick deck leaves only a soft bright patch.
+        ctx.globalAlpha = Math.min(1, s.dim * (1 - 0.75 * c));
         ctx.drawImage(bloom, s.x - B, s.y - B, 2 * B, 2 * B);
       }
       if (corona) {

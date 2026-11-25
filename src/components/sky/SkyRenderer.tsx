@@ -220,6 +220,15 @@ function start(
   };
 
   const moonR = () => (view.vw < COLUMN_BREAK ? 12 : 14);
+  /**
+   * How much cloud is in front of a point 0..1: the cloud field's opacity there, thickened by rain (a storm deck
+   * is darker than its alpha says) and by full cover (no gaps in an overcast sky).
+   */
+  const occlusion = (x: number, y: number) => {
+    const cover = n("uCloudCover");
+    const c = clouds.ready ? clouds.at(x, y) : cover;
+    return Math.min(1, c * (1 + 0.6 * n("uRainDark")) + Math.max(0, cover - 0.85) * 3);
+  };
   const particleState = (): ParticleState => ({
     night: n("uNight"),
     cloudCover: n("uCloudCover"),
@@ -230,9 +239,7 @@ function start(
     moonVisible:
       n("uMoonUp") *
       n("uNight") *
-      (clouds.ready
-        ? 1 - 0.85 * clouds.at(v2("uMoonPos")[0]! * view.vw, v2("uMoonPos")[1]! * view.vh)
-        : Math.max(0, 1 - 1.05 * n("uCloudCover")) ** 0.7) *
+      Math.max(0, 1 - 1.05 * occlusion(v2("uMoonPos")[0]! * view.vw, v2("uMoonPos")[1]! * view.vh)) ** 0.7 *
       (1 - 0.6 * n("uFog")),
     moonR: moonR(),
     moonDim: textDim(v2("uMoonPos")[0]! * view.vw, v2("uMoonPos")[1]! * view.vh, moonR(), Infinity),
@@ -253,7 +260,7 @@ function start(
       up: model.sun.up,
       glow: n("uGlow"),
       horizon: oklabToRgb(model.colors.horizon),
-      cloud: clouds.ready ? clouds.at(x, y) : n("uCloudCover") > 0.9 ? n("uCloudCover") : 0,
+      cloud: occlusion(x, y),
       fog: n("uFog"),
       cover: n("uCloudCover"),
       dim: textDim(x, y, r, scrim) * smooth01(-0.9, 0.6, alt),
@@ -271,7 +278,10 @@ function start(
     }
   };
 
+  // Dev/test builds: main-thread ms per frame, logged every 60 frames next to the GPU timer.
+  const cpu: number[] = [];
   const draw = (t: number, dt: number, still: boolean) => {
+    const c0 = SKY_DEBUG ? performance.now() : 0;
     let lightning = 0;
     if (!still && model.thunder) {
       if (forceBolt) lightning = 1;
@@ -359,6 +369,7 @@ function start(
           horizon: hz,
           rim: n("uGlow") * smooth01(-2, 1, n("sunAlt")),
           sunX: v2("sunPos")[0]! * view.vw,
+          night: smooth01(-6, -14, n("sunAlt")),
         });
         lastLight = t;
       }
@@ -428,6 +439,15 @@ function start(
               x: ((m.x0 + m.x1) / 2) * world.s - walk * PARALLAX.L3,
             })),
           };
+      }
+    }
+    if (SKY_DEBUG && !still) {
+      cpu.push(performance.now() - c0);
+      if (cpu.length >= 60) {
+        const avg = cpu.reduce((a, b) => a + b, 0) / cpu.length;
+        const max = Math.max(...cpu);
+        console.info(`[sky] CPU ${avg.toFixed(3)} ms/frame (max ${max.toFixed(2)}) at ${view.vw}x${view.vh}`);
+        cpu.length = 0;
       }
     }
     frames++;

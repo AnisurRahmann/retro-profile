@@ -100,22 +100,28 @@ export function SkyLabel({ copy }: { copy: Copy }) {
         aria-controls={open ? `${id}-pop` : undefined}
         onClick={() => (open ? close() : setOpen(true))}
         className="sky-label inline-flex flex-wrap items-center gap-x-1.5 text-left font-mono text-xs leading-5 whitespace-nowrap text-on-sky transition-colors duration-150 hover:text-text"
+        data-wraps=""
         data-testid="sky-label"
       >
         {hydrated ? <SkyGlyph kind={glyph} fraction={m.fraction} waxing={m.waxing} amber={amber} /> : <span className="size-2.5 flex-none" />}
-        {scrubbing ? (
-          <span className="sky-clock text-signal" data-testid="sky-preview">
-            {fill(copy.preview, { time: minutesLabel(snap.preview!) })}
+        {/* While scrubbing, "preview 18:40" is laid over the clock and the place (they keep their space, hidden),
+            so nothing on the line moves. */}
+        <span className="relative inline-flex items-center gap-x-1.5">
+          <span className={scrubbing ? "invisible" : undefined}>
+            <SylhetClock />
           </span>
-        ) : (
-          <SylhetClock />
-        )}
-        <span className="sky-place" data-testid="sky-place">
-          {PLACES.map((p) => (
-            <span key={p} aria-hidden={p !== place} data-active={p === place ? "" : undefined}>
-              {copy.places[p]}
+          <span className={`sky-place${scrubbing ? " invisible" : ""}`} data-testid="sky-place">
+            {PLACES.map((p) => (
+              <span key={p} aria-hidden={p !== place} data-active={p === place ? "" : undefined}>
+                {copy.places[p]}
+              </span>
+            ))}
+          </span>
+          {scrubbing ? (
+            <span className="absolute top-0 left-0 text-signal" data-testid="sky-preview">
+              {fill(copy.preview, { time: minutesLabel(snap.preview!) })}
             </span>
-          ))}
+          ) : null}
         </span>
         {showWx ? (
           <span data-testid="sky-weather">

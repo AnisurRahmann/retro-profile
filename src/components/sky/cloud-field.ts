@@ -82,7 +82,7 @@ export function createCloudField() {
     const py = qy + 1.6 * (wy - 0.5);
     const lo = fbm3(px, py);
     const d = (lo + detail(px, py) - 0.48) * 1.9 + 0.5;
-    const th = 0.85 + (0.25 - 0.85) * c.cover;
+    const th = 0.85 + (0.25 - 0.85) * c.cover - 0.3 * c.rainDark;
     const dens = sm(th, th + 0.22, d);
     if (dens <= 0) return 0;
     const thick = sm(th, th + 0.5, d);

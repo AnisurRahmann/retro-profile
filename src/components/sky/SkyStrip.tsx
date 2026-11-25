@@ -128,7 +128,7 @@ export function SkyStrip({ copy, sunrise, sunset }: { copy: Copy; sunrise: strin
       className="sky-strip mt-2"
       data-testid="sky-strip"
     >
-      <svg width={w} height={H} viewBox={`0 0 ${w} ${H}`} aria-hidden="true" className="block overflow-visible">
+      <svg width={w} viewBox={`0 0 ${w} ${H}`} preserveAspectRatio="none" aria-hidden="true" className="block overflow-visible">
         <line x1={PAD} x2={w - PAD} y1={y0} y2={y0} className="stroke-hairline" strokeWidth={1} />
         {hydrated ? (
           <>

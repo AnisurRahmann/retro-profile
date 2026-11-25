@@ -41,6 +41,8 @@ export type Lighting = {
   rim: number;
   /** Sun x on screen (px) for the rim's falloff. */
   sunX: number;
+  /** Night 0..1: the city's glow lifts the sky behind the skyline so the silhouettes read. */
+  night: number;
 };
 
 export function createLandscape(canvas: HTMLCanvasElement) {
@@ -54,7 +56,8 @@ export function createLandscape(canvas: HTMLCanvasElement) {
   let w = 1,
     H = 1,
     dpr = 1;
-  let light: Lighting = { horizon: hexToLab(brand.ink), rim: 0, sunX: 0 };
+  let light: Lighting = { horizon: hexToLab(brand.ink), rim: 0, sunX: 0, night: 0 };
+  let glowCss = "";
   let lightKey = "";
   const colors = {} as Record<LayerId, string>;
   let river = "rgba(0,0,0,1)";
@@ -195,10 +198,12 @@ export function createLandscape(canvas: HTMLCanvasElement) {
     /** New light: recolours (re-renders) the strips when it has changed enough. */
     setLighting(l: Lighting) {
       light = l;
-      const key = `${l.horizon.map((v) => Math.round(v * 200)).join()}|${Math.round(l.rim * 20)}|${Math.round(l.sunX / 40)}`;
+      const key = `${l.horizon.map((v) => Math.round(v * 200)).join()}|${Math.round(l.rim * 20)}|${Math.round(l.sunX / 40)}|${Math.round(l.night * 20)}`;
       if (key === lightKey) return false;
       lightKey = key;
       for (const layer of LAYERS) colors[layer] = css(oklabToRgb(layerColor(l.horizon, layer)));
+      // Sky glow over the city: the horizon lifted toward warm grey.
+      glowCss = l.night > 0.02 ? css(oklabToRgb(mixLab(l.horizon, [0.62, 0.01, 0.03], 0.16)), 0.45 * l.night) : "";
       river = css(oklabToRgb(riverColor(l.horizon)));
       return true;
     },
@@ -215,6 +220,16 @@ export function createLandscape(canvas: HTMLCanvasElement) {
       if (!world) return;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (glowCss) {
+        // Behind everything in the band: a soft lift from the hilltops down to the river.
+        const top = (LIFT + 14 * world.s) * dpr;
+        const bottom = (LIFT + 72 * world.s) * dpr;
+        const g = ctx.createLinearGradient(0, top, 0, bottom);
+        g.addColorStop(0, "rgba(0,0,0,0)");
+        g.addColorStop(1, glowCss);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, top, canvas.width, bottom - top);
+      }
       for (const layer of LAYERS) {
         const o = scrollY * PARALLAX[layer];
         const st = strips[layer];
