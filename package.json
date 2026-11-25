@@ -16,7 +16,8 @@
     "knowledge": "tsx scripts/build-knowledge.ts",
     "shots": "tsx scripts/shots.ts",
     "e2e": "playwright test",
-    "eval:live": "tsx evals/run.ts --live"
+    "eval:live": "tsx evals/run.ts --live",
+    "eval:mock": "tsx evals/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.14.0",

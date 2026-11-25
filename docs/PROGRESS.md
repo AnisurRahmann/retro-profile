@@ -1,16 +1,17 @@
 # Progress
 
 ## Done
+- Phase 6: 39 eval cases in 6 categories, deterministic grader + LLM judge, `pnpm eval:live` writes `evals/report.md`. Mock: 27/39 (facts need the real model), all forbidden/injection/scope/unknowns pass on mock, 48 unit tests.
 - Phase 5: `/chat` (empty state, streaming, Stop, New chat, tool cards, intro form, rate-limit and error fallbacks, kill switch). 40 unit + 17 e2e.
 - Phase 0–2: Next 16 shell, tokens, content model, static pages (commit 70d4296).
 - Phase 4: agent backend (NDJSON /api/chat, tools, guardrails, Supabase limits + budget, logging, /api/intro + Resend, migrations). 36 unit tests.
 - Phase 3: waveform, rotating status line (pauses on hidden tab, static under reduced motion), show-more (grid-rows 0fr→1fr, `inert` when closed), hover states. Playwright: 11 passing.
 
 ## In progress
-- Phase 6: evals.
+- Phase 7: meta and polish.
 
 ## Next task
-- Phase 6: `evals/cases.yaml`, `evals/run.ts` (live + mock), harness test.
+- Phase 7: metadata, OG images, JSON-LD, sitemap, robots, favicon, build-output `[[` test, verification loop x2, Lighthouse.
 
 ## Commands
 - `pnpm typecheck && pnpm lint && pnpm test && pnpm build`

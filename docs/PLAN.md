@@ -8,5 +8,5 @@ Definition of done for every phase: `pnpm typecheck && pnpm lint && pnpm test &&
 - [x] **3 Motion** — waveform, rotating status line, show-more, hover states; reduced-motion path for each. DoD: verification loop + e2e for show-more and reduced motion.
 - [x] **4 Agent backend** — knowledge build, `/api/chat` NDJSON stream, tools, guardrails, rate limit + budget (Supabase RPC), logging, `/api/intro` + Resend, migrations incl. 90-day retention. DoD: unit tests for encoder/parser, tools, validation.
 - [x] **5 Agent UI** — `/chat` empty + conversation states, tool cards, intro form, stop, errors, kill switch. DoD: verification loop with mocked model.
-- [ ] **6 Evals** — model adapter (anthropic + mock), `evals/cases.yaml` (≥30), `pnpm eval:live` with 2 layers + report; `pnpm test` runs the harness on the mock. DoD: mock suite passes.
+- [x] **6 Evals** — model adapter (anthropic + mock), `evals/cases.yaml` (≥30), `pnpm eval:live` with 2 layers + report; `pnpm test` runs the harness on the mock. DoD: mock suite passes.
 - [ ] **7 Meta + polish** — metadata, OG images (site + chat), JSON-LD Person, sitemap, robots, SVG favicon, `[[` build-output grep test, verification loop twice, Lighthouse recorded.
