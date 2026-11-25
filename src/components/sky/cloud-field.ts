@@ -11,7 +11,17 @@ export const CLOUD_REFRESH_S = 0.5;
 
 const N = NOISE_SIZE;
 
-export type CloudInputs = { drift: [number, number]; z: number; cover: number; rainDark: number };
+/** cirrus: the clear-sky aesthetic floor (0 or 0.06) applied above cirrusY px (mirrors the shader's uCirrus). */
+/** How opaque the clear-sky cirrus wisps are, relative to a cloud of the same density. */
+export const CIRRUS_ALPHA = 0.45;
+export type CloudInputs = {
+  drift: [number, number];
+  z: number;
+  cover: number;
+  rainDark: number;
+  cirrus?: number;
+  cirrusY?: number;
+};
 
 export function createCloudField() {
   const tex = noiseData();
@@ -73,7 +83,9 @@ export function createCloudField() {
 
   /** Cloud opacity at a CSS px point (0 clear … 1 the densest deck). */
   const sample = (x: number, y: number, c: CloudInputs) => {
-    if (c.cover <= 0.005) return 0;
+    const ci = c.cirrus && c.cirrusY ? c.cirrus * (1 - sm(0.7 * c.cirrusY, c.cirrusY, y)) : 0;
+    const cover = Math.max(c.cover, ci);
+    if (cover <= 0.005) return 0;
     const qx = (x - c.drift[0]) / 400;
     const qy = (y - c.drift[1]) / (190 + 210 * (1 - y / vh));
     const wx = fbm3(qx * 0.6 + 1.7 + c.z, qy * 0.6 + 9.2 + c.z * 0.6);
@@ -82,11 +94,13 @@ export function createCloudField() {
     const py = qy + 1.6 * (wy - 0.5);
     const lo = fbm3(px, py);
     const d = (lo + detail(px, py) - 0.48) * 1.9 + 0.5;
-    const th = 0.85 + (0.25 - 0.85) * c.cover - 0.3 * c.rainDark;
+    const th = 0.85 + (0.25 - 0.85) * cover - 0.3 * c.rainDark;
     const dens = sm(th, th + 0.22, d);
     if (dens <= 0) return 0;
     const thick = sm(th, th + 0.5, d);
-    return Math.min(0.85, dens * (0.55 + 0.3 * thick) * (1 + 0.08 * c.rainDark)) / 0.85;
+    const a = Math.min(0.85, dens * (0.55 + 0.3 * thick) * (1 + 0.08 * c.rainDark)) / 0.85;
+    // Cirrus wisps are thin: 45% where only the floor makes them.
+    return ci > c.cover ? a * CIRRUS_ALPHA : a;
   };
 
   return {
@@ -97,7 +111,8 @@ export function createCloudField() {
     update(c: CloudInputs) {
       for (let j = 0; j < GRID_H; j++) {
         const y = ((j + 0.5) / GRID_H) * vh;
-        for (let i = 0; i < GRID_W; i++) grid[j * GRID_W + i] = sample(((i + 0.5) / GRID_W) * vw, y, c);
+        for (let i = 0; i < GRID_W; i++)
+          grid[j * GRID_W + i] = sample(((i + 0.5) / GRID_W) * vw, y, c);
       }
       ready = true;
     },
@@ -127,7 +142,8 @@ export function createCloudField() {
       const i1 = Math.min(GRID_W - 1, Math.floor((x1 / vw) * GRID_W));
       const j0 = Math.max(0, Math.floor((y0 / vh) * GRID_H));
       const j1 = Math.min(GRID_H - 1, Math.floor((y1 / vh) * GRID_H));
-      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) m = Math.max(m, grid[j * GRID_W + i]!);
+      for (let j = j0; j <= j1; j++)
+        for (let i = i0; i <= i1; i++) m = Math.max(m, grid[j * GRID_W + i]!);
       return m;
     },
   };

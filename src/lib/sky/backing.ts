@@ -4,7 +4,8 @@
  *
  * - "none": the text already reads (≥ 7:1 for --text, ≥ 4.8:1 for secondary text: --graphite, --on-sky).
  * - "halo": a text-shadow halo in --ink (1px, 6px, 16px at a, a, 0.6a) is enough; a comes from HALO_CURVE.
- * - "chip": a crisp glass chip behind the text (--ink at CHIP_ALPHA or more, blur 8px, radius 6px).
+ * - "chip": a light glass chip behind the text, no border (--ink at CHIP_ALPHA or more, blur 10px, radius 5px,
+ *   1px × 6px around the text), solved to CHIP_TARGET: comfortably over the 4.5 gate, not to the "none" 7:1.
  *
  * The background is estimated from the renderer's CPU-side model, never sampled from pixels at runtime: the
  * gradient colour at the element's height, the brightest cloud tops the 64×36 cloud mirror puts over its box,
@@ -16,12 +17,23 @@
  * (tests/e2e/sky-backing.spec.ts), which measures what the browser actually painted.
  */
 import { brand } from "../brand";
-import { contrast, hexToRgb, luminance, oklabToRgb, over, rgbToOklab, toGamma, toLinear, type Lab, type RGB } from "./color";
+import {
+  contrast,
+  hexToRgb,
+  luminance,
+  oklabToRgb,
+  over,
+  toGamma,
+  toLinear,
+  type Lab,
+  type RGB,
+} from "./color";
 import { dayness, sunColor } from "./gradient";
 import type { SkyModel } from "./model";
 import { CITY_GLOW } from "./palette";
-import { layerColor, riverColor } from "./landscape/colors";
+import { groundColor, riverColor, sunLight } from "./landscape/colors";
 import { RIVER } from "./landscape/shapes";
+import { gradientLab, gradientRgb, HORIZON_AWAY, skyParam, type Horizon } from "./horizon";
 
 export type Backing = "none" | "halo" | "chip";
 
@@ -31,7 +43,9 @@ export const GRAPHITE = hexToRgb(brand.graphite);
 /** Share of --text in --on-sky (globals.css mirrors it). */
 export const ON_SKY_TEXT = 0.82;
 /** --on-sky = color-mix(in srgb, --text 82%, --graphite): secondary text over the open sky. */
-export const ON_SKY: RGB = TEXT.map((t, i) => t * ON_SKY_TEXT + GRAPHITE[i]! * (1 - ON_SKY_TEXT)) as RGB;
+export const ON_SKY: RGB = TEXT.map(
+  (t, i) => t * ON_SKY_TEXT + GRAPHITE[i]! * (1 - ON_SKY_TEXT),
+) as RGB;
 
 /** "none" thresholds: primary text (--text) and secondary text (--graphite, --on-sky). The pixel gate is 4.5. */
 export const TARGET_PRIMARY = 7;
@@ -40,9 +54,14 @@ export const TARGET_SECONDARY = 4.8;
 export const isPrimary = (c: RGB) => Math.max(...c.map((v, i) => Math.abs(v - TEXT[i]!))) < 0.03;
 export const targetFor = (c: RGB) => (isPrimary(c) ? TARGET_PRIMARY : TARGET_SECONDARY);
 
-/** The chip's --ink alpha (the brief's 0.62); solved higher, up to CHIP_MAX, where the sky needs it. */
-export const CHIP_ALPHA = 0.62;
+/** The chip's --ink alpha (v4: 0.5); solved higher, up to CHIP_MAX, where the sky needs it. */
+export const CHIP_ALPHA = 0.5;
 export const CHIP_MAX = 0.97;
+/** The contrast a chip is solved to (any text colour): the 4.5 gate plus a margin for the model. */
+export const CHIP_TARGET = 5;
+/** Small text (≤ SMALL_PX: the caption, strip labels, footer) prefers a halo up to this alpha before a chip. */
+export const SMALL_PX = 12;
+export const SMALL_HALO_MAX = 0.85;
 
 /**
  * Halo calibration: halo alpha a → the --ink alpha k the halo is "worth" behind the text, as the pixel gate
@@ -74,10 +93,11 @@ export function haloInk(a: number, bucket: number): number {
   return c[c.length - 1]![bucket]!;
 }
 
-/** The smallest halo alpha (to 0.05) worth `need` ink, or null when even a = 1 isn't enough. */
-export function haloFor(need: number, bucket: number): number | null {
+/** The smallest halo alpha (to 0.05, at most `max`) worth `need` ink, or null when even `max` isn't enough. */
+export function haloFor(need: number, bucket: number, max = 1): number | null {
   if (need <= 0) return 0;
-  for (let a = 0.05; a <= 1.0001; a += 0.05) if (haloInk(a, bucket) >= need) return Math.round(a * 100) / 100;
+  for (let a = 0.05; a <= max + 0.0001; a += 0.05)
+    if (haloInk(a, bucket) >= need) return Math.round(a * 100) / 100;
   return null;
 }
 
@@ -106,7 +126,11 @@ export function inkNeeded(bg: RGB, text: RGB, min: number, max = 1, aa = 0): num
   return Math.ceil(hi * 1000) / 1000;
 }
 
-export type Decision = { mode: Backing; /** halo alpha, or the chip's ink alpha */ a: number; contrast: number };
+export type Decision = {
+  mode: Backing;
+  /** halo alpha, or the chip's ink alpha */ a: number;
+  contrast: number;
+};
 
 /** Pick the lightest backing that keeps `text` readable over `bg` (as rendered at this size and DPR). */
 export function decide(bg: RGB, text: RGB, fontPx: number, dpr = 2): Decision {
@@ -118,11 +142,25 @@ export function decide(bg: RGB, text: RGB, fontPx: number, dpr = 2): Decision {
   };
   const bare = on(0);
   if (bare >= min) return { mode: "none", a: 0, contrast: bare };
-  const need = inkNeeded(bg, text, min, 1, aa);
   const bucket = sizeBucket(fontPx);
-  const a = haloFor(need, bucket);
+  // A halo, if one can make the "none" target; small text tries it up to SMALL_HALO_MAX, and settles for the chip's
+  // target from a halo rather than wear a chip.
+  const a = haloFor(
+    inkNeeded(bg, text, min, 1, aa),
+    bucket,
+    fontPx <= SMALL_PX ? SMALL_HALO_MAX : 1,
+  );
   if (a !== null) return { mode: "halo", a, contrast: on(haloInk(a, bucket)) };
-  const chip = Math.min(CHIP_MAX, Math.max(CHIP_ALPHA, Math.ceil(inkNeeded(bg, text, min, CHIP_MAX, aa) * 100) / 100));
+  const goal = Math.min(min, CHIP_TARGET);
+  if (fontPx <= SMALL_PX) {
+    const s = haloFor(inkNeeded(bg, text, goal, 1, aa), bucket, SMALL_HALO_MAX);
+    if (s === 0) return { mode: "none", a: 0, contrast: bare };
+    if (s !== null) return { mode: "halo", a: s, contrast: on(haloInk(s, bucket)) };
+  }
+  const chip = Math.min(
+    CHIP_MAX,
+    Math.max(CHIP_ALPHA, Math.ceil(inkNeeded(bg, text, goal, CHIP_MAX, aa) * 100) / 100),
+  );
   return { mode: "chip", a: chip, contrast: on(chip) };
 }
 
@@ -144,11 +182,15 @@ const brighter = (p: RGB, q: RGB) => (luminance(q) > luminance(p) ? q : p);
 /** How likely a cloud sits behind a spot, from cover alone (until the renderer's cloud field runs). */
 export const cloudPresence = (cover: number) => smoothstep(0.05, 0.35, cover);
 
-/** The CSS gradient's colour at height y (0 top … 1 bottom of the viewport), as the browser interpolates it. */
-export function gradientAt(m: Pick<SkyModel, "colors">, y: number): Lab {
-  const [z, mi, h] = [m.colors.zenith, m.colors.mid, m.colors.horizon].map(oklabToRgb) as [RGB, RGB, RGB];
-  const c = y < 0.55 ? over(z, mi, Math.max(0, y) / 0.55) : over(mi, h, Math.min(1, (y - 0.55) / 0.45));
-  return rgbToOklab(c);
+/** The horizon as fractions of the viewport height (src/lib/sky/horizon.ts): gutter mode is { h: 1, b: 1 }. */
+export const FLAT: Horizon = { h: 1, b: 1 };
+
+/**
+ * The CSS gradient's colour at height y (0 top … 1 bottom of the viewport), as the browser interpolates it, for a
+ * horizon at hz.h that returns to the mid colour by hz.b (fractions of the viewport height).
+ */
+export function gradientAt(m: Pick<SkyModel, "colors">, y: number, hz: Horizon = FLAT): Lab {
+  return gradientLab(m.colors, y, hz, HORIZON_AWAY);
 }
 
 /**
@@ -156,14 +198,22 @@ export function gradientAt(m: Pick<SkyModel, "colors">, y: number): Lab {
  * and golden undersides (alpha × `clouds`, the cloud presence over the box) and the fog composited exactly as the
  * shader does (linear-light colours at their maximum alpha, then composited in sRGB by the browser).
  */
-export function skyAt(m: SkyInput, y: number, clouds = cloudPresence(m.cloudCover)): RGB {
-  const hRgb = oklabToRgb(gradientAt(m, y));
+export function skyAt(
+  m: SkyInput,
+  y: number,
+  clouds = cloudPresence(m.cloudCover),
+  hz: Horizon = FLAT,
+): RGB {
+  const hRgb = gradientRgb(m.colors, y, hz, HORIZON_AWAY);
+  const p = skyParam(y, hz, HORIZON_AWAY);
   const base = lin(hRgb);
   const H = lin(oklabToRgb(m.colors.horizon));
   const day = dayness(m.astro.elevation);
   let best = hRgb;
-  // Horizon glow: horizon × 1.331 (linear) at alpha 0.75 · glow · exp(−((1 − y) / 0.42)² · 2.2), under the sun.
-  const g = Math.min(1, m.glow) * 0.75 * Math.exp(-(((1 - Math.min(1, y)) / 0.42) ** 2) * 2.2);
+  // Horizon glow: horizon × 1.331 (linear) at alpha 0.75 · glow · exp(−((H − y) / 0.42)² · 2.2), under the sun,
+  // centred on the horizon line (in gutter mode H = 1: the viewport bottom).
+  const gy = y <= hz.b ? hz.h : HORIZON_AWAY;
+  const g = Math.min(1, m.glow) * 0.75 * Math.exp(-(((gy - y) / 0.42) ** 2) * 2.2);
   if (g > 0) best = brighter(best, over(hRgb, gam(scale(H, 1.331)), g));
   if (clouds > 0) {
     const l = luma(base);
@@ -171,13 +221,17 @@ export function skyAt(m: SkyInput, y: number, clouds = cloudPresence(m.cloudCove
     const night = scale(base, 0.55);
     const tops = scale(grey, 1.405);
     const under = mixRgb(scale(grey, 0.95), scale(H, 1.1), Math.min(1, m.glow) * 0.495);
-    for (const c of [tops, under]) best = brighter(best, over(hRgb, gam(mixRgb(night, c, day)), 0.85 * clouds));
+    for (const c of [tops, under])
+      best = brighter(best, over(hRgb, gam(mixRgb(night, c, day)), 0.85 * clouds));
   }
-  // Fog: base desaturated 60%, × 1.19, at alpha fog · 0.55 · smoothstep(.35, 1, y).
-  const fy = m.fog * smoothstep(0.35, 1, y) * 0.55;
+  // Fog: base desaturated 60%, × 1.19, at alpha fog · 0.55 · smoothstep(.35, 1, p), strongest at the horizon.
+  const fy = m.fog * smoothstep(0.35, 1, p) * 0.55;
   if (fy > 0) {
     const l = luma(base);
-    best = brighter(best, over(hRgb, gam(scale(base.map((v) => l + (v - l) * 0.4) as RGB, 1.19)), fy));
+    best = brighter(
+      best,
+      over(hRgb, gam(scale(base.map((v) => l + (v - l) * 0.4) as RGB, 1.19)), fy),
+    );
   }
   return best;
 }
@@ -207,7 +261,8 @@ function profile(t: number): number {
 }
 
 export type Box = { x0: number; y0: number; x1: number; y1: number };
-const distTo = (b: Box, x: number, y: number) => Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.y0 - y, 0, y - b.y1));
+const distTo = (b: Box, x: number, y: number) =>
+  Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.y0 - y, 0, y - b.y1));
 
 /** The sun's disc and blooms over `bg` at distance d from its centre (bodies.ts: 3×, 8×, 20× r at .35, .12, .05). */
 export function sunOver(bg: RGB, s: SunDisc, d: number): RGB {
@@ -240,10 +295,12 @@ export function moonOver(bg: RGB, m: MoonDisc, d: number): RGB {
 /** The night city glow: CITY_GLOW at `alpha` at and below the horizon, fading to 0 at `reach` px above it. */
 export type CityGlow = { horizonY: number; reach: number; alpha: number };
 const GLOW_RGB = hexToRgb(CITY_GLOW);
+export const GLOW_MARGIN = 1.3;
 export function cityGlowOver(bg: RGB, g: CityGlow, y: number): RGB {
   if (g.alpha <= 0) return bg;
   const t = 1 - Math.min(1, Math.max(0, (g.horizonY - y) / g.reach));
-  return t > 0 ? over(bg, GLOW_RGB, g.alpha * t) : bg;
+  // × GLOW_MARGIN: the canvas composites the glow a little brighter than this model (pixel gate, 21:00 thunder).
+  return t > 0 ? over(bg, GLOW_RGB, Math.min(1, g.alpha * t * GLOW_MARGIN)) : bg;
 }
 
 export type Scene = {
@@ -258,6 +315,8 @@ export type Scene = {
   glows: CityGlow[];
   /** Landscape bands on screen (viewport px, without the take-off headroom): below the far bank, it's land. */
   lands?: { top: number; h: number }[];
+  /** The horizon, viewport px (src/lib/sky/horizon.ts); the viewport bottom when absent. */
+  horizon?: Horizon;
 };
 
 /**
@@ -267,7 +326,10 @@ export type Scene = {
 function landAt(s: Scene, y: number): RGB | null {
   for (const l of s.lands ?? []) {
     const u = ((y - l.top) / l.h) * 100;
-    if (u >= 89 && u <= 100) return oklabToRgb(layerColor(s.m.colors.horizon, "L4"));
+    if (u >= 89 && u <= 100)
+      return oklabToRgb(
+        groundColor({ horizon: s.m.colors.horizon, k: sunLight(s.m.astro.elevation) }),
+      );
     if (u >= RIVER[0] && u < 89) return oklabToRgb(riverColor(s.m.colors.horizon));
   }
   return null;
@@ -278,13 +340,19 @@ export const CLOUD_MARGIN = 300;
 
 /** The brightest background the sky can put behind a box (viewport px). */
 export function backgroundFor(s: Scene, b: Box): RGB {
-  const clouds = s.cloudsIn ? Math.max(0, s.cloudsIn({ x0: b.x0 - CLOUD_MARGIN, y0: b.y0, x1: b.x1 + CLOUD_MARGIN, y1: b.y1 })) : undefined;
+  const clouds = s.cloudsIn
+    ? Math.max(
+        0,
+        s.cloudsIn({ x0: b.x0 - CLOUD_MARGIN, y0: b.y0, x1: b.x1 + CLOUD_MARGIN, y1: b.y1 }),
+      )
+    : undefined;
   let best: RGB = [0, 0, 0];
   const n = Math.max(2, Math.min(6, Math.ceil((b.y1 - b.y0) / 24)));
+  const hz = s.horizon ? { h: s.horizon.h / s.vh, b: s.horizon.b / s.vh } : FLAT;
   for (let i = 0; i <= n; i++) {
     const y = b.y0 + ((b.y1 - b.y0) * i) / n;
     const land = landAt(s, y);
-    let c = land ?? skyAt(s.m, y / s.vh, clouds ?? cloudPresence(s.m.cloudCover));
+    let c = land ?? skyAt(s.m, y / s.vh, clouds ?? cloudPresence(s.m.cloudCover), hz);
     if (!land) for (const g of s.glows) c = cityGlowOver(c, g, y);
     best = brighter(best, c);
   }

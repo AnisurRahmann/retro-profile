@@ -1,8 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { ANCHOR_AT, closingWalk, gutterCentre, gutterWidth, landMode, nearestPlace, PARALLAX, scenePlace, screenX, solveAnchors, stageWalk } from "@/lib/sky/landscape/anchors";
-import { cityGlowAlpha, CITY_GLOW_REACH, fireflyCount, LATE_SHARE, LIT_SHARE, windowLit, windowSchedule } from "@/lib/sky/landscape/lights";
+import {
+  ANCHOR_AT,
+  bandHeight,
+  closingWalk,
+  END_MARGIN,
+  gutterCentre,
+  gutterWidth,
+  landMode,
+  MIN_GAP_VH,
+  nearestPlace,
+  PARALLAX,
+  scenePlace,
+  screenX,
+  solveAnchors,
+  stageWalk,
+} from "@/lib/sky/landscape/anchors";
+import {
+  cityGlowAlpha,
+  CITY_GLOW_REACH,
+  fireflyCount,
+  LATE_SHARE,
+  LIT_SHARE,
+  windowLit,
+  windowSchedule,
+} from "@/lib/sky/landscape/lights";
 import { keaneBridge } from "@/lib/sky/landscape/shapes";
-import { layerColor } from "@/lib/sky/landscape/colors";
+import { layerColor, sunLight } from "@/lib/sky/landscape/colors";
 import { cityGlowOver, gradientAt, type CityGlow } from "@/lib/sky/backing";
 import { luminance, oklabToRgb } from "@/lib/sky/color";
 import { skyColors } from "@/lib/sky/gradient";
@@ -10,20 +33,29 @@ import { CONDITIONS } from "@/lib/sky/weather";
 import { buildClosingScene, buildStageScene, buildWorld } from "@/lib/sky/landscape/world";
 
 // Section tops (document px) for a 1440×900 home page.
-const SECTIONS = { stage: 0, shipped: 622, bench: 1010, receipts: 1460, closer: 2100, footer: 2480 };
+const SECTIONS = {
+  stage: 0,
+  shipped: 622,
+  bench: 1010,
+  receipts: 1460,
+  closer: 2100,
+  footer: 2480,
+};
 const VW = 1440;
 const VH = 900;
 
 describe("landmark anchors, centre mode (pages without a stage, < 1100px)", () => {
   const anchors = solveAnchors(SECTIONS, VW, VH);
 
-  it("centres each landmark when its section's top reaches 40% of the viewport", () => {
-    expect(anchors.map((a) => a.id)).toEqual(["tea", "bridge", "city", "city2", "airport", "tea2"]);
-    for (const a of anchors) {
+  it("centres each landmark when its section's top reaches 40% (or earlier, keeping 0.6 vh between landmarks)", () => {
+    expect(anchors.map((a) => a.id)).toEqual(["tea", "bridge", "city", "city2", "airport"]);
+    for (const [i, a] of anchors.entries()) {
       const top = SECTIONS[a.section as keyof typeof SECTIONS];
-      const scrollY = Math.max(0, top - ANCHOR_AT * VH);
-      if (top > ANCHOR_AT * VH) expect(top - scrollY).toBeCloseTo(ANCHOR_AT * VH, 9);
-      expect(screenX(a.x, scrollY, PARALLAX[a.layer])).toBeCloseTo(VW / 2, 9);
+      expect(a.s).toBeLessThanOrEqual(Math.max(0, top - ANCHOR_AT * VH) + 1e-9);
+      if (i > 0 && a.s > 0) expect(a.s - anchors[i - 1]!.s).toBeGreaterThanOrEqual(0);
+      if (i < anchors.length - 1 && a.s > 0)
+        expect(anchors[i + 1]!.s - a.s).toBeGreaterThanOrEqual(MIN_GAP_VH * VH - 1e-9);
+      expect(screenX(a.x, a.s, PARALLAX[a.layer])).toBeCloseTo(VW / 2, 9);
     }
   });
 
@@ -33,7 +65,7 @@ describe("landmark anchors, centre mode (pages without a stage, < 1100px)", () =
     expect(nearestPlace(anchors, 650)).toBe("city");
     expect(nearestPlace(anchors, 1100)).toBe("city");
     expect(nearestPlace(anchors, 1740)).toBe("airport");
-    expect(nearestPlace(anchors, 2200)).toBe("tea");
+    expect(nearestPlace(anchors, 2200)).toBe("airport");
     expect(nearestPlace([], 0)).toBeNull();
   });
 
@@ -60,7 +92,13 @@ describe("landmark anchors, gutter mode (≥ 1100px)", () => {
   it("solves each landmark onto its gutter centre when its section's top is at 40%, alternating sides", () => {
     expect(g).toBe(336);
     const sides = Object.fromEntries(anchors.map((a) => [a.id, a.side]));
-    expect(sides).toEqual({ tea: "left", bridge: "right", city: "left", city2: "left", airport: "right", tea2: "left" });
+    expect(sides).toEqual({
+      tea: "left",
+      bridge: "right",
+      city: "left",
+      city2: "left",
+      airport: "right",
+    });
     for (const a of anchors) {
       const want = a.side === "left" ? g / 2 : VW - g / 2;
       expect(gutterCentre(VW, a.side)).toBe(want);
@@ -76,7 +114,7 @@ describe("landmark anchors, gutter mode (≥ 1100px)", () => {
       const w = buildWorld(an, vw, VH, 3200, 162, "gutter");
       const gw = gutterWidth(vw);
       for (const m of w.marks) {
-        const a = an.find((x) => (m.id === "clock" ? x.id === "bridge" : m.id === "city" ? x.id === "city" || x.id === "city2" : x.id === m.id))!;
+        const a = an.find((x) => (m.id === "clock" ? x.id === "bridge" : x.id === m.id))!;
         // Screen extent at the anchor's scroll.
         const x0 = m.x0 * w.s - a.s * PARALLAX.L3;
         const x1 = m.x1 * w.s - a.s * PARALLAX.L3;
@@ -85,23 +123,10 @@ describe("landmark anchors, gutter mode (≥ 1100px)", () => {
           expect(x1).toBeGreaterThan(vw - gw);
           continue;
         }
-        if (m.id === "city") continue; // two clusters share the id; checked below
         expect(x1 - x0, `${m.id} at ${vw}`).toBeLessThanOrEqual(0.9 * gw + 0.5);
         const inLeft = x0 >= -0.5 && x1 <= gw + 0.5;
         const inRight = x0 >= vw - gw - 0.5 && x1 <= vw + 0.5;
         expect(inLeft || inRight, `${m.id} at ${vw}: ${x0.toFixed(0)}–${x1.toFixed(0)}`).toBe(true);
-      }
-      const cities = w.marks.filter((m) => m.id === "city");
-      expect(cities).toHaveLength(2);
-      for (const [m, id] of [
-        [cities[0]!, "city"],
-        [cities[1]!, "city2"],
-      ] as const) {
-        const a = an.find((x) => x.id === id)!;
-        const x0 = m.x0 * w.s - a.s * PARALLAX.L3;
-        const x1 = m.x1 * w.s - a.s * PARALLAX.L3;
-        expect(x0).toBeGreaterThanOrEqual(-0.5);
-        expect(x1).toBeLessThanOrEqual(gw + 0.5);
       }
       expect(w.plane).not.toBeNull();
       expect(w.planeK).toBeLessThanOrEqual(1);
@@ -111,9 +136,57 @@ describe("landmark anchors, gutter mode (≥ 1100px)", () => {
   it("builds a world whose landmarks don't overlap and are long enough for the page", () => {
     const w = buildWorld(anchors, VW, VH, 3200, 162, "gutter");
     const marks = [...w.marks].sort((a, b) => a.x0 - b.x0);
-    for (let i = 1; i < marks.length; i++) expect(marks[i]!.x0).toBeGreaterThanOrEqual(marks[i - 1]!.x1 - 0.01);
+    for (let i = 1; i < marks.length; i++)
+      expect(marks[i]!.x0).toBeGreaterThanOrEqual(marks[i - 1]!.x1 - 0.01);
     expect(w.length.L4 * w.s).toBeGreaterThanOrEqual(VW + (3200 - VH) * PARALLAX.L4);
     expect(w.lights.L3.filter((l) => l.kind === "window").length).toBeGreaterThan(20);
+  });
+});
+
+describe("B1: every landmark is reachable, once", () => {
+  it("for page heights of 1.5–6 viewports, reaches each landmark inside the scroll range, the airport at the bottom", () => {
+    for (const [vw, vh] of [
+      [1440, 900],
+      [1920, 1080],
+      [1100, 800],
+    ] as const) {
+      for (let pages = 1.5; pages <= 6; pages += 0.25) {
+        const docH = pages * vh;
+        const max = docH - vh;
+        // Sections spread like the home page's: a stage, then Shipped … the closer near the end.
+        const f = (k: number) => Math.round(docH * k);
+        const sections = {
+          stage: 0,
+          shipped: f(0.2),
+          bench: f(0.34),
+          receipts: f(0.5),
+          closer: f(0.78),
+          footer: f(0.92),
+        };
+        const an = solveAnchors(sections, vw, vh, max, "gutter");
+        for (const a of an) {
+          expect(a.s, `${a.id} ${pages}`).toBeGreaterThanOrEqual(0);
+          expect(a.s, `${a.id} ${pages}`).toBeLessThanOrEqual(max - END_MARGIN + 1e-9);
+          // Reached: at its scroll it stands on its gutter centre.
+          expect(screenX(a.x, a.s, PARALLAX[a.layer])).toBeCloseTo(gutterCentre(vw, a.side), 6);
+        }
+        expect(an.at(-1)!.id).toBe("airport");
+        expect(an.at(-1)!.s).toBeCloseTo(max - END_MARGIN, 9);
+        for (let i = 1; i < an.length; i++)
+          if (an[i - 1]!.s > 0)
+            expect(an[i]!.s - an[i - 1]!.s).toBeGreaterThanOrEqual(MIN_GAP_VH * vh - 1e-6);
+        const w = buildWorld(an, vw, vh, docH, bandHeight(vw, vh), "gutter");
+        const ids = w.marks.map((m) => m.id).sort();
+        expect(ids, `${vw} ${pages}`).toEqual(["airport", "bridge", "city", "city2", "clock"]);
+        // The airport's world position is where the solver put it (never nudged off its target).
+        const port = w.marks.find((m) => m.id === "airport")!;
+        const at = an.find((a) => a.id === "airport")!;
+        expect(((port.x0 + port.x1) / 2) * w.s - at.s * PARALLAX.L3).toBeCloseTo(
+          gutterCentre(vw, "right"),
+          0,
+        );
+      }
+    }
   });
 });
 
@@ -122,13 +195,13 @@ describe("scene mode (< 1100px with a stage)", () => {
     expect(stageWalk(0, 650, 375)).toBe(0);
     expect(stageWalk(325, 650, 375)).toBeCloseTo(187.5, 9);
     expect(stageWalk(2000, 650, 375)).toBe(375);
-    // Centred in the viewport: no walk; entering and leaving: ±0.3 vw.
+    // Centred in the viewport: no walk; entering and leaving: ±0.15 vw.
     expect(closingWalk((812 - 200) / 2, 200, 812, 375)).toBeCloseTo(0, 9);
-    expect(closingWalk(812, 200, 812, 375)).toBeCloseTo(-0.3 * 375, 9);
-    expect(closingWalk(-200, 200, 812, 375)).toBeCloseTo(0.3 * 375, 9);
+    expect(closingWalk(812, 200, 812, 375)).toBeCloseTo(-0.15 * 375, 9);
+    expect(closingWalk(-200, 200, 812, 375)).toBeCloseTo(0.15 * 375, 9);
   });
 
-  it("puts the tea gardens and Keane Bridge on the stage's horizon, the city and the airport in the closing band", () => {
+  it("puts the tea gardens and Keane Bridge on the stage's horizon, the airport in the closing band", () => {
     const stage = buildStageScene(375, 114);
     expect(stage.marks.map((m) => m.id).sort()).toEqual(["bridge", "clock"]);
     const bridge = stage.marks.find((m) => m.id === "bridge")!;
@@ -137,7 +210,7 @@ describe("scene mode (< 1100px with a stage)", () => {
     expect(bridge.x1 * stage.s).toBeLessThan(375 + 40);
     expect(stage.layers.L2.length).toBeGreaterThan(3); // shade trees over the tea mounds
     const closing = buildClosingScene(375, 200);
-    expect(closing.marks.map((m) => m.id).sort()).toEqual(["airport", "city"]);
+    expect(closing.marks.map((m) => m.id)).toEqual(["airport"]);
     for (const m of closing.marks) {
       expect(m.x0 * closing.s).toBeGreaterThanOrEqual(-1);
       expect(m.x1 * closing.s).toBeLessThanOrEqual(376);
@@ -165,7 +238,8 @@ describe("window lights", () => {
   it("light 45% of windows before 22:00, 10% by 01:00, and wake between 05:00 and 06:30", () => {
     const n = 6000;
     const s = Array.from({ length: n }, (_, i) => windowSchedule(i, 120));
-    const share = (min: number) => Array.from({ length: n }, (_, i) => windowLit(i, min, 120)).filter(Boolean).length / n;
+    const share = (min: number) =>
+      Array.from({ length: n }, (_, i) => windowLit(i, min, 120)).filter(Boolean).length / n;
     expect(Math.abs(share(20 * 60 + 30) - LIT_SHARE)).toBeLessThan(0.025);
     expect(share(23 * 60 + 30)).toBeLessThan(share(20 * 60 + 30)); // the city goes to sleep
     expect(Math.abs(share(60) - LATE_SHARE)).toBeLessThan(0.02);
@@ -210,13 +284,20 @@ describe("the night landscape", () => {
           for (const cover of [0, 1])
             for (const mins of [21 * 60, 2 * 60]) {
               const colors = skyColors(e, phase, c);
-              const glow: CityGlow = { horizonY: top + 50 * s, reach: CITY_GLOW_REACH * vh, alpha: cityGlowAlpha(mins, cover, 1) };
+              const glow: CityGlow = {
+                horizonY: top + 50 * s,
+                reach: CITY_GLOW_REACH * vh,
+                alpha: cityGlowAlpha(mins, cover, 1),
+              };
               for (const layer of ["L1", "L2", "L3", "L4"] as const) {
-                const sil = luminance(oklabToRgb(layerColor(colors.horizon, layer)));
+                const sil = luminance(oklabToRgb(layerColor(colors.horizon, layer, sunLight(e))));
                 for (let u = tops[layer]!; u <= 70; u += 5) {
                   const y = top + u * s;
                   const sky = cityGlowOver(oklabToRgb(gradientAt({ colors }, y / vh)), glow, y);
-                  if (sil >= luminance(sky)) fails.push(`${e}° ${c} ${phase} cover ${cover} ${layer} u=${u}: ${sil.toFixed(4)} ≥ ${luminance(sky).toFixed(4)}`);
+                  if (sil >= luminance(sky))
+                    fails.push(
+                      `${e}° ${c} ${phase} cover ${cover} ${layer} u=${u}: ${sil.toFixed(4)} ≥ ${luminance(sky).toFixed(4)}`,
+                    );
                 }
               }
             }
@@ -226,7 +307,9 @@ describe("the night landscape", () => {
 
 describe("fireflies", () => {
   it("count by month, none in the wet", () => {
-    expect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => fireflyCount(m, false))).toEqual([4, 4, 4, 10, 10, 18, 18, 18, 10, 10, 4, 4]);
+    expect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => fireflyCount(m, false))).toEqual([
+      4, 4, 4, 10, 10, 18, 18, 18, 10, 10, 4, 4,
+    ]);
     expect(fireflyCount(7, true)).toBe(0);
   });
 });

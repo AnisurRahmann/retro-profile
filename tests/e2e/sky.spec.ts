@@ -11,9 +11,14 @@ type Sky = {
   cap?: number;
   sun?: { x: number; y: number; up: boolean; cloud: number; dim: number };
   moon?: { x: number; y: number; up: boolean };
-  takeoffs?: number;
+  plane?: { state: string; flights: number };
   place?: string | null;
-  land?: { mode: string; offsets: number[]; marks: { id: string; x: number }[]; closing?: { id: string; x: number }[] };
+  land?: {
+    mode: string;
+    offsets: number[];
+    marks: { id: string; x: number }[];
+    closing?: { id: string; x: number }[];
+  };
   geom?: { apexY: number; horizonY: number; w: number; h: number };
 };
 declare global {
@@ -24,11 +29,19 @@ declare global {
 
 const sky = (page: Page) => page.evaluate(() => window.__sky);
 const dhaka = (d: Date) =>
-  new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
+  new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Dhaka",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(d);
 const label = (page: Page) => page.getByTestId("sky-label");
 const place = (page: Page) => page.locator("[data-testid=sky-place] .sky-place-name");
 const preview = (page: Page) => page.getByTestId("sky-preview");
 const strip = (page: Page) => page.getByRole("slider", { name: "Preview a day in Sylhet" });
+/** Scroll to the bottom of the page (the airport). */
+const bottom = (page: Page) =>
+  page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
 /** Scroll so a section's top sits at 40% of the viewport (its landmark centred). */
 const walkTo = (page: Page, id: string) =>
   page.evaluate((id) => {
@@ -39,7 +52,10 @@ const walkTo = (page: Page, id: string) =>
 test.use({ viewport: { width: 1440, height: 900 } });
 
 test("the label shows HH:mm in Asia/Dhaka, whatever the visitor's zone", async ({ browser }) => {
-  const ctx = await browser.newContext({ timezoneId: "America/New_York", viewport: { width: 1440, height: 900 } });
+  const ctx = await browser.newContext({
+    timezoneId: "America/New_York",
+    viewport: { width: 1440, height: 900 },
+  });
   const page = await ctx.newPage();
   const t = new Date("2026-12-15T20:00:10Z"); // 02:00 in Sylhet, 15:00 in New York
   await page.clock.install({ time: t });
@@ -50,15 +66,21 @@ test("the label shows HH:mm in Asia/Dhaka, whatever the visitor's zone", async (
   await ctx.close();
 });
 
-test("the label reads time · temperature · weather · place, with no gap, and one spoken label", async ({ page }) => {
+test("the label reads time · temperature · weather · place, with no gap, and one spoken label", async ({
+  page,
+}) => {
   await page.goto("/?sky=2026-12-15T16:45&wx=clear");
   await expect(page.getByTestId("sky-weather")).toBeVisible();
   await expect(place(page)).toHaveText("tea gardens, Sylhet");
   const text = (await label(page).innerText()).replace(/\s+/g, " ").trim();
   expect(text).toMatch(/^\d\d:\d\d · \d+°C · clear · tea gardens, Sylhet$/);
   // Separators are decoration; the button has one aria-label.
-  for (const sep of await label(page).locator(".sky-sep").all()) await expect(sep).toHaveAttribute("aria-hidden", "true");
-  await expect(label(page)).toHaveAttribute("aria-label", /^\d\d:\d\d in Sylhet, \d+ degrees, clear, by the tea gardens$/);
+  for (const sep of await label(page).locator(".sky-sep").all())
+    await expect(sep).toHaveAttribute("aria-hidden", "true");
+  await expect(label(page)).toHaveAttribute(
+    "aria-label",
+    /^\d\d:\d\d in Sylhet, \d+ degrees, clear, by the tea gardens$/,
+  );
   // No reserved width: the place follows the weather after one separator.
   const w = (await page.getByTestId("sky-weather").boundingBox())!;
   const p = (await place(page).boundingBox())!;
@@ -66,7 +88,9 @@ test("the label reads time · temperature · weather · place, with no gap, and 
   expect(Math.abs(p.y - w.y)).toBeLessThan(2);
 });
 
-test("on a phone the label is two designed lines: no leading separator on the second", async ({ browser }) => {
+test("on a phone the label is two designed lines: no leading separator on the second", async ({
+  browser,
+}) => {
   const ctx = await browser.newContext({ viewport: { width: 375, height: 812 } });
   const page = await ctx.newPage();
   await page.goto("/?sky=2026-12-15T16:45&wx=clear");
@@ -81,7 +105,9 @@ test("on a phone the label is two designed lines: no leading separator on the se
   await ctx.close();
 });
 
-test("the strip is 260×40 with 11px graphite tick labels; the now dot stays while the handle is dragged away", async ({ page }) => {
+test("the strip is 260×40 with 11px graphite tick labels; the now dot stays while the handle is dragged away", async ({
+  page,
+}) => {
   await page.goto("/?sky=2026-12-15T11:00&wx=clear");
   await expect(page.getByTestId("sky-strip-now")).toBeAttached();
   const box = (await strip(page).boundingBox())!;
@@ -133,7 +159,9 @@ test("/api/sylhet is fetched once on load and not again within 15 minutes", asyn
   await ctx.close();
 });
 
-test("weather shows when /api/sylhet answers; only the time when it fails, and nothing throws", async ({ page }) => {
+test("weather shows when /api/sylhet answers; only the time when it fails, and nothing throws", async ({
+  page,
+}) => {
   await page.goto("/");
   await expect(page.getByTestId("sky-weather")).toContainText("°C");
 
@@ -159,7 +187,9 @@ test("the popover keeps the details (no scrubber) and closes on Escape", async (
   await expect(label(page)).toBeFocused();
 });
 
-test("the sun-path strip is a keyboard slider; leaving it returns the sky to now", async ({ page }) => {
+test("the sun-path strip is a keyboard slider; leaving it returns the sky to now", async ({
+  page,
+}) => {
   await page.goto("/?sky=2026-12-15T11:00&wx=clear");
   await page.waitForFunction(() => window.__sky?.state === "day");
   const s = strip(page);
@@ -200,7 +230,9 @@ test("dragging the strip scrubs the whole sky; letting go eases back to now", as
   await page.waitForFunction(() => window.__sky?.state === "day");
 });
 
-test("a horizontal drag on the open sky scrubs time (a viewport width = 12 h), then eases back", async ({ page }) => {
+test("a horizontal drag on the open sky scrubs time (a viewport width = 12 h), then eases back", async ({
+  page,
+}) => {
   await page.goto("/?sky=2026-12-15T11:00&wx=clear");
   await page.waitForFunction(() => (window.__sky?.frames ?? 0) >= 1);
   await page.mouse.move(300, 160);
@@ -219,12 +251,21 @@ test("a horizontal drag on the open sky scrubs time (a viewport width = 12 h), t
   await page.mouse.up();
 });
 
-test("on a phone a vertical swipe on the sky scrolls the page and doesn't scrub; a sideways one does", async ({ browser }) => {
-  const ctx = await browser.newContext({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+test("on a phone a vertical swipe on the sky scrolls the page and doesn't scrub; a sideways one does", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({
+    viewport: { width: 375, height: 812 },
+    hasTouch: true,
+    isMobile: true,
+    deviceScaleFactor: 2,
+  });
   const page = await ctx.newPage();
   await page.goto("/?sky=2026-12-15T11:00&wx=clear");
   await page.waitForFunction(() => (window.__sky?.frames ?? 0) >= 1);
-  expect(await page.locator("[data-sky-stage]").evaluate((el) => getComputedStyle(el).touchAction)).toBe("pan-y");
+  expect(
+    await page.locator("[data-sky-stage]").evaluate((el) => getComputedStyle(el).touchAction),
+  ).toBe("pan-y");
   // Record whether a preview ever appears.
   await page.evaluate(() => {
     const w = window as Window & { __scrubbed?: boolean };
@@ -236,15 +277,30 @@ test("on a phone a vertical swipe on the sky scrolls the page and doesn't scrub;
   const cdp = await page.context().newCDPSession(page);
   // Headless Chromium sometimes drops the first synthetic gesture of a session: retry until the page moves.
   for (let i = 0; i < 3 && (await page.evaluate(() => window.scrollY)) < 100; i++) {
-    await cdp.send("Input.synthesizeScrollGesture", { x: 180, y: 160, yDistance: -300, gestureSourceType: "touch", speed: 600 });
+    await cdp.send("Input.synthesizeScrollGesture", {
+      x: 180,
+      y: 160,
+      yDistance: -300,
+      gestureSourceType: "touch",
+      speed: 600,
+    });
     await page.waitForTimeout(300);
   }
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
-  expect(await page.evaluate(() => (window as Window & { __scrubbed?: boolean }).__scrubbed)).toBe(false);
+  expect(await page.evaluate(() => (window as Window & { __scrubbed?: boolean }).__scrubbed)).toBe(
+    false,
+  );
   // A sideways swipe on the sky scrubs.
   await page.evaluate(() => window.scrollTo(0, 0));
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 100, y: 160 }] });
-  for (let i = 1; i <= 10; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: 100 + 18 * i, y: 161 }] });
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: 100, y: 160 }],
+  });
+  for (let i = 1; i <= 10; i++)
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: 100 + 18 * i, y: 161 }],
+    });
   await expect(preview(page)).toBeVisible();
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await expect(preview(page)).toHaveCount(0, { timeout: 3000 });
@@ -254,9 +310,15 @@ test("on a phone a vertical swipe on the sky scrolls the page and doesn't scrub;
 test.describe("the first-visit time-lapse", () => {
   test("plays once per session after 2.5 s of quiet, then shows the hint", async ({ page }) => {
     await page.goto("/?teaser");
-    await page.waitForFunction(() => document.documentElement.dataset.skyTeaser === "playing", null, { timeout: 6000 });
+    await page.waitForFunction(
+      () => document.documentElement.dataset.skyTeaser === "playing",
+      null,
+      { timeout: 6000 },
+    );
     await expect(preview(page)).toBeVisible();
-    await page.waitForFunction(() => document.documentElement.dataset.skyTeaser === "done", null, { timeout: 12000 });
+    await page.waitForFunction(() => document.documentElement.dataset.skyTeaser === "done", null, {
+      timeout: 12000,
+    });
     await expect(page.getByTestId("sky-hint")).toHaveAttribute("data-show", "");
     await expect(page.getByTestId("sky-hint")).toHaveText("drag the sky ← →");
     await expect(preview(page)).toHaveCount(0, { timeout: 2000 });
@@ -269,7 +331,11 @@ test.describe("the first-visit time-lapse", () => {
 
   test("any input cancels it and the sky returns to now", async ({ page }) => {
     await page.goto("/?teaser");
-    await page.waitForFunction(() => document.documentElement.dataset.skyTeaser === "playing", null, { timeout: 6000 });
+    await page.waitForFunction(
+      () => document.documentElement.dataset.skyTeaser === "playing",
+      null,
+      { timeout: 6000 },
+    );
     await page.waitForTimeout(800);
     await page.keyboard.press("Shift");
     await page.waitForFunction(() => document.documentElement.dataset.skyTeaser === "cancelled");
@@ -291,7 +357,9 @@ test.describe("the first-visit time-lapse", () => {
   });
 });
 
-test("the place name follows the landmarks as you walk down the page, without moving the line", async ({ page }) => {
+test("the place name follows the landmarks as you walk down the page, without moving the line", async ({
+  page,
+}) => {
   await page.goto("/?sky=2026-12-15T20:30&wx=clear");
   await page.waitForFunction(() => (window.__sky?.frames ?? 0) >= 1);
   const weatherX = async () => (await page.getByTestId("sky-weather").boundingBox())?.x;
@@ -302,7 +370,7 @@ test("the place name follows the landmarks as you walk down the page, without mo
   await walkTo(page, "bench");
   await expect(place(page)).toHaveText("city rooftops, Sylhet");
   await walkTo(page, "closer");
-  await expect(place(page)).toHaveText("Osmani Airport, Sylhet");
+  await expect(place(page)).toHaveText("near Osmani Airport, Sylhet");
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(place(page)).toHaveText("tea gardens, Sylhet");
   expect(await weatherX()).toBe(x0);
@@ -313,49 +381,183 @@ test("the place name follows the landmarks as you walk down the page, without mo
   expect(land.mode).toBe("gutter");
   const clock = land.marks.find((m) => m.id === "clock")!;
   expect(Math.abs(clock.x - (1440 - 336 / 2))).toBeLessThan(30);
-  await walkTo(page, "closer");
+  // B1: the airport is the end of the walk, reached at the bottom of the page on its gutter centre; every landmark
+  // is in the world once.
+  await bottom(page);
   await page.waitForTimeout(300);
-  const airport = (await sky(page))!.land!.marks.find((m) => m.id === "airport")!;
-  expect(airport.x).toBeGreaterThan(1104);
-  expect(airport.x).toBeLessThan(1440);
+  const marks = (await sky(page))!.land!.marks;
+  expect(marks.map((m) => m.id).sort()).toEqual(["airport", "bridge", "city", "city2", "clock"]);
+  const airport = marks.find((m) => m.id === "airport")!;
+  expect(Math.abs(airport.x - (1440 - 336 / 2))).toBeLessThan(30);
 });
 
-test("scene mode (375): the landscape is the stage's horizon and a closing band; tapping Book 30 min flies the plane", async ({ browser }) => {
-  const ctx = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2 });
+test("scene mode (375): the landscape is the stage's horizon and a closing band; tapping Book 30 min flies the plane", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({
+    viewport: { width: 375, height: 812 },
+    deviceScaleFactor: 2,
+  });
   const page = await ctx.newPage();
   await page.goto("/?sky=2026-12-15T16:45&wx=clear");
-  await page.waitForFunction(() => (window.__sky?.frames ?? 0) >= 1 && window.__sky?.land?.mode === "scene", null, { timeout: 8000 });
+  await page.waitForFunction(
+    () => (window.__sky?.frames ?? 0) >= 1 && window.__sky?.land?.mode === "scene",
+    null,
+    { timeout: 8000 },
+  );
   expect(await page.locator("[data-sky-landscape]").isVisible()).toBe(false);
   await expect(page.locator("[data-sky-scene=stage] canvas")).toHaveAttribute("data-ready", "");
   const stage = await page.locator("[data-sky-stage]").boundingBox();
   const scene = await page.locator("[data-sky-scene=stage]").boundingBox();
   expect(Math.abs(scene!.y + scene!.height - (stage!.y + stage!.height))).toBeLessThan(1);
-  // The bridge is on the stage's horizon; the closing band holds the city and the airport.
+  // The bridge is on the stage's horizon; the closing band is the airport.
   expect((await sky(page))!.land!.marks.map((m) => m.id)).toContain("bridge");
-  await page.locator("[data-sky-scene=closing]").scrollIntoViewIfNeeded();
+  await bottom(page);
   await page.waitForTimeout(400);
-  expect(((await sky(page))!.land!.closing ?? []).map((m) => m.id).sort()).toEqual(["airport", "city"]);
-  await page.locator("[data-sky-takeoff]").dispatchEvent("pointerdown");
-  await expect.poll(async () => (await sky(page))!.takeoffs ?? 0).toBe(1);
+  expect(((await sky(page))!.land!.closing ?? []).map((m) => m.id)).toEqual(["airport"]);
+  await expect(place(page)).toHaveText("near Osmani Airport, Sylhet");
   await ctx.close();
 });
 
-test("the plane takes off when Book 30 min is hovered with the airport on screen", async ({ page }) => {
+for (const size of [
+  { width: 375, height: 812 },
+  { width: 1440, height: 900 },
+]) {
+  test(`B2 at ${size.width}: the plane takes off on every arrival at the airport (3 visits, 3 flights)`, async ({
+    browser,
+  }) => {
+    test.setTimeout(90_000);
+    const ctx = await browser.newContext({
+      viewport: size,
+      deviceScaleFactor: size.width < 640 ? 2 : 1,
+    });
+    const page = await ctx.newPage();
+    await page.goto("/?sky=2026-12-15T16:45&wx=clear");
+    await page.waitForFunction(
+      () => (window.__sky?.frames ?? 0) >= 1 && !!window.__sky?.plane,
+      null,
+      { timeout: 8000 },
+    );
+    expect((await sky(page))!.plane!.flights).toBe(0);
+    for (let visit = 1; visit <= 3; visit++) {
+      await bottom(page);
+      await expect
+        .poll(async () => (await sky(page))!.plane!.flights, { timeout: 4000 })
+        .toBe(visit);
+      // Staying put doesn't fly another.
+      await page.waitForTimeout(500);
+      expect((await sky(page))!.plane!.flights).toBe(visit);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      // The next plane is at the gate 4.6 + 2.5 + 0.6 s later.
+      await expect
+        .poll(async () => (await sky(page))!.plane!.state, { timeout: 12_000 })
+        .toBe("parked");
+    }
+    expect((await sky(page))!.plane!.flights).toBe(3);
+    await ctx.close();
+  });
+}
+
+test("Book 30 min (hover or tap) flies a parked plane once, only with the airport on screen", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
   await page.goto("/?sky=2026-12-15T15:00&wx=clear");
-  await page.waitForFunction(() => (window.__sky?.frames ?? 0) >= 1);
+  await page.waitForFunction(() => (window.__sky?.frames ?? 0) >= 1 && !!window.__sky?.plane);
   // Not from the top of the page: the airport isn't on screen (dispatch, so nothing scrolls).
   await page.locator("[data-sky-takeoff]").dispatchEvent("pointerover");
   await page.waitForTimeout(200);
-  expect((await sky(page))!.takeoffs ?? 0).toBe(0);
-  await walkTo(page, "closer");
-  await page.waitForTimeout(400);
+  expect((await sky(page))!.plane!.flights).toBe(0);
+  // Arriving flies one; wait for the next plane at the gate.
+  await bottom(page);
+  await expect.poll(async () => (await sky(page))!.plane!.flights).toBe(1);
+  await expect
+    .poll(async () => (await sky(page))!.plane!.state, { timeout: 12_000 })
+    .toBe("parked");
   await page.locator("[data-sky-takeoff]").hover();
-  await expect.poll(async () => (await sky(page))!.takeoffs ?? 0).toBe(1);
+  await expect.poll(async () => (await sky(page))!.plane!.flights).toBe(2);
   expect((await sky(page))!.cap).toBe(60);
+  // While it's flying, another hover or tap is ignored (no double planes).
+  await page.mouse.move(0, 0);
+  await page.locator("[data-sky-takeoff]").hover();
+  await page.locator("[data-sky-takeoff]").dispatchEvent("pointerdown");
+  await page.waitForTimeout(500);
+  expect((await sky(page))!.plane!.flights).toBe(2);
 });
 
-test("reduced motion: a static frame (fps 0) and no parallax on scroll; the place name still updates", async ({ browser }) => {
-  const ctx = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 1440, height: 900 } });
+test("reduced motion: the plane stays parked (no take-off on arrival or on Book 30 min)", async ({
+  browser,
+}) => {
+  for (const size of [
+    { width: 375, height: 812 },
+    { width: 1440, height: 900 },
+  ]) {
+    const ctx = await browser.newContext({ reducedMotion: "reduce", viewport: size });
+    const page = await ctx.newPage();
+    await page.goto("/?sky=2026-12-15T16:45&wx=clear");
+    await page.waitForFunction(
+      () => (window.__sky?.frames ?? 0) >= 1 && !!window.__sky?.plane,
+      null,
+      { timeout: 8000 },
+    );
+    await bottom(page);
+    await page.waitForTimeout(800);
+    await page.locator("[data-sky-takeoff]").hover();
+    await page.waitForTimeout(800);
+    expect((await sky(page))!.plane).toEqual({ state: "parked", flights: 0 });
+    await ctx.close();
+  }
+});
+
+test("phones: no strip; the sun on the big arc is the slider (keys and drag), off while over text", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({
+    viewport: { width: 375, height: 812 },
+    deviceScaleFactor: 2,
+  });
+  const page = await ctx.newPage();
+  await page.goto("/?sky=2026-12-15T11:00&wx=clear");
+  await page.waitForFunction(() => (window.__sky?.frames ?? 0) >= 1);
+  await expect(page.getByTestId("sky-strip")).toHaveCount(0);
+  const handle = page.getByTestId("sky-arc-handle");
+  await expect(handle).toHaveAttribute("role", "slider");
+  await expect(handle).toHaveAttribute("aria-label", "Preview a day in Sylhet");
+  // 44×44, centred on the sun's disc.
+  const box = (await handle.boundingBox())!;
+  expect(Math.round(box.width)).toBe(44);
+  const sun = (await sky(page))!.sun!;
+  expect(Math.abs(box.x + 22 - sun.x)).toBeLessThan(3);
+  expect(Math.abs(box.y + 22 - sun.y)).toBeLessThan(3);
+  // Keys, like the strip.
+  await handle.focus();
+  await page.keyboard.press("PageUp");
+  await expect(preview(page)).toHaveText("preview 12:00");
+  await page.keyboard.press("Escape");
+  await expect(preview(page)).toHaveCount(0, { timeout: 3000 });
+  // Drag the sun toward the west: the time moves on and the disc follows the finger.
+  if ((await handle.getAttribute("data-off")) === null) {
+    await page.mouse.move(box.x + 22, box.y + 22);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 22 + 80, box.y + 22, { steps: 6 });
+    await expect(preview(page)).toBeVisible();
+    await page.mouse.up();
+    await expect(preview(page)).toHaveCount(0, { timeout: 3000 });
+  }
+  // Scrolled away from the stage, it takes no pointer.
+  await page.evaluate(() => window.scrollTo(0, 1500));
+  await page.waitForTimeout(300);
+  await expect(handle).toHaveAttribute("data-off", "");
+  await ctx.close();
+});
+
+test("reduced motion: a static frame (fps 0) and no parallax on scroll; the place name still updates", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({
+    reducedMotion: "reduce",
+    viewport: { width: 1440, height: 900 },
+  });
   const page = await ctx.newPage();
   await page.goto("/?sky=2026-12-15T21:00&wx=rain");
   await page.waitForFunction(() => (window.__sky?.frames ?? 0) >= 1, null, { timeout: 8000 });
@@ -368,14 +570,16 @@ test("reduced motion: a static frame (fps 0) and no parallax on scroll; the plac
   await page.waitForTimeout(1000);
   expect((await sky(page))!.frames).toBe(frames);
   await walkTo(page, "closer");
-  await expect(place(page)).toHaveText("Osmani Airport, Sylhet");
+  await expect(place(page)).toHaveText("near Osmani Airport, Sylhet");
   await page.waitForTimeout(600);
   expect((await sky(page))!.land!.offsets).toEqual([0, 0, 0, 0]);
   expect((await sky(page))!.fps).toBe(0);
   await ctx.close();
 });
 
-test("the loop runs at 24fps when nothing moves, 60 while it rains or you scroll", async ({ page }) => {
+test("the loop runs at 24fps when nothing moves, 60 while it rains or you scroll", async ({
+  page,
+}) => {
   await page.goto("/?sky=2026-12-15T11:00&wx=partly");
   await page.waitForFunction(() => (window.__sky?.fps ?? 0) > 0, null, { timeout: 8000 });
   await page.waitForTimeout(1500);
@@ -402,14 +606,28 @@ test("the loop runs at 24fps when nothing moves, 60 while it rains or you scroll
   await page.waitForFunction(() => window.__sky?.cap === 60, null, { timeout: 8000 });
 });
 
-test("sky layers are decorative, fixed, behind content and never intercept clicks", async ({ page }) => {
+test("sky layers are decorative, fixed, behind content and never intercept clicks", async ({
+  page,
+}) => {
   await page.goto("/?sky=2026-12-15T16:55&wx=partly");
   await page.waitForFunction(() => (window.__sky?.frames ?? 0) >= 1, null, { timeout: 8000 });
   const layers = await page.evaluate(() =>
-    ["[data-sky-gradient]", "[data-sky-atmosphere]", "[data-sky-particles]", "[data-sky-landscape]", ".grain"].map((sel) => {
+    [
+      "[data-sky-gradient]",
+      "[data-sky-atmosphere]",
+      "[data-sky-particles]",
+      "[data-sky-landscape]",
+      ".grain",
+    ].map((sel) => {
       const el = document.querySelector(sel)!;
       const s = getComputedStyle(el);
-      return { sel, hidden: el.getAttribute("aria-hidden"), pe: s.pointerEvents, pos: s.position, z: s.zIndex };
+      return {
+        sel,
+        hidden: el.getAttribute("aria-hidden"),
+        pe: s.pointerEvents,
+        pos: s.position,
+        z: s.zIndex,
+      };
     }),
   );
   expect(layers).toEqual([
@@ -420,13 +638,20 @@ test("sky layers are decorative, fixed, behind content and never intercept click
     { sel: ".grain", hidden: "true", pe: "none", pos: "fixed", z: "-1" },
   ]);
   // No column scrim: loose text gets its own backing, solved per element.
-  await page.waitForFunction(() => (window.__sky?.backing?.length ?? 0) > 3, null, { timeout: 8000 });
+  await page.waitForFunction(() => (window.__sky?.backing?.length ?? 0) > 3, null, {
+    timeout: 8000,
+  });
   expect(await page.locator("[data-sky-scrim], .text-scrim").count()).toBe(0);
-  await page.getByRole("link", { name: /Support Agent/ }).first().click();
+  await page
+    .getByRole("link", { name: /Support Agent/ })
+    .first()
+    .click();
   await expect(page).toHaveURL(/\/work\/support-agent$/);
 });
 
-test("the sun sits on the arc: on the horizon at sunrise, under the apex at noon, never clipped", async ({ page }) => {
+test("the sun sits on the arc: on the horizon at sunrise, under the apex at noon, never clipped", async ({
+  page,
+}) => {
   await page.goto("/?sky=2026-12-15T11:50&wx=clear");
   await page.waitForFunction(() => window.__sky?.sun?.up === true);
   await page.waitForTimeout(1500);
@@ -440,7 +665,9 @@ test("the sun sits on the arc: on the horizon at sunrise, under the apex at noon
   expect(dusk.sun!.y).toBeGreaterThan(dusk.geom!.horizonY - 20);
 });
 
-test("the first paint already has the right sky (no flash): night colours at 02:00", async ({ page }) => {
+test("the first paint already has the right sky (no flash): night colours at 02:00", async ({
+  page,
+}) => {
   await page.goto("/?sky=2026-12-15T02:00&wx=clear", { waitUntil: "commit" });
   await page.waitForSelector("[data-sky-gradient]", { state: "attached" });
   const v = await page.evaluate(() => ({

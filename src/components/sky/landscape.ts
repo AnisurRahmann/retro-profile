@@ -10,10 +10,25 @@
  * the sun.
  */
 import { brand } from "@/lib/brand";
-import { hexToLab, hexToRgb, mixLab, oklabToRgb, type Lab, type RGB } from "@/lib/sky/color";
-import { layerColor, riverColor } from "@/lib/sky/landscape/colors";
+import {
+  hexToLab,
+  hexToRgb,
+  mixLab,
+  oklabToRgb,
+  scaleL,
+  type Lab,
+  type RGB,
+} from "@/lib/sky/color";
+import {
+  groundColor,
+  layerColorLit,
+  riverColor,
+  teaRowColor,
+} from "@/lib/sky/landscape/colors";
 import { PARALLAX, type LayerId } from "@/lib/sky/landscape/anchors";
 import { BANK_Y, RIVER } from "@/lib/sky/landscape/shapes";
+/** The 1px glint's line, band units: just above the near bank's lowest point (ridgeL4 ≥ 87.2). */
+const GLINT_Y = 87.4;
 import { CITY_GLOW } from "@/lib/sky/palette";
 import { ridgeL1, ridgeL2, ridgeL4, type Placed, type World } from "@/lib/sky/landscape/world";
 import type { Shape } from "@/lib/sky/landscape/shapes";
@@ -24,17 +39,25 @@ export const LIFT = 120;
 /** The city glow's horizon in band units: the foot of the far hills (L1's ridge averages 34). */
 export const GLOW_HORIZON = 50;
 const LAYERS: LayerId[] = ["L1", "L2", "L3", "L4"];
-export { DEPTH, layerColor, NEAR, riverColor } from "@/lib/sky/landscape/colors";
+export { layerColor, riverColor } from "@/lib/sky/landscape/colors";
 
 /** Band height for a viewport: 18vh desktop, 14svh mobile, clamped to 110–200 px (CSS mirrors it). */
 export { bandHeight } from "@/lib/sky/landscape/anchors";
 
-const css = (c: RGB, a = 1) => `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
+const css = (c: RGB, a = 1) =>
+  `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
 
-type Paths = { fill: Path2D | null; strokes: [Path2D, number][]; cuts: [Path2D, number, number | undefined][] };
+type Paths = {
+  fill: Path2D | null;
+  strokes: [Path2D, number][];
+  cuts: [Path2D, number, number | undefined][];
+};
 
 export type Lighting = {
   horizon: Lab;
+  /** Lightness multiplier (colors.ts sunLight) and the far hills' golden-hour wash (≤ 0.18). */
+  k: number;
+  wash: number;
   /** Rim strength 0..1 (golden hour). */
   rim: number;
   /** Sun x on screen (px) for the rim's falloff. */
@@ -51,9 +74,9 @@ export type Lighting = {
 
 /**
  * @param lift transparent headroom above the band (px).
- * @param fadeBottom the bottom this many px fade out (the stage scene).
+ * @param fade the scenes' ground runs on below the band and fades into the sky over this many px (GROUND_FADE).
  */
-export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBottom = 0) {
+export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
   const cache = new Map<Shape, Paths>();
@@ -64,12 +87,29 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
   let w = 1,
     H = 1,
     dpr = 1;
-  let light: Lighting = { horizon: hexToLab(brand.ink), rim: 0, sunX: 0, night: 0, glow: 0, glowReach: 0, moonRim: 0, moonX: 0 };
+  let light: Lighting = {
+    horizon: hexToLab(brand.ink),
+    k: 1,
+    wash: 0,
+    rim: 0,
+    sunX: 0,
+    night: 0,
+    glow: 0,
+    glowReach: 0,
+    moonRim: 0,
+    moonX: 0,
+  };
   const glowRgb = hexToRgb(CITY_GLOW);
   const moonLab = hexToLab(brand.text);
   let lightKey = "";
   const colors = {} as Record<LayerId, string>;
   let river = "rgba(0,0,0,1)";
+  /** The near ground under L4's things (L4 lifted +3% L, so palms and posts read against it) and the water's edge. */
+  let ground: RGB = [0, 0, 0];
+  let glint = "rgba(0,0,0,0)";
+  let rows = "rgba(0,0,0,0)";
+  /** The airport's tones: tarmac (the ground a shade lighter), the rim light, the glass's sky reflection. */
+  const tones = { tarmac: "rgba(0,0,0,1)", rim: "rgba(0,0,0,1)", glass: "rgba(0,0,0,1)" };
 
   const paths = (s: Shape): Paths => {
     let p = cache.get(s);
@@ -84,11 +124,19 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
     return p;
   };
 
-  const ridge = (layer: LayerId) => (layer === "L1" ? ridgeL1 : layer === "L2" ? ridgeL2 : layer === "L4" ? ridgeL4 : null);
+  const ridge = (layer: LayerId) =>
+    layer === "L1" ? ridgeL1 : layer === "L2" ? ridgeL2 : layer === "L4" ? ridgeL4 : null;
 
-  /** Everything solid on a layer between world units x0 and x1, in one style. */
-  const solid = (g: CanvasRenderingContext2D, layer: LayerId, x0: number, x1: number, style: string | CanvasGradient) => {
-    g.fillStyle = style;
+  /** Everything solid on a layer between world units x0 and x1, in one style (L4's ground in `ridgeStyle`). */
+  const solid = (
+    g: CanvasRenderingContext2D,
+    layer: LayerId,
+    x0: number,
+    x1: number,
+    style: string | CanvasGradient,
+    ridgeStyle = style,
+  ) => {
+    g.fillStyle = ridgeStyle;
     g.strokeStyle = style;
     const r = ridge(layer);
     if (r) {
@@ -99,6 +147,7 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
       g.closePath();
       g.fill();
     }
+    g.fillStyle = style;
     if (layer === "L3") g.fillRect(x0, 68.5, x1 - x0, RIVER[0] + 0.5 - 68.5); // the far bank under the town
     for (const it of world!.layers[layer]) {
       if (it.x + it.shape.x1 * it.k < x0 || it.x + it.shape.x0 * it.k > x1) continue;
@@ -116,24 +165,41 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
     }
   };
 
-  /** Punch-outs: tea rows on L2 (fine scallops following the mounds), the clock face. */
+  /**
+   * Tea bush rows on L2: scalloped rows following the mounds' contour, 6px apart (5–7 with the scallops), a little
+   * lighter than the hill. Drawn, not punched out, so the sky never shows through the gardens.
+   */
+  const teaRows = (g: CanvasRenderingContext2D, x0: number, x1: number) => {
+    const s = world!.s;
+    const gap = 6 / s;
+    const bump = 2.2 / s;
+    const step = Math.max(2.5, 7 / s);
+    g.strokeStyle = rows;
+    g.lineWidth = 1.6 / s;
+    g.lineCap = "round";
+    g.beginPath();
+    for (let j = 0; j < 7; j++) {
+      const off = 2.2 + j * gap;
+      let x = Math.floor(x0 / step) * step + (j % 2) * step * 0.5;
+      g.moveTo(x, ridgeL2(x) + off);
+      for (; x <= x1; x += step)
+        g.quadraticCurveTo(
+          x + step / 2,
+          ridgeL2(x + step / 2) + off - bump,
+          x + step,
+          ridgeL2(x + step) + off,
+        );
+    }
+    g.stroke();
+  };
+
+  /** Punch-outs: the clock face. */
   const cuts = (g: CanvasRenderingContext2D, layer: LayerId, x0: number, x1: number) => {
     g.globalCompositeOperation = "destination-out";
     g.strokeStyle = "#000";
-    if (layer === "L2") {
-      g.lineWidth = 0.45;
-      g.globalAlpha = 0.32;
-      g.beginPath();
-      for (let j = 0; j < 6; j++) {
-        const off = 3 + j * 3.3;
-        let x = Math.floor(x0 / 3) * 3;
-        g.moveTo(x, ridgeL2(x) + off);
-        for (; x <= x1; x += 3) g.quadraticCurveTo(x + 1.5, ridgeL2(x + 1.5) + off - 1.1, x + 3, ridgeL2(x + 3) + off);
-      }
-      g.stroke();
-    }
     for (const it of world!.layers[layer]) {
-      if (!it.shape.cut || it.x + it.shape.x1 * it.k < x0 || it.x + it.shape.x0 * it.k > x1) continue;
+      if (!it.shape.cut || it.x + it.shape.x1 * it.k < x0 || it.x + it.shape.x0 * it.k > x1)
+        continue;
       g.save();
       g.translate(it.x, it.y + it.base * (1 - it.k));
       if (it.k !== 1) g.scale(it.k, it.k);
@@ -171,11 +237,12 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
     // 0.3 × illumination, on the moon's side): the layer in the rim colour, then the body 1 px lower.
     const moon = light.rim <= 0.02 && light.moonRim > 0.02;
     if ((light.rim > 0.02 || moon) && layer !== "L1") {
-      const base = layerColor(light.horizon, layer);
+      // Golden-hour light is this rim only: 1px of the horizon colour at 0.55 on the sun's side.
+      const base = layerColorLit(light, layer);
       const tint = moon ? moonLab : light.horizon;
-      const k = moon ? light.moonRim : 0.5 * light.rim;
+      const k = moon ? light.moonRim : 0.55 * light.rim;
       const hi = oklabToRgb(mixLab(base, tint, k));
-      const lo = oklabToRgb(mixLab(base, tint, moon ? 0 : 0.15 * light.rim));
+      const lo = oklabToRgb(base);
       const sunU = ((moon ? light.moonX : light.sunX) + offsetPx) / s;
       const span = w / s;
       const grad = g.createLinearGradient(sunU - span, 0, sunU + span, 0);
@@ -185,9 +252,10 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
       solid(g, layer, x0, x1, grad);
       g.save();
       g.translate(0, 1 / s);
-      solid(g, layer, x0, x1, body);
+      solid(g, layer, x0, x1, body, layer === "L4" ? css(ground) : body);
       g.restore();
-    } else solid(g, layer, x0, x1, body);
+    } else solid(g, layer, x0, x1, body, layer === "L4" ? css(ground) : body);
+    if (layer === "L2") teaRows(g, x0, x1);
     cuts(g, layer, x0, x1);
     st.x0 = x0Px;
     st.key = lightKey;
@@ -206,18 +274,25 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
       w = vw;
       H = h;
       canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round((H + lift) * dpr);
+      canvas.height = Math.round((H + lift + fade) * dpr);
       world = wd;
       for (const l of LAYERS) strips[l].x0 = Number.NaN;
     },
     /** New light: recolours (re-renders) the strips when it has changed enough. */
     setLighting(l: Lighting) {
       light = l;
-      const key = `${l.horizon.map((v) => Math.round(v * 200)).join()}|${Math.round(l.rim * 20)}|${Math.round(l.sunX / 40)}|${Math.round(l.night * 20)}|${Math.round(l.moonRim * 40)}|${Math.round(l.moonX / 40)}`;
+      const key = `${l.horizon.map((v) => Math.round(v * 200)).join()}|${Math.round(l.k * 100)}|${Math.round(l.wash * 100)}|${Math.round(l.rim * 20)}|${Math.round(l.sunX / 40)}|${Math.round(l.night * 20)}|${Math.round(l.moonRim * 40)}|${Math.round(l.moonX / 40)}`;
       if (key === lightKey) return false;
       lightKey = key;
-      for (const layer of LAYERS) colors[layer] = css(oklabToRgb(layerColor(l.horizon, layer)));
+      for (const layer of LAYERS) colors[layer] = css(oklabToRgb(layerColorLit(l, layer)));
+      rows = css(oklabToRgb(teaRowColor(l)));
+      const l3 = layerColorLit(l, "L3");
+      tones.tarmac = css(oklabToRgb([Math.min(1, l3[0] + 0.07), l3[1], l3[2]]));
+      tones.rim = css(oklabToRgb(mixLab(l3, l.horizon, 0.55)));
+      tones.glass = css(oklabToRgb(l.horizon));
       river = css(oklabToRgb(riverColor(l.horizon)));
+      ground = oklabToRgb(groundColor(l));
+      glint = css(oklabToRgb(scaleL(riverColor(l.horizon), 0.12)), 0.7);
       return true;
     },
     /** Screen x of a world-unit point on a layer at this walk (0 under reduced motion). */
@@ -232,7 +307,10 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
      * reflections) with the context in CSS px, origin at the band's top-left; a world-unit point x on that layer
      * is at screen x · s − offset.
      */
-    draw(walk: number, between: (g: CanvasRenderingContext2D, layer: LayerId | "river", offset: number) => void) {
+    draw(
+      walk: number,
+      between: (g: CanvasRenderingContext2D, layer: LayerId | "river", offset: number) => void,
+    ) {
       if (!world) return;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -254,7 +332,8 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
       for (const layer of LAYERS) {
         const o = walk * PARALLAX[layer];
         const st = strips[layer];
-        if (!(o >= st.x0 + 8 && o + w <= st.x0 + w + 2 * PAD - 8) || st.key !== lightKey) renderStrip(layer, o);
+        if (!(o >= st.x0 + 8 && o + w <= st.x0 + w + 2 * PAD - 8) || st.key !== lightKey)
+          renderStrip(layer, o);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.drawImage(st.c, Math.round((st.x0 - o) * dpr), Math.round(lift * dpr));
         ctx.setTransform(dpr, 0, 0, dpr, 0, lift * dpr);
@@ -267,22 +346,24 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
           ctx.globalAlpha = 0.45;
           ctx.fillRect(0, RIVER[0] * world.s, w, 2.2 * world.s);
           ctx.globalAlpha = 1;
+          // The water's edge: a 1px glint along the near bank (the ground's wavy edge hides parts of it).
+          ctx.fillStyle = glint;
+          ctx.fillRect(0, Math.round(GLINT_Y * world.s), w, 1);
           between(ctx, "river", walk * PARALLAX.L3);
         }
         between(ctx, layer, o);
       }
-      if (fadeBottom > 0) {
-        // The stage scene ends where the page goes on: its ground fades out instead of stopping on a hard line.
-        const y1 = canvas.height;
-        const y0 = y1 - fadeBottom * dpr;
+      if (fade > 0) {
+        // A scene's ground doesn't stop on a line: it runs on under the band and fades into the sky below it
+        // (which is the mid colour there, never the horizon's: src/lib/sky/horizon.ts).
+        const y0 = (lift + H) * dpr;
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        const fg = ctx.createLinearGradient(0, y0, 0, y1);
-        fg.addColorStop(0, "rgba(0,0,0,0)");
-        fg.addColorStop(1, "rgba(0,0,0,1)");
-        ctx.globalCompositeOperation = "destination-out";
+        const fg = ctx.createLinearGradient(0, y0, 0, y0 + fade * dpr);
+        fg.addColorStop(0, css(ground, 1));
+        fg.addColorStop(0.45, css(ground, 0.55));
+        fg.addColorStop(1, css(ground, 0));
         ctx.fillStyle = fg;
-        ctx.fillRect(0, y0, canvas.width, y1 - y0);
-        ctx.globalCompositeOperation = "source-over";
+        ctx.fillRect(0, y0, canvas.width, fade * dpr);
       }
     },
     /** Re-render every strip now (the light changed while scrubbing). */
@@ -291,6 +372,7 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
     },
     placedOn: (layer: LayerId): Placed[] => world?.layers[layer] ?? [],
     colorOf: (layer: LayerId) => colors[layer] ?? "rgba(0,0,0,1)",
+    tones,
   };
 }
 

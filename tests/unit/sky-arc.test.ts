@@ -1,7 +1,17 @@
 import SunCalc from "suncalc";
 import { describe, expect, it } from "vitest";
-import { ALT_REF, ARC, arcGeom, arcPoint, moonPass, SCENE_HORIZON, seasonScale, stageHeightFor, sunPass } from "@/lib/sky/arc";
-import { bandHeight } from "@/lib/sky/landscape/anchors";
+import {
+  ALT_REF,
+  ARC,
+  arcGeom,
+  arcPoint,
+  moonPass,
+  SCENE_HORIZON,
+  seasonScale,
+  stageHeightFor,
+  sunPass,
+} from "@/lib/sky/arc";
+import { sceneBand } from "@/lib/sky/landscape/anchors";
 import { solarNoon } from "@/lib/sky/astro";
 import { dhakaDate } from "@/lib/sky/time";
 import { SYLHET } from "@/lib/sky/weather";
@@ -50,7 +60,10 @@ describe("sky arc", () => {
     expect(pj.y).toBeCloseTo(g.apexY, 0);
     expect(june.u).toBeCloseTo(0.5, 1);
     const ratio = (g.horizonY - pd.y) / (g.horizonY - pj.y);
-    expect(ratio).toBeCloseTo(Math.sin((dec.maxAlt * Math.PI) / 180) / Math.sin((ALT_REF * Math.PI) / 180), 2);
+    expect(ratio).toBeCloseTo(
+      Math.sin((dec.maxAlt * Math.PI) / 180) / Math.sin((ALT_REF * Math.PI) / 180),
+      2,
+    );
     expect(ratio).toBeLessThan(0.7);
   });
 
@@ -87,10 +100,10 @@ describe("moon pass (suncalc.getMoonTimes)", () => {
 
   it("on a 375×812 phone the arc spans ≥ 300px, from header + 16 down into the stage scene's hills", () => {
     const stage = stageHeightFor(375, 812);
-    expect(stage).toBeCloseTo(0.8 * 812, 6);
+    expect(stage).toBeCloseTo(0.76 * 812, 6);
     const m = arcGeom(375, 812, stage, true);
     expect(m.apexY).toBe(64 + 16);
-    const band = bandHeight(375, 812);
+    const band = sceneBand(375, 812);
     expect(m.horizonY).toBeCloseTo(stage - (1 - SCENE_HORIZON) * band, 6);
     expect(m.horizonY - m.apexY).toBeGreaterThanOrEqual(300);
     // 16:45 on 15 Dec: low in the west, right of centre, above the hills, inside the screen.
@@ -100,6 +113,6 @@ describe("moon pass (suncalc.getMoonTimes)", () => {
     expect(pt.cx).toBeGreaterThan(375 / 2);
     expect(pt.cx + 13).toBeLessThanOrEqual(375);
     expect(pt.y).toBeLessThan(m.horizonY - 13);
-    expect(stageHeightFor(375, 600)).toBe(560);
+    expect(stageHeightFor(375, 600)).toBe(540);
   });
 });

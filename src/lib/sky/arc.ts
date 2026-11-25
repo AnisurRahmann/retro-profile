@@ -12,7 +12,7 @@
 import SunCalc from "suncalc";
 import { sun, sunTimes } from "./astro";
 import { SYLHET } from "./weather";
-import { bandHeight } from "./landscape/anchors";
+import { sceneBand } from "./landscape/anchors";
 
 const DEG = 180 / Math.PI;
 const RAD = Math.PI / 180;
@@ -43,7 +43,9 @@ export type ArcGeom = { w: number; h: number; horizonY: number; apexY: number };
  */
 export function arcGeom(vw: number, vh: number, stageBottom: number, scene = false): ArcGeom {
   const apexY = ARC.header + (scene ? ARC.sceneApexGap : ARC.apexGap);
-  const horizon = scene ? stageBottom - (1 - SCENE_HORIZON) * bandHeight(vw, vh) : stageBottom - ARC.horizonDrop * vh;
+  const horizon = scene
+    ? stageBottom - (1 - SCENE_HORIZON) * sceneBand(vw, vh)
+    : stageBottom - ARC.horizonDrop * vh;
   return { w: vw, h: vh, horizonY: Math.max(apexY + 80, horizon), apexY };
 }
 
@@ -52,13 +54,18 @@ export const SCENE_HORIZON = 0.4;
 
 /** Stage height as CSS computes it (for pages without a stage, the sun still needs a horizon). */
 export const stageHeightFor = (vw: number, vh: number) =>
-  vw >= 808 ? Math.max(460, Math.min(0.62 * vh, 640)) : vw >= 640 ? Math.max(460, 0.7 * vh) : Math.max(560, 0.8 * vh);
+  vw >= 808
+    ? Math.max(460, Math.min(0.62 * vh, 640))
+    : vw >= 640
+      ? Math.max(460, 0.7 * vh)
+      : Math.max(540, 0.76 * vh);
 
 /** Geometry for pure contexts (tests, the guard's defaults): a 1440×900 desktop. */
 export const DEFAULT_GEOM: ArcGeom = arcGeom(1440, 900, stageHeightFor(1440, 900));
 
 /** Seasonal height of a pass whose highest point is `maxAltDeg`: 1 at the June-solstice noon sun. */
-export const seasonScale = (maxAltDeg: number) => Math.min(1, Math.max(0, Math.sin(maxAltDeg * RAD) / Math.sin(ALT_REF * RAD)));
+export const seasonScale = (maxAltDeg: number) =>
+  Math.min(1, Math.max(0, Math.sin(maxAltDeg * RAD) / Math.sin(ALT_REF * RAD)));
 
 /** A body's progress (u) and altitude on its pass; `up` = between rise and set. */
 export type Pass = { u: number; alt: number; maxAlt: number; up: boolean };
@@ -75,7 +82,10 @@ export function arcPoint(u: number, alt: number, maxAlt: number, g: ArcGeom): Ar
 
 /** The dashed night continuation under the horizon (west back to east), depth px at its lowest. */
 export function nightPoint(v: number, g: ArcGeom, depth: number): { x: number; y: number } {
-  return { x: g.w * (0.5 + (0.5 - ARC.east) * Math.cos(Math.PI * v)), y: g.horizonY + depth * Math.sin(Math.PI * v) };
+  return {
+    x: g.w * (0.5 + (0.5 - ARC.east) * Math.cos(Math.PI * v)),
+    y: g.horizonY + depth * Math.sin(Math.PI * v),
+  };
 }
 
 const noonAlt = new Map<string, number>();
@@ -94,7 +104,8 @@ export function sunPass(date: Date): Pass {
   return { u, alt: sun(date).elevationDeg, maxAlt, up: u >= 0 && u <= 1 };
 }
 
-const moonAlt = (t: number) => SunCalc.getMoonPosition(new Date(t), SYLHET.lat, SYLHET.lon).altitude * DEG;
+const moonAlt = (t: number) =>
+  SunCalc.getMoonPosition(new Date(t), SYLHET.lat, SYLHET.lon).altitude * DEG;
 
 /** Moonrise and moonset instants around `date` (suncalc's search, run on the surrounding UTC days). */
 export function moonEvents(date: Date): { rises: number[]; sets: number[] } {
@@ -106,7 +117,8 @@ export function moonEvents(date: Date): { rises: number[]; sets: number[] } {
     if (m.rise) rises.push(m.rise.getTime());
     if (m.set) sets.push(m.set.getTime());
   }
-  const uniq = (a: number[]) => [...new Set(a.map((x) => Math.round(x / 6e4) * 6e4))].sort((p, q) => p - q);
+  const uniq = (a: number[]) =>
+    [...new Set(a.map((x) => Math.round(x / 6e4) * 6e4))].sort((p, q) => p - q);
   return { rises: uniq(rises), sets: uniq(sets) };
 }
 

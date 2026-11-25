@@ -205,8 +205,7 @@ const raw = {
       org: GERALD,
       period: GERALD_PERIOD,
       role: GERALD_ROLE,
-      problem:
-        "A 10,000-SKU catalog capped revenue, and inventory risk ruled out stocking more.",
+      problem: "A 10,000-SKU catalog capped revenue, and inventory risk ruled out stocking more.",
       built:
         "An Amazon integration via Zinc with catalog sync, order placement, failure handling and reconciliation.",
       flow: ["Catalog sync", "Order placement", "Failure handling", "Reconciliation"],
@@ -352,8 +351,7 @@ const raw = {
   services: {
     offer:
       "Voice and phone automation for small and mid-size businesses. Fixed-fee pilot: one phone number, one use case, 2 to 4 weeks, with a pass/fail metric agreed before it starts. Then a monthly fee to run and improve it.",
-    pricing:
-      "Pricing and rates are never stated in chat. Route the visitor to a call (book_call).",
+    pricing: "Pricing and rates are never stated in chat. Route the visitor to a call (book_call).",
     roles:
       "Also open to full-time AI engineering roles on AI-first product teams. Happy to talk about roles; route to book_call.",
   },
@@ -510,8 +508,7 @@ const raw = {
     meta: {
       title: "Shakil (Anisur Rahman), Fullstack AI Engineer",
       chatTitle: "Talk to my agent",
-      chatDescription:
-        "Ask Shakil's agent about his work. If it's worth his time, it gets to him.",
+      chatDescription: "Ask Shakil's agent about his work. If it's worth his time, it gets to him.",
       liftsDescription: "Shakil's current training split.",
     },
     nav: { chat: "Talk to my agent", work: "Work", lifts: "Lifts", home: "Home" },
@@ -639,7 +636,7 @@ const raw = {
         tea: "tea gardens, Sylhet",
         bridge: "near Keane Bridge, Sylhet",
         city: "city rooftops, Sylhet",
-        airport: "Osmani Airport, Sylhet",
+        airport: "near Osmani Airport, Sylhet",
       },
       placesSpoken: {
         default: "",

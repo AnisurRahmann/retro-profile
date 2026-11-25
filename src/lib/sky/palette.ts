@@ -29,3 +29,15 @@ export const WINDOW_LIT = "#FFD9A0";
 export const CITY_GLOW = "#E8A15A";
 /** Cool white TV light in a few windows, flickering gently. */
 export const TV_LIT = "#CFDDFF";
+/**
+ * Landscape layers before lighting (src/lib/sky/landscape/colors.ts): far hills slate-blue, tea gardens deep tea-green
+ * (and the bush rows on them), the town, the near ground. Each keeps its own hue; the horizon only hazes it.
+ */
+export const LAND_L1 = "#2B3550";
+export const LAND_L2 = "#1E2E28";
+export const LAND_TEA_ROWS = "#24372F";
+export const LAND_L3 = "#171D2A";
+export const LAND_L4 = "#0C1018";
+/** Runway lights: the threshold (green) and the far end (red); the plane's red beacon uses the same red. */
+export const RWY_GREEN = "#62E08E";
+export const RWY_RED = "#FF5A4E";

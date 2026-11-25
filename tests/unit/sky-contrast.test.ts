@@ -13,6 +13,8 @@ import {
   aaMix,
   backgroundFor,
   CHIP_ALPHA,
+  CHIP_TARGET,
+  SMALL_PX,
   CHIP_MAX,
   decide,
   GRAPHITE,
@@ -53,13 +55,23 @@ function model(e: number, phase: Phase, c: Condition) {
 }
 
 /** Contrast of the text as rendered (anti-aliased toward the background at DPR 1) over its backing. */
-const effective = (bg: [number, number, number], text: [number, number, number], d: ReturnType<typeof decide>, px: number, dpr = 2) => {
-  const b = over(bg, INK, d.mode === "none" ? 0 : d.mode === "halo" ? haloInk(d.a, sizeBucket(px)) : d.a);
+const effective = (
+  bg: [number, number, number],
+  text: [number, number, number],
+  d: ReturnType<typeof decide>,
+  px: number,
+  dpr = 2,
+) => {
+  const b = over(
+    bg,
+    INK,
+    d.mode === "none" ? 0 : d.mode === "halo" ? haloInk(d.a, sizeBucket(px)) : d.a,
+  );
   return contrast(over(text, b, aaMix(px, dpr)), b);
 };
 
 describe("per-element backing", () => {
-  it("keeps --text ≥ 7, --on-sky and --graphite ≥ 4.5 at every elevation, condition, phase and height", () => {
+  it("keeps --text ≥ 7 (≥ CHIP_TARGET on a chip or ≤ 12px), --on-sky and --graphite ≥ 4.5 at every elevation, condition, phase and height", () => {
     const tones = [
       { name: "text", rgb: TEXT, min: 7 },
       { name: "on-sky", rgb: ON_SKY, min: 4.5 },
@@ -76,19 +88,29 @@ describe("per-element backing", () => {
             const y = i / 32;
             const bg = skyAt(m, y);
             for (const t of tones)
-              for (const [px, dpr] of [[12, 1], [12, 2], [16, 1], [36, 1]] as const) {
+              for (const [px, dpr] of [
+                [12, 1],
+                [12, 2],
+                [16, 1],
+                [36, 1],
+              ] as const) {
                 const d = decide(bg, t.rgb, px, dpr);
                 count[d.mode]++;
                 const k = effective(bg, t.rgb, d, px, dpr);
                 const where = `${e}° ${c} ${phase} y=${y.toFixed(2)} ${t.name} ${px}px@${dpr} ${d.mode} ${d.a}`;
                 if (k < worst.c) worst = { c: k, where };
-                if (k < t.min) fails.push(`${where}: ${k.toFixed(2)} over ${rgbToHex(bg)}`);
+                if (
+                  k < (d.mode === "chip" || px <= SMALL_PX ? Math.min(t.min, CHIP_TARGET) : t.min)
+                )
+                  fails.push(`${where}: ${k.toFixed(2)} over ${rgbToHex(bg)}`);
               }
           }
         }
       }
     }
-    console.info(`[backing] worst ${worst.c.toFixed(2)}:1 at ${worst.where}; modes ${JSON.stringify(count)}`);
+    console.info(
+      `[backing] worst ${worst.c.toFixed(2)}:1 at ${worst.where}; modes ${JSON.stringify(count)}`,
+    );
     expect(fails.slice(0, 20)).toEqual([]);
   }, 30_000);
 
@@ -116,7 +138,8 @@ describe("per-element backing", () => {
           for (const t of [TEXT, GRAPHITE]) {
             const d = decide(bg, t, 12, 1);
             const k = effective(bg, t, d, 12, 1);
-            if (k < 4.5) fails.push(`${e}° ${c} box ${x0},${y0}: ${k.toFixed(2)} (${d.mode} ${d.a})`);
+            if (k < 4.5)
+              fails.push(`${e}° ${c} box ${x0},${y0}: ${k.toFixed(2)} (${d.mode} ${d.a})`);
           }
         }
       }
@@ -155,7 +178,14 @@ describe("per-element backing", () => {
   });
 
   it("counts the sun's colour from its altitude", () => {
-    const s: Scene = { m: model(5, "evening", "clear"), vw: 1440, vh: 900, sun: { x: 100, y: 100, r: 16, alt: 5, cloud: 0, fog: 0 }, moon: null, glows: [] };
+    const s: Scene = {
+      m: model(5, "evening", "clear"),
+      vw: 1440,
+      vh: 900,
+      sun: { x: 100, y: 100, r: 16, alt: 5, cloud: 0, fog: 0 },
+      moon: null,
+      glows: [],
+    };
     const on = backgroundFor(s, { x0: 95, y0: 95, x1: 105, y1: 105 });
     expect(contrast(on, sunColor(5))).toBeLessThan(1.1);
   });

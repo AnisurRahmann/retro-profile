@@ -140,7 +140,13 @@ export function createSun(dpr: () => number) {
      * @param t seconds (animation clock; 0 under reduced motion)
      * @param rayGap gap in the clouds along a ray at angle a (0 = clouded … 1 = clear), for crepuscular rays
      */
-    draw(ctx: CanvasRenderingContext2D, s: SunState, t: number, day: number, rayGap: (a: number) => number) {
+    draw(
+      ctx: CanvasRenderingContext2D,
+      s: SunState,
+      t: number,
+      day: number,
+      rayGap: (a: number) => number,
+    ) {
       if (!s.up || s.dim <= 0.001) return;
       const k = `${Math.round(s.alt)}|${Math.round(s.glow * 20)}|${s.r}|${s.horizon.map((v) => Math.round(v * 40)).join()}|${dpr()}`;
       if (k !== key) {
@@ -200,7 +206,14 @@ export function createSun(dpr: () => number) {
 export type Sun = ReturnType<typeof createSun>;
 
 /** Moon halo (22°, only when humidity > 85%): a faint ring at 4%. */
-export function drawHalo(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, alpha: number, text: string) {
+export function drawHalo(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  alpha: number,
+  text: string,
+) {
   if (alpha <= 0.001) return;
   ctx.globalAlpha = 0.04 * alpha;
   ctx.strokeStyle = text;
@@ -227,7 +240,8 @@ export function drawArc(
   ctx.lineCap = "round";
   ctx.setLineDash([0.01, 9]);
   ctx.lineWidth = 2;
-  ctx.globalAlpha = 0.09;
+  // 9%, brightening to 22% while the sky is being scrubbed (the phone's arc handle, the strip, the time-lapse).
+  ctx.globalAlpha = 0.09 + 0.13 * nightAlpha;
   ctx.beginPath();
   day.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
   ctx.stroke();

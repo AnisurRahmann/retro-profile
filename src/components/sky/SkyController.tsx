@@ -3,7 +3,13 @@
 import { useEffect } from "react";
 import { skyModel } from "@/lib/sky/model";
 import { effectiveWeather, parseOverrides, skyStore, skyTime } from "@/lib/sky/store";
-import { landMode, nearestPlace, scenePlace, solveAnchors, type Anchor } from "@/lib/sky/landscape/anchors";
+import {
+  landMode,
+  nearestPlace,
+  scenePlace,
+  solveAnchors,
+  type Anchor,
+} from "@/lib/sky/landscape/anchors";
 import { geomNow, onViewGeometry, onViewScroll, startView, view } from "@/lib/sky/view";
 import { isWeather } from "@/lib/sky/weather";
 
@@ -23,7 +29,13 @@ function paint() {
   html.dataset.sky = m.astro.state;
   if (TEST) {
     const w = window as Window & { __sky?: Record<string, unknown> };
-    w.__sky = { ...w.__sky, state: m.astro.state, elevation: m.astro.elevation, condition: m.condition, fps: w.__sky?.fps ?? 0 };
+    w.__sky = {
+      ...w.__sky,
+      state: m.astro.state,
+      elevation: m.astro.elevation,
+      condition: m.condition,
+      fps: w.__sky?.fps ?? 0,
+    };
   }
   if (s.scrubbing) html.dataset.skyScrub = "";
   else delete html.dataset.skyScrub;
@@ -47,9 +59,13 @@ export function SkyController() {
       try {
         // no-cache: the response's stale-while-revalidate is for the CDN; in the browser it would serve the
         // previous poll's copy and revalidate behind it, so every update would arrive one poll late.
-        const res = await fetch("/api/sylhet", { cache: "no-cache", headers: { accept: "application/json" } });
+        const res = await fetch("/api/sylhet", {
+          cache: "no-cache",
+          headers: { accept: "application/json" },
+        });
         const body: unknown = res.ok ? await res.json() : null;
-        if (!dead) skyStore.set({ weather: isWeather(body) ? body : skyStore.get().weather, loaded: true });
+        if (!dead)
+          skyStore.set({ weather: isWeather(body) ? body : skyStore.get().weather, loaded: true });
       } catch {
         if (!dead) skyStore.set({ loaded: true });
       }
@@ -78,8 +94,14 @@ export function SkyController() {
     // The label's place name follows the landmark nearest its target (also under reduced motion).
     let anchors: Anchor[] = [];
     const place = () => {
-      // Scene mode: the label follows the stage's horizon scene.
-      const p = landMode(view.vw, !!view.stage) === "scene" ? scenePlace(view.y, view.stage - (view.sections.stage ?? 0), view.vw) : nearestPlace(anchors, view.y);
+      // Scene mode: the label follows the stage's horizon scene, then the closing scene (the airport) once it's in view.
+      const closing = document.querySelector("[data-sky-scene=closing]")?.getBoundingClientRect();
+      const p =
+        landMode(view.vw, !!view.stage) === "scene"
+          ? closing && closing.top < 0.75 * view.vh && closing.bottom > 0
+            ? "airport"
+            : scenePlace(view.y, view.stage - (view.sections.stage ?? 0), view.vw)
+          : nearestPlace(anchors, view.y);
       skyStore.set({ place: p });
       if (TEST) {
         const w = window as unknown as { __sky?: Record<string, unknown> };
@@ -88,7 +110,13 @@ export function SkyController() {
     };
     const unsubAnchors = onViewGeometry(() => {
       const mode = landMode(view.vw, !!view.stage);
-      anchors = solveAnchors(view.sections, view.vw, view.vh, Math.max(0, view.docH - view.vh), mode === "scene" ? "centre" : mode);
+      anchors = solveAnchors(
+        view.sections,
+        view.vw,
+        view.vh,
+        Math.max(0, view.docH - view.vh),
+        mode === "scene" ? "centre" : mode,
+      );
       place();
     });
     const unsubPlace = onViewScroll(place);

@@ -8,21 +8,25 @@
 import { mulberry32 } from "../random";
 
 export type Pt = [number, number];
+/** Night lights: windows, lamps, bridge deck lights, runway edge / threshold (green) / far end (red), glass panes. */
+export type LightKind = "window" | "lamp" | "deck" | "runway" | "threshold" | "rwyend" | "pane";
 export type Shape = {
   fill?: string;
   stroke?: { d: string; width: number }[];
   cut?: { d: string; alpha: number; width?: number }[];
   /** Night lights in local units: windows, lamps, deck lights, runway lights. */
-  lights?: { at: Pt; kind: "window" | "lamp" | "deck" | "runway" }[];
+  lights?: { at: Pt; kind: LightKind }[];
   /** Local x extent. */
   x0: number;
   x1: number;
 };
 
 const f = (n: number) => +n.toFixed(2);
-const rect = (x: number, y: number, w: number, h: number) => `M${f(x)} ${f(y)}h${f(w)}v${f(h)}h${f(-w)}Z`;
+const rect = (x: number, y: number, w: number, h: number) =>
+  `M${f(x)} ${f(y)}h${f(w)}v${f(h)}h${f(-w)}Z`;
 const line = (a: Pt, b: Pt) => `M${f(a[0])} ${f(a[1])}L${f(b[0])} ${f(b[1])}`;
-const circle = (cx: number, cy: number, r: number) => `M${f(cx - r)} ${f(cy)}a${f(r)} ${f(r)} 0 1 0 ${f(2 * r)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-2 * r)} 0Z`;
+const circle = (cx: number, cy: number, r: number) =>
+  `M${f(cx - r)} ${f(cy)}a${f(r)} ${f(r)} 0 1 0 ${f(2 * r)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-2 * r)} 0Z`;
 
 export const BANK_Y = 70;
 export const RIVER = [72, 86] as const;
@@ -64,8 +68,15 @@ export function keaneBridge(): Shape {
     }
   }
   // A string of 14 warm lights along the deck (mirrored in the river at night).
-  for (let k = 0; k < 14; k++) lights.push({ at: [(spans * W * (k + 0.5)) / 14, deckTop - 0.5], kind: "deck" });
-  return { fill, stroke: [{ d: strokes.join(""), width: 0.75 }], lights, x0: -16, x1: spans * W + 16 };
+  for (let k = 0; k < 14; k++)
+    lights.push({ at: [(spans * W * (k + 0.5)) / 14, deckTop - 0.5], kind: "deck" });
+  return {
+    fill,
+    stroke: [{ d: strokes.join(""), width: 0.75 }],
+    lights,
+    x0: -16,
+    x1: spans * W + 16,
+  };
 }
 
 /**
@@ -84,7 +95,11 @@ export function clockTower(): Shape {
     fill,
     cut: [
       { d: circle(0, b - 32.5, 3), alpha: 0.55 },
-      { d: line([0, b - 32.5], [0, b - 34.6]) + line([0, b - 32.5], [1.6, b - 32.5]), alpha: 1, width: 0.5 },
+      {
+        d: line([0, b - 32.5], [0, b - 34.6]) + line([0, b - 32.5], [1.6, b - 32.5]),
+        alpha: 1,
+        width: 0.5,
+      },
     ],
     x0: -7,
     x1: 7,
@@ -110,7 +125,9 @@ export function cityBlock(seed: number, width: number, tower: boolean): Shape {
     } else if (r() < 0.4) fill += rect(x + w * 0.6, top - 2.5, 3.5, 2.5);
     if (r() < 0.25) strokes.push(line([x + w * 0.3, top], [x + w * 0.3, top - 5 - r() * 4]));
     // Windows: a grid on the facade.
-    for (let wy = top + 3; wy < BANK_Y - 3; wy += 3.6) for (let wx = x + 1.6; wx < x + w - 1.2; wx += 2.8) lights.push({ at: [wx, wy], kind: "window" });
+    for (let wy = top + 3; wy < BANK_Y - 3; wy += 3.6)
+      for (let wx = x + 1.6; wx < x + w - 1.2; wx += 2.8)
+        lights.push({ at: [wx, wy], kind: "window" });
     x += w + (r() < 0.2 ? 1.5 + r() * 3 : 0);
   }
   if (tower) {
@@ -133,48 +150,70 @@ export function cityBlock(seed: number, width: number, tower: boolean): Shape {
   return { fill, stroke: [{ d: strokes.join(""), width: 0.5 }], lights, x0: 0, x1: width };
 }
 
-/** A plane in side view, nose to the right. Local origin: under the main gear; 36 units long. */
-export function planePath(): string {
-  return (
-    // Fuselage with a rounded nose and a tapered tail.
-    "M0 -6.2C6 -7.2 24 -7.4 30 -6.8C33.5 -6.4 35.6 -5.3 35.8 -4.2C35.6 -3.1 33.8 -2.4 30 -2.3L4 -2.3C1.5 -2.4 -1.5 -3.3 -3 -4.4Z" +
-    // Tail fin and stabiliser.
-    "M-3 -4.4L-5.6 -13.2L-2.6 -13.2L4 -6.4Z" +
-    "M-4.6 -5.4L2.6 -5.6L1.8 -4.6L-4.2 -4.4Z" +
-    // Wing (a dark slab below the fuselage) and an engine.
-    "M10 -3.2L22 -3.4L19 -1.6L11.6 -1.4Z" +
-    "M14 -2.4h5.4a1 1 0 0 1 0 2h-5.4Z" +
-    // Gear.
-    "M15.6 -0.4h0.6v0.4h-0.6Z M31.2 -2.3h0.5v2.3h-0.5Z M15.7 0h0.4v0h-0.4Z"
-  );
-}
-
-/** Osmani Airport: runway with edge lights, terminal, control tower, a parked plane. Local x 0 … 230. */
-export function airport(): Shape {
+/**
+ * Osmani Airport, a set piece that reads at a glance: a long runway at ground level (drawn by life.ts: tarmac, a
+ * dashed centreline, white edge lights, green at the threshold, red at the end), a low terminal with a glass
+ * facade, the control tower with its flared glass cab, a fence line, a windsock at the runway's far end, and a
+ * narrow-body parked at the gate (life.ts). Local x 0 … 230; the runway runs 0 … 172 in front, the terminal and
+ * tower stand right of it, the gate is just past the threshold so the plane taxis on and rolls left.
+ */
+export function airport(): Airport {
   const b = BANK_Y;
-  let fill = rect(0, b - 0.8, 230, 0.8);
-  // Terminal: long and low with a shallow curved roof.
-  fill += `M40 ${b}V${b - 8}Q75 ${b - 12.5} 110 ${b - 8}V${b}Z`;
-  fill += rect(46, b - 13.5, 0.6, 3.5) + rect(100, b - 13, 0.6, 3);
-  // Control tower: shaft, flared cab, roof, mast.
-  fill += rect(121, b - 30, 4.4, 30);
-  fill += `M116.6 ${b - 37.5}H129.8L127.8 ${b - 30}H118.6Z`;
-  fill += rect(116, b - 39, 14.4, 1.5);
-  // Parked plane on the apron.
-  const strokes = [line([123.2, b - 39], [123.2, b - 45]), line([121.4, b - 43], [125, b - 43])];
+  let fill = "";
+  const strokes: string[] = [];
   const lights: NonNullable<Shape["lights"]> = [];
-  for (let x = 4; x <= 226; x += 6) lights.push({ at: [x, b - 0.4], kind: "runway" });
-  for (let x = 44; x < 108; x += 3) lights.push({ at: [x, b - 5], kind: "window" });
-  return { fill, stroke: [{ d: strokes.join(""), width: 0.6 }], lights, x0: 0, x1: 230 };
+  // Fence: posts every 5 units and two wires, behind the runway.
+  for (let x = 1; x <= 228; x += 5) fill += rect(x, b - 3.6, 0.5, 2.8);
+  strokes.push(line([0, b - 3.3], [230, b - 3.3]) + line([0, b - 2.1], [230, b - 2.1]));
+  // Terminal: long and low, a shallow curved roof, a jet bridge reaching toward the gate.
+  fill += `M140 ${b}V${b - 8.5}Q174 ${b - 11.8} 208 ${b - 8.5}V${b}Z`;
+  fill += rect(146, b - 12.2, 0.6, 3.2) + rect(200, b - 11.8, 0.6, 3);
+  fill += rect(131, b - 6.2, 10, 2.2) + rect(131.5, b - 4, 1.2, 4);
+  // Control tower: shaft, flared cab, roof, mast with a crossbar.
+  fill += rect(214, b - 30, 4.4, 30);
+  fill += `M209.6 ${b - 37.5}H226.4L223.6 ${b - 30}H212.4Z`;
+  fill += rect(209, b - 39, 18, 1.5);
+  strokes.push(line([216.2, b - 39], [216.2, b - 45]) + line([214.4, b - 43], [218, b - 43]));
+  // Runway lights: white along both edges, green across the threshold (right), red across the far end (left).
+  for (let x = 4; x <= 166; x += 6)
+    lights.push(
+      { at: [x, AIRPORT_RUNWAY.y - AIRPORT_RUNWAY.hw], kind: "runway" },
+      { at: [x, AIRPORT_RUNWAY.y + AIRPORT_RUNWAY.hw], kind: "runway" },
+    );
+  for (const dy of [-1, 0, 1]) {
+    lights.push({
+      at: [AIRPORT_RUNWAY.x1 - 0.5, AIRPORT_RUNWAY.y + dy * AIRPORT_RUNWAY.hw],
+      kind: "threshold",
+    });
+    lights.push({
+      at: [AIRPORT_RUNWAY.x0 + 0.5, AIRPORT_RUNWAY.y + dy * AIRPORT_RUNWAY.hw],
+      kind: "rwyend",
+    });
+  }
+  // Glass: the terminal's facade and the tower's cab (panes lit at night, the sky's reflection by day).
+  for (const [x0, y0, x1, y1] of AIRPORT_GLASS)
+    for (let x = x0 + 1.2; x < x1 - 0.6; x += 2.4)
+      lights.push({ at: [x, (y0 + y1) / 2], kind: "pane" });
+  return { fill, stroke: [{ d: strokes.join(""), width: 0.35 }], lights, x0: 0, x1: 230 };
 }
+export type Airport = Shape;
 
-/** Where the plane parks and takes off from (local airport units). */
-export const AIRPORT_PLANE: Pt = [150, BANK_Y - 0.8];
+/** The runway (local units): from x0 (its far end, left) to x1 (the threshold, right), centreline y, half-width. */
+export const AIRPORT_RUNWAY = { x0: 0, x1: 172, y: BANK_Y + 0.7, hw: 1.1 } as const;
+/** Glass panes [x0, y0, x1, y1] (local units): the terminal's facade, the tower's cab. */
+export const AIRPORT_GLASS: readonly (readonly [number, number, number, number])[] = [
+  [143, BANK_Y - 7.2, 205, BANK_Y - 3.8],
+  [211.4, BANK_Y - 36.6, 224.6, BANK_Y - 32],
+];
+/** Where the plane parks (its main gear, local units): on the apron just past the threshold. */
+export const AIRPORT_PLANE: Pt = [178, BANK_Y - 1.2];
+/** The windsock's mast foot (local units), by the runway's far end. */
+export const AIRPORT_WINDSOCK: Pt = [7, BANK_Y - 1];
 
 /** Tea-garden shade tree (tall, thin, umbrella crowns), base at (0, 0). */
 export function shadeTree(seed: number): Shape {
   const r = mulberry32(seed);
-  const h = 13 + r() * 12;
+  const h = 18 + r() * 14;
   const w = 9 + r() * 8;
   const lean = (r() - 0.5) * 2;
   let fill = `M${f(lean - w / 2)} ${f(-h)}Q${f(lean)} ${f(-h - 3.6)} ${f(lean + w / 2)} ${f(-h)}Q${f(lean)} ${f(-h + 1.4)} ${f(lean - w / 2)} ${f(-h)}Z`;
@@ -183,7 +222,12 @@ export function shadeTree(seed: number): Shape {
     const y2 = -h + 4 + r() * 2;
     fill += `M${f(lean * 0.7 - w2 / 2)} ${f(y2)}Q${f(lean * 0.7)} ${f(y2 - 2.4)} ${f(lean * 0.7 + w2 / 2)} ${f(y2)}Q${f(lean * 0.7)} ${f(y2 + 1)} ${f(lean * 0.7 - w2 / 2)} ${f(y2)}Z`;
   }
-  return { fill, stroke: [{ d: `M0 0Q${f(lean * 0.3)} ${f(-h / 2)} ${f(lean)} ${f(-h + 0.6)}`, width: 0.8 }], x0: -w / 2 - 2, x1: w / 2 + 2 };
+  return {
+    fill,
+    stroke: [{ d: `M0 0Q${f(lean * 0.3)} ${f(-h / 2)} ${f(lean)} ${f(-h + 0.6)}`, width: 0.8 }],
+    x0: -w / 2 - 2,
+    x1: w / 2 + 2,
+  };
 }
 
 /** A riverside tree (rounded crown) or a low house with a gable, base at (0, BANK_Y). */
@@ -192,11 +236,22 @@ export function bankThing(seed: number): Shape {
   if (r() < 0.6) {
     const rad = 3 + r() * 3;
     const cy = BANK_Y - 4 - rad;
-    return { fill: circle(0, cy, rad) + circle(rad * 0.7, cy + 1.5, rad * 0.7) + rect(-0.5, cy, 1, BANK_Y - cy), x0: -rad, x1: rad * 1.7 };
+    return {
+      fill:
+        circle(0, cy, rad) +
+        circle(rad * 0.7, cy + 1.5, rad * 0.7) +
+        rect(-0.5, cy, 1, BANK_Y - cy),
+      x0: -rad,
+      x1: rad * 1.7,
+    };
   }
   const w = 6 + r() * 6;
   const h = 4 + r() * 3;
-  return { fill: `M0 ${BANK_Y}V${f(BANK_Y - h)}L${f(w / 2)} ${f(BANK_Y - h - 3)}L${f(w)} ${f(BANK_Y - h)}V${BANK_Y}Z`, x0: 0, x1: w };
+  return {
+    fill: `M0 ${BANK_Y}V${f(BANK_Y - h)}L${f(w / 2)} ${f(BANK_Y - h - 3)}L${f(w)} ${f(BANK_Y - h)}V${BANK_Y}Z`,
+    x0: 0,
+    x1: w,
+  };
 }
 
 /** Near foreground (L4), base at (0, NEAR_Y): palm, bamboo clump, lamp post, low wall or a parked rickshaw. */
@@ -220,7 +275,17 @@ export function palm(seed: number): Shape {
     fill += `M${f(top[0])} ${f(top[1])}Q${f(mid[0] + nx)} ${f(mid[1] + ny)} ${f(tip[0])} ${f(tip[1])}Q${f(mid[0] - nx)} ${f(mid[1] - ny)} ${f(top[0])} ${f(top[1])}Z`;
   }
   fill += circle(top[0], top[1] + 1.5, 1.8);
-  return { fill, stroke: [{ d: `M0 ${NEAR_Y}Q${f(lean * 0.15)} ${f(NEAR_Y - h * 0.5)} ${f(top[0])} ${f(top[1])}`, width: 2.2 }], x0: -24 + lean, x1: 24 + lean };
+  return {
+    fill,
+    stroke: [
+      {
+        d: `M0 ${NEAR_Y}Q${f(lean * 0.15)} ${f(NEAR_Y - h * 0.5)} ${f(top[0])} ${f(top[1])}`,
+        width: 2.2,
+      },
+    ],
+    x0: -24 + lean,
+    x1: 24 + lean,
+  };
 }
 
 export function bamboo(seed: number): Shape {
@@ -233,7 +298,9 @@ export function bamboo(seed: number): Shape {
     const h = 40 + r() * 35;
     const bend = (r() - 0.5) * 22;
     const tip: Pt = [bx + bend, NEAR_Y - h];
-    strokes.push(`M${f(bx)} ${NEAR_Y}Q${f(bx + bend * 0.2)} ${f(NEAR_Y - h * 0.6)} ${f(tip[0])} ${f(tip[1])}`);
+    strokes.push(
+      `M${f(bx)} ${NEAR_Y}Q${f(bx + bend * 0.2)} ${f(NEAR_Y - h * 0.6)} ${f(tip[0])} ${f(tip[1])}`,
+    );
     for (let k = 0; k < 4; k++) {
       const t = 0.55 + k * 0.13;
       const lx = bx + bend * t * t;
@@ -248,7 +315,9 @@ export function bamboo(seed: number): Shape {
 export function lampPost(): Shape {
   return {
     fill: `M5.2 ${NEAR_Y - 46.5}h4.6l-0.8 2h-3Z` + rect(-1.6, NEAR_Y - 3, 3.2, 3),
-    stroke: [{ d: `M0 ${NEAR_Y}V${NEAR_Y - 44}Q0 ${NEAR_Y - 47} 4 ${NEAR_Y - 47}H7.5`, width: 1.1 }],
+    stroke: [
+      { d: `M0 ${NEAR_Y}V${NEAR_Y - 44}Q0 ${NEAR_Y - 47} 4 ${NEAR_Y - 47}H7.5`, width: 1.1 },
+    ],
     lights: [{ at: [7.5, NEAR_Y - 43.8], kind: "lamp" }],
     x0: -2,
     x1: 10,
@@ -257,7 +326,8 @@ export function lampPost(): Shape {
 
 export function lowWall(width: number): Shape {
   let fill = rect(0, NEAR_Y - 9, width, 9);
-  for (let x = 0; x <= width; x += 22) fill += rect(x - 1.5, NEAR_Y - 12, 3, 12) + rect(x - 2.2, NEAR_Y - 12.8, 4.4, 1);
+  for (let x = 0; x <= width; x += 22)
+    fill += rect(x - 1.5, NEAR_Y - 12, 3, 12) + rect(x - 2.2, NEAR_Y - 12.8, 4.4, 1);
   return { fill, x0: -2.2, x1: width + 2.2 };
 }
 
@@ -270,7 +340,10 @@ export function rickshaw(spokes = 0): Shape {
     let d = circle(cx, -r, r);
     for (let k = 0; k < 3; k++) {
       const a = spokes + (k * Math.PI) / 3;
-      d += line([cx - Math.cos(a) * r * 0.92, -r - Math.sin(a) * r * 0.92], [cx + Math.cos(a) * r * 0.92, -r + Math.sin(a) * r * 0.92]);
+      d += line(
+        [cx - Math.cos(a) * r * 0.92, -r - Math.sin(a) * r * 0.92],
+        [cx + Math.cos(a) * r * 0.92, -r + Math.sin(a) * r * 0.92],
+      );
     }
     return d;
   };
