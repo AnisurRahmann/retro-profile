@@ -374,6 +374,13 @@ html {
 [data-on-sky][data-backing="chip"]::before {
   opacity: 1;
 }
+/* An icon fills its box to the corners, so the chip's rounded corners left sky inside the box grown by the chip's
+   footprint, which is what the pixel gate measures around an element (tests/e2e/sky-backing.spec.ts): 3–6px from a
+   solid icon's edges it found sky, not chip (v5.1: the footer's LinkedIn icon once the footer sat above the band).
+   An element that is only an icon gets a chip that reaches past that shot. */
+[data-on-sky]:has(> svg:only-child)::before {
+  inset: -3px -8px;
+}
 @media (prefers-reduced-motion: reduce) {
   [data-on-sky],
   [data-on-sky]::before {
