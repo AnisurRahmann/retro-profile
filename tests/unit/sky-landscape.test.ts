@@ -82,6 +82,21 @@ describe("landmark anchors, centre mode (pages without a stage, < 1100px)", () =
     expect(nearestPlace([], 0)).toBeNull();
   });
 
+  it("names the landmark of the section at the 40% line even when the landmarks had to be kept apart (v5.1)", () => {
+    // The home page at 1440×900 (measured): its sections are closer together than the landmarks' minimum gap, so
+    // Keane Bridge is pushed back to scroll 0 and the label used to say "city rooftops" all through Shipped.
+    const sections = { stage: 0, shipped: 622, bench: 950, receipts: 1658, closer: 1806 };
+    const anchors = solveAnchors(sections, VW, VH, 1483, "gutter");
+    const bridge = anchors.find((a) => a.id === "bridge")!;
+    expect(bridge.s).toBe(0); // pushed back so it keeps clear of the city
+    expect(bridge.at).toBe(262); // its section's 40% line
+    const at = (id: string) => sections[id as keyof typeof sections]! - ANCHOR_AT * VH;
+    expect(nearestPlace(anchors, at("stage"))).toBe("tea");
+    expect(nearestPlace(anchors, at("shipped"))).toBe("bridge");
+    expect(nearestPlace(anchors, at("bench"))).toBe("city");
+    expect(nearestPlace(anchors, at("closer"))).toBe("airport");
+  });
+
   it("keeps the sky still and the near layer fastest (real parallax)", () => {
     expect(PARALLAX.L1).toBeLessThan(PARALLAX.L2);
     expect(PARALLAX.L2).toBeLessThan(PARALLAX.L3);

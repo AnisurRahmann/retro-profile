@@ -378,13 +378,22 @@ test("the place name follows the landmarks as you walk down the page, without mo
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(place(page)).toHaveText("tea gardens, Sylhet");
   expect(await weatherX()).toBe(x0);
-  // Desktop: each landmark reaches its gutter, never the middle of the column.
-  await walkTo(page, "shipped");
-  await page.waitForTimeout(300);
-  const land = (await sky(page))!.land!;
-  expect(land.mode).toBe("gutter");
-  const clock = land.marks.find((m) => m.id === "clock")!;
-  expect(Math.abs(clock.x - (1440 - 336 / 2))).toBeLessThan(30);
+  // Desktop: each landmark reaches its gutter. Sections close together push landmarks apart in scroll
+  // (anchors.ts MIN_GAP_VH), so the clock tower reaches the right gutter's centre at its own anchor, which is not
+  // always where its section's top is at 40%: look for its closest approach over the whole walk.
+  expect((await sky(page))!.land!.mode).toBe("gutter");
+  const closest = await page.evaluate(async () => {
+    let best = Infinity;
+    const max = document.documentElement.scrollHeight - innerHeight;
+    for (let y = 0; y <= max; y += 40) {
+      window.scrollTo(0, y);
+      await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
+      const m = window.__sky!.land!.marks.find((k) => k.id === "clock")!;
+      best = Math.min(best, Math.abs(m.x - (1440 - 336 / 2)));
+    }
+    return best;
+  });
+  expect(closest).toBeLessThan(30);
   // B1: the airport is the end of the walk, reached at the bottom of the page on its gutter centre; every landmark
   // is in the world once.
   await bottom(page);

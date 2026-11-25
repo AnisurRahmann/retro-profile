@@ -118,6 +118,15 @@ At 03:30 clear, 375×812 and 1440×900:
 - Shots: `.shots/v5.1/T7/sky-2026-11-26T{03-30-wx-clear,11-00-wx-partly,16-45-wx-clear}-375x812-{200ms-after-jump,maxscroll}.png`, `sheet.png`, `sheet-tablet.png` (768×1024, unchanged behaviour but the same scene).
 - How: `margin-top: -48px` on the scene and `margin-top: 16px` on the footer below 1100px; in the renderer each scene is drawn once on the first frame and then drawn ahead while within 1.5 viewport heights (`IntersectionObserver`, `rootMargin: "150% 0px"`). DECISIONS #115.
 
+#### Found by the full Playwright run after T7
+
+`main` itself is not green. The same suite on 3cb5d0d (a throwaway worktree, same machine): **53 passed, 3 failed**: the place-name test, the "Book 30 min" hover test and the 1440 contrast gate (the footer's LinkedIn icon at 4.23:1). On the branch after T7: 57 passed, 3 failed. Each one:
+
+- **T6 follow-up, a regression, fixed.** With the footer above the band the LinkedIn icon measured 2.29:1 (it was 4.23 on `main`, over the darker band). The chip itself was right (ink at 0.77, opacity 1). A solid icon fills its box, so the chip's rounded corners left sky inside the gate's shot (the box grown by the chip's footprint), 3–6px from the glyph, and the gate measured that sky. An element that is only an icon now gets a chip that reaches past the shot (`inset: -3px -8px`). Measured after: 5.07 at 16:45, 5.04 at 11:00. The gate passes at both sizes (88 and 200 measurements; worst 4.82 and 4.75).
+- **The phone swipe test, a regression in the test, fixed.** It swiped at y = 160, which is the text block in the postcard stage, so nothing scrubbed (by design: text is not the handle). It now swipes 70px under the text block. 3 runs of 3.
+- **"Book 30 min" hover, flaky on `main`, fixed.** The test hovers as soon as the plane reads "parked", which is true while it is still fading in over 600 ms, and the trigger asked for a fully visible plane. The plane now goes and finishes fading in as it taxis; arrivals still wait for it. 3 runs of 3 (on `main` it failed in the one baseline run).
+- **The place name, failing on `main`, fixed. Outside the brief, so it is its own commit.** `nearestPlace` is documented as "the landmark whose section is nearest its 40% line", but it compared the compressed anchor scroll. With Receipts on the page the sections are closer than the landmarks' minimum gap, Keane Bridge is pushed back to scroll 0, and the label said "city rooftops" all through Shipped (and "Osmani Airport" through Receipts). It now goes by where each section's 40% line is (`Anchor.at`). The landmark *positions* are unchanged. The test's second half, which never ran on `main`, also put the clock tower at its gutter centre when Shipped's top is at 40%; under the min-gap rule the tower reaches that centre at scroll 0, so the test now looks for its closest approach over the whole walk (it is 0px, at the top of the page). 3 runs of 3. DECISIONS #116.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.
