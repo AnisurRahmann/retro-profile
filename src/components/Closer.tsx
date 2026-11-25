@@ -9,6 +9,7 @@ export const buttonSecondary =
 export function Closer() {
   return (
     <section
+      id="closer"
       aria-labelledby="closer-heading"
       className="section rounded-[10px] glass border border-hairline p-7 shadow-[inset_0_1px_0_var(--highlight)]"
     >

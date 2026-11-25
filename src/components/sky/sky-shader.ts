@@ -14,10 +14,11 @@
  * - Fog: desaturated sky lifted +6% L, alpha uFog × 0.55, strongest across the bottom 40%.
  * - Moon glow: radial halo, illumination × up × night × (1 − 0.7 cover).
  * - Horizon glow: ellipse on the bottom edge under the sun (0.9 × width), horizon colour +10% L.
- * Clouds and the glow are damped to COLUMN_DAMP behind the 768px column (ramping out over 96px), which the scrim
- * solver mirrors.
+ * Clouds and the glow are damped to COLUMN_DAMP behind the column scrim only (src/lib/sky/scrim.ts columnMask ×
+ * rampMask: the 768px column with 220px smootherstep sides, from the scrolled stage bottom uScrimTop down), which
+ * the scrim solver mirrors. Over the open stage nothing is damped.
  */
-import { COLUMN_DAMP, MOON_COLUMN_PX } from "@/lib/sky/scrim";
+import { COLUMN_BREAK, COLUMN_DAMP, MOON_COLUMN_PX, SCRIM_FALLOFF_PX, SCRIM_RAMP_PX } from "@/lib/sky/scrim";
 
 export const OCTAVES = 4;
 /** Side of the value-noise texture (R8, repeat, linear). One filtered fetch per noise lookup instead of 4 hashes. */
@@ -29,7 +30,7 @@ void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Posit
 export const FRAG = `#version 300 es
 precision highp float;
 uniform vec2 uRes;
-uniform float uScale,uTime,uSunX,uGlow,uCloudCover,uFog,uRainDark,uLightning,uMoonIllum,uMoonUp,uNight,uDay,uGolden;
+uniform float uScale,uScrimTop,uTime,uSunX,uGlow,uCloudCover,uFog,uRainDark,uLightning,uMoonIllum,uMoonUp,uNight,uDay,uGolden;
 uniform vec2 uWind,uMoonPos;
 uniform vec3 uZenith,uMid,uHorizon;
 out vec4 o;
@@ -41,6 +42,7 @@ float detail(vec2 p){p=R*R*R*p;float v=0.,a=.0625;for(int i=3;i<${OCTAVES};i++){
 vec3 sky(float y){return y<.55?mix(uZenith,uMid,y/.55):mix(uMid,uHorizon,(y-.55)/.45);}
 float luma(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
 void over(inout vec4 acc,vec3 c,float a){acc.rgb+=c*a*(1.-acc.a);acc.a+=a*(1.-acc.a);}
+float sst(float a,float b,float x){float t=clamp((x-a)/(b-a),0.,1.);return t*t*t*(t*(t*6.-15.)+10.);}
 vec3 toGamma(vec3 c){return mix(c*12.92,1.055*pow(c,vec3(1./2.4))-.055,step(.0031308,c));}
 void main(){
 vec2 css=vec2(gl_FragCoord.x,uRes.y-gl_FragCoord.y)/uScale;
@@ -48,7 +50,8 @@ vec2 vp=uRes/uScale;
 vec2 uv=css/vp;
 vec3 base=sky(uv.y);
 vec4 acc=vec4(0.);
-float col=1.-${COLUMN_DAMP}*(1.-smoothstep(${MOON_COLUMN_PX / 2}.,${MOON_COLUMN_PX / 2 + 96}.,abs(css.x-vp.x*.5)));
+float cm=vp.x<${COLUMN_BREAK}.?1.:1.-sst(${MOON_COLUMN_PX / 2}.,${MOON_COLUMN_PX / 2 + SCRIM_FALLOFF_PX}.,abs(css.x-vp.x*.5));
+float col=1.-${(1 - COLUMN_DAMP).toFixed(3)}*cm*sst(uScrimTop,uScrimTop+${SCRIM_RAMP_PX}.,css.y);
 float cloudA=0.;
 if(uCloudCover>.005){
 vec2 q=(css-uWind*uTime)/vec2(400.,190.+210.*(1.-uv.y));

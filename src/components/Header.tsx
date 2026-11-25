@@ -5,7 +5,8 @@ const navLink = "text-sm text-graphite transition-colors duration-150 hover:text
 
 export function Header() {
   return (
-    <header className="column flex h-16 items-center justify-between">
+    <header className="column relative z-10 flex h-16 items-center justify-between" data-sky-head="">
+      <span aria-hidden="true" className="text-scrim head-scrim" />
       <Link href="/" aria-label={ui.nav.home} className="font-mono text-[15px] text-text">
         as
         <span aria-hidden="true" className="sky-dot" />

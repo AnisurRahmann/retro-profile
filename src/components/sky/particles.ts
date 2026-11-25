@@ -4,7 +4,7 @@
  */
 import { hexToRgb } from "@/lib/sky/color";
 import { STAR_COOL, STAR_WARM } from "@/lib/sky/palette";
-import { MOON_IN_COLUMN } from "@/lib/sky/scrim";
+import { columnMask, MOON_IN_COLUMN, rampMask } from "@/lib/sky/scrim";
 
 /** mulberry32: small, fast, seedable. */
 export function mulberry32(seed: number): () => number {
@@ -160,9 +160,11 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
         }
       }
     },
-    draw(t: number, nowMs: number, s: ParticleState, twinkle: boolean, column: [number, number]) {
+    /** @param scrimTop viewport y where the column scrim starts (stars and the moon are dimmed under it). */
+    draw(t: number, nowMs: number, s: ParticleState, twinkle: boolean, scrimTop: number) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
+      const under = (x: number, y: number) => columnMask(x, w) * rampMask(y, scrimTop);
 
       // Stars.
       const vis = s.night * (1 - s.cloudCover * 0.9) * (1 - s.fog * 0.8);
@@ -174,7 +176,7 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
           const y = py + sR[i]! * Math.sin(a);
           if (x < -2 || y < -2 || x > w + 2 || y > h + 2) continue;
           const tw = twinkle ? 0.85 + 0.15 * Math.sin(t * sF[i]! + sPh[i]!) : 1;
-          ctx.globalAlpha = sA[i]! * vis * tw * (x > column[0] && x < column[1] ? 0.5 : 1);
+          ctx.globalAlpha = sA[i]! * vis * tw * (1 - 0.5 * under(x, y));
           ctx.fillStyle = sWarm[i] ? warm : cool;
           const r = sSize[i]!;
           if (r < 0.9) ctx.fillRect(x - r, y - r, r * 2, r * 2);
@@ -201,7 +203,7 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
           ctx.save();
           ctx.translate(cx, cy);
           if (!s.moon.waxing) ctx.scale(-1, 1); // waxing: lit limb toward the setting sun (west, right)
-          ctx.globalAlpha = (cx > column[0] - R && cx < column[1] + R ? MOON_IN_COLUMN : 0.92) * s.moonVisible;
+          ctx.globalAlpha = (0.92 + (MOON_IN_COLUMN - 0.92) * under(cx, cy)) * s.moonVisible;
           ctx.beginPath();
           ctx.arc(0, 0, R, -Math.PI / 2, Math.PI / 2, false);
           ctx.ellipse(0, 0, R * Math.abs(1 - 2 * f), R, 0, Math.PI / 2, -Math.PI / 2, f <= 0.5);
@@ -248,8 +250,8 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
               const ra = rA[i]!;
               if (Math.abs(ra - bucket) > 0.035) continue;
               const x = rX[i]!;
-              if (x >= column[0] && x <= column[1] ? !inCol : inCol) continue;
               const y = rY[i]!;
+              if (under(x, y) > 0.5 ? !inCol : inCol) continue;
               ctx.moveTo(x, y);
               ctx.lineTo(x - rL[i]! * slope, y - rL[i]!);
             }

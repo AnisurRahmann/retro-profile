@@ -2,8 +2,9 @@
 
 import { useEffect } from "react";
 import { skyModel } from "@/lib/sky/model";
-import { MOON_COLUMN_PX, scrimProfile } from "@/lib/sky/scrim";
+import { columnMask, HERO_TARGETS, regionScrim, scrimProfile } from "@/lib/sky/scrim";
 import { effectiveWeather, parseOverrides, skyStore, skyTime } from "@/lib/sky/store";
+import { onViewGeometry, startView, view } from "@/lib/sky/view";
 import { isWeather } from "@/lib/sky/weather";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
@@ -19,14 +20,18 @@ function paint() {
   html.style.setProperty("--sky-zenith", m.css.zenith);
   html.style.setProperty("--sky-mid", m.css.mid);
   html.style.setProperty("--sky-horizon", m.css.horizon);
-  // How much of the moon disc sits behind the column (it's dimmed there, and the scrim accounts for it).
-  const vw = window.innerWidth;
-  const mx = m.moon.x * vw;
-  const inColumn = m.moon.up && Math.abs(mx - vw / 2) < MOON_COLUMN_PX / 2 + 14;
+  // How much of the moon disc can sit behind the column scrim (it's dimmed there, and the scrim accounts for it).
+  const inColumn = m.moon.up && columnMask(m.moon.x * view.vw, view.vw) > 0;
   const moon = inColumn ? m.night * Math.max(0, 1 - 1.05 * m.cloudCover) ** 0.7 * (1 - 0.6 * m.fog) : 0;
   const profile = scrimProfile(m, moon, m.moon.y);
   profile.forEach((a, i) => html.style.setProperty(`--scrim-${i}`, String(a)));
   const scrim = Math.max(...profile);
+  // Text scrims over the open stage, solved at scroll 0 (document px = viewport px there).
+  const vh = view.vh;
+  const hero = view.hero;
+  const head = view.head;
+  html.style.setProperty("--hero-a", String(hero ? regionScrim(m, hero.y / vh, (hero.y + hero.h) / vh, HERO_TARGETS) : 0));
+  html.style.setProperty("--head-a", String(head ? regionScrim(m, head.y / vh, (head.y + head.h) / vh, HERO_TARGETS) : 0));
   html.dataset.sky = m.astro.state;
   if (TEST) {
     const w = window as Window & { __sky?: Record<string, unknown> };
@@ -82,6 +87,8 @@ export function SkyController() {
       astroLoop();
     };
 
+    const stopView = startView();
+    const unsubView = onViewGeometry(paint);
     const unsub = skyStore.subscribe(paint);
     void load().then(schedule);
     astroLoop();
@@ -89,6 +96,8 @@ export function SkyController() {
     return () => {
       dead = true;
       unsub();
+      unsubView();
+      stopView();
       window.clearTimeout(pollTimer);
       window.clearTimeout(tick);
       document.removeEventListener("visibilitychange", onVisibility);

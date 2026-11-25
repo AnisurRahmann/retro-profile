@@ -8,11 +8,12 @@ import { dayness } from "@/lib/sky/gradient";
 import { skyModel, type SkyModel } from "@/lib/sky/model";
 import { effectiveWeather, SKY_DEBUG, skyStore, skyTime } from "@/lib/sky/store";
 import { dayOfYear } from "@/lib/sky/time";
+import { scrimTop } from "@/lib/sky/view";
+import { SCRIM_RAMP_PX } from "@/lib/sky/scrim";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createParticles, mulberry32, type Particles, type ParticleState } from "./particles";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
-const COLUMN = 768;
 
 /** Smoothed shader inputs, keyed by uniform name. Each converges over ~4 s (exponential, τ = 1 s); 0.12 s while scrubbing. */
 type Targets = Record<string, number | number[]>;
@@ -121,10 +122,9 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
     moonVisible: n("uMoonUp") * n("uNight") * Math.max(0, 1 - 1.05 * n("uCloudCover")) ** 0.7 * (1 - 0.6 * n("uFog")),
   });
 
-  const columnBand = (): [number, number] => {
-    const vw = ptsCanvas.clientWidth;
-    return [Math.max(0, (vw - COLUMN) / 2), Math.min(vw, (vw + COLUMN) / 2)];
-  };
+  // Under reduced motion nothing redraws on scroll, so the static frame assumes the page is scrolled (the scrim
+  // everywhere): the moon and stars stay dimmed behind the column even over the stage.
+  const top = (still: boolean) => (still ? -SCRIM_RAMP_PX : scrimTop());
 
   const draw = (t: number, dt: number, still: boolean) => {
     let lightning = 0;
@@ -139,12 +139,12 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
         lightning = strikeAt >= 0 ? lightningEnvelope(t - strikeAt) : 0;
       }
     } else if (still && model.thunder && forceBolt) lightning = 1;
-    const u: Targets = { ...cur, uTime: still ? 0 : t, uLightning: lightning };
+    const u: Targets = { ...cur, uTime: still ? 0 : t, uLightning: lightning, uScrimTop: top(still) };
     if (atm && !lost) atm.draw(u);
     if (pts) {
       const ps = particleState();
       pts.step(still ? 0 : dt, ps);
-      pts.draw(t, skyTime().getTime(), ps, !still, columnBand());
+      pts.draw(t, skyTime().getTime(), ps, !still, top(still));
     }
     frames++;
     if (TEST && w2.__sky) w2.__sky.frames = frames;

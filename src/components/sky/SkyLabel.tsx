@@ -180,7 +180,7 @@ export function SkyLabel({ copy }: { copy: Copy }) {
         aria-expanded={open}
         aria-controls={open ? `${id}-pop` : undefined}
         onClick={() => (open ? close() : setOpen(true))}
-        className="sky-label inline-flex items-center gap-1.5 font-mono text-xs leading-5 text-graphite transition-colors duration-150 hover:text-text"
+        className="sky-label inline-flex items-center gap-1.5 font-mono text-xs leading-5 text-on-sky transition-colors duration-150 hover:text-text"
         data-testid="sky-label"
       >
         {hydrated ? <SkyGlyph kind={glyph} fraction={m.fraction} waxing={m.waxing} amber={amber} /> : <span className="size-2.5 flex-none" />}
