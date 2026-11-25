@@ -18,3 +18,4 @@ Format: decision · rejected alternative · why.
 9. **Tile colours** chosen as dark muted mid-tones (luminance below `--graphite`, ≥ 4.5:1 against the `--text` monogram); a vitest computes the ratios from the CSS.
 10. **Status line height reserved per breakpoint** (2 lines under 640px, 1 above) so the longest line wrapping never shifts the one-liner. Typed-in remainder is rendered `invisible` so wrapping is final from the first character.
 11. **Show-more uses `inert` on the collapsed panel** in addition to `aria-expanded`, so hidden cards can't be tabbed to.
+12. **Show-more panel class is `.reveal`, not `.collapse`.** Tailwind 4 ships a `collapse` utility (`visibility: collapse`) that silently overrode the panel. Caught by e2e.

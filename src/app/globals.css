@@ -133,23 +133,23 @@ a.card:hover {
 .tile-steel { background: var(--tile-steel); }
 
 /* ── Show more ──────────────────────────────────────────────── */
-.collapse {
+.reveal {
   display: grid;
   grid-template-rows: 0fr;
   transition: grid-template-rows 220ms ease;
 }
-.collapse[data-open="true"] {
+.reveal[data-open="true"] {
   grid-template-rows: 1fr;
 }
-.collapse > .collapse-inner {
+.reveal > .reveal-inner {
   overflow: hidden;
   min-height: 0;
 }
 /* Keep the focus ring visible on cards inside the clip */
-.collapse[data-open="true"] > .collapse-inner {
+.reveal[data-open="true"] > .reveal-inner {
   overflow: visible;
 }
-.collapse[data-open="false"] > .collapse-inner {
+.reveal[data-open="false"] > .reveal-inner {
   visibility: hidden;
   transition: visibility 0s linear 220ms;
 }
@@ -257,7 +257,7 @@ a.card:hover {
     transform: scaleY(var(--s));
   }
   .status-line,
-  .collapse,
+  .reveal,
   .card {
     transition: none;
   }

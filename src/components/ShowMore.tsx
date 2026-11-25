@@ -17,8 +17,8 @@ export function ShowMore({
   const panelId = useId();
   return (
     <>
-      <div id={panelId} className="collapse" data-open={open} inert={!open}>
-        <div className="collapse-inner">
+      <div id={panelId} className="reveal" data-open={open} inert={!open}>
+        <div className="reveal-inner">
           <div className="grid gap-2.5 pt-2.5 sm:grid-cols-2">{hidden}</div>
         </div>
       </div>
