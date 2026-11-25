@@ -18,7 +18,7 @@ export function Closer() {
       </h2>
       <p className="mt-3 max-w-[46ch] text-base text-graphite">{closer.body}</p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <a href={links.calendar} target="_blank" rel="noopener" className={buttonPrimary}>
+        <a href={links.calendar} target="_blank" rel="noopener" className={buttonPrimary} data-sky-takeoff="">
           {ui.home.bookCta}
         </a>
         <Link href="/chat" className={buttonSecondary}>

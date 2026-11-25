@@ -20,6 +20,11 @@ for (const id of (process.argv[3] ?? "shipped,closer").split(",")) {
     if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 0.4 * window.innerHeight);
   }, id);
   await p.waitForTimeout(1200);
+  // TAKEOFF=1: hover "Book 30 min" and shoot mid-climb.
+  if (process.env.TAKEOFF && id === "closer") {
+    await p.hover("[data-sky-takeoff]");
+    await p.waitForTimeout(Number(process.env.TAKEOFF));
+  }
   const file = `.shots/sky/walk${process.env.HIDE ? "-bare" : ""}-${q.replace(/[^a-z0-9]+/gi, "_")}-${id.replace(/\W/g, "")}-${w}.png`;
   // BAND=1: only the bottom 240px (the landscape band).
   await p.screenshot({ path: file, clip: process.env.BAND ? { x: 0, y: h - 240, width: w, height: 240 } : undefined });

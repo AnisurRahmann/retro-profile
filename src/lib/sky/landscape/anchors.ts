@@ -29,18 +29,22 @@ export const LANDMARKS: Spec[] = [
 
 export type Anchor = Spec & { /** scroll at which it's centred */ s: number; /** world x, CSS px */ x: number };
 
-export const anchorScroll = (sectionTop: number, vh: number) => Math.max(0, sectionTop - ANCHOR_AT * vh);
-export const anchorX = (sectionTop: number, vw: number, vh: number, k: number) => vw / 2 + anchorScroll(sectionTop, vh) * k;
+/** Scroll at which a section's top is at 40% of the viewport (clamped to the page's scroll range). */
+export const anchorScroll = (sectionTop: number, vh: number, maxScroll = Infinity) => Math.min(maxScroll, Math.max(0, sectionTop - ANCHOR_AT * vh));
+export const anchorX = (sectionTop: number, vw: number, vh: number, k: number, maxScroll = Infinity) => vw / 2 + anchorScroll(sectionTop, vh, maxScroll) * k;
 /** Screen x of a world point on a layer at a scroll position. */
 export const screenX = (worldX: number, scrollY: number, k: number) => worldX - scrollY * k;
 
-/** Anchors for the sections present on the page (document tops in px). */
-export function solveAnchors(sections: Record<string, number>, vw: number, vh: number): Anchor[] {
+/**
+ * Anchors for the sections present on the page (document tops in px). Sections too close to the bottom to reach
+ * 40% are centred at the page's last scroll position instead.
+ */
+export function solveAnchors(sections: Record<string, number>, vw: number, vh: number, maxScroll = Infinity): Anchor[] {
   const out: Anchor[] = [];
   for (const l of LANDMARKS) {
     const top = sections[l.section];
     if (top === undefined) continue;
-    const s = anchorScroll(top, vh);
+    const s = anchorScroll(top, vh, maxScroll);
     out.push({ ...l, s, x: vw / 2 + s * PARALLAX[l.layer] });
   }
   return out;

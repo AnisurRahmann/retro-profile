@@ -7,16 +7,18 @@ import { hexToRgb, oklabToRgb, rgbToOklab, toGamma, toLinear, type Lab } from "@
 import { dayness } from "@/lib/sky/gradient";
 import { skyModel, type SkyModel } from "@/lib/sky/model";
 import { effectiveWeather, SKY_DEBUG, skyStore, skyTime } from "@/lib/sky/store";
-import { dayOfYear } from "@/lib/sky/time";
+import { dayOfYear, dhakaParts } from "@/lib/sky/time";
+import { sunColor } from "@/lib/sky/gradient";
 import { ALT_REF, nightPoint, sunPath, type ArcGeom } from "@/lib/sky/arc";
 import { columnMask, COLUMN_BREAK, rampMask, SUN_UNDER_TEXT } from "@/lib/sky/scrim";
 import { geomNow, notifyGeometry, onViewGeometry, onViewScroll, runtime, scrimTop, view } from "@/lib/sky/view";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createSun, drawArc, type SunState } from "./bodies";
 import { CLOUD_REFRESH_S, createCloudField } from "./cloud-field";
-import { createLandscape, type Landscape } from "./landscape";
+import { createLandscape, LIFT, type Landscape } from "./landscape";
+import { createLife, TAKEOFF_S, type Life, type LifeFrame } from "./life";
 import { createParticles, mulberry32, type Particles, type ParticleState } from "./particles";
-import { solveAnchors } from "@/lib/sky/landscape/anchors";
+import { PARALLAX, solveAnchors } from "@/lib/sky/landscape/anchors";
 import { buildWorld } from "@/lib/sky/landscape/world";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
@@ -85,6 +87,9 @@ type Window2 = Window & {
     sun?: { x: number; y: number; up: boolean; cloud: number; dim: number };
     moon?: { x: number; y: number; up: boolean };
     geom?: ArcGeom;
+    takeoffs?: number;
+    place?: string | null;
+    land?: { offsets: number[]; marks: { id: string; x: number }[] };
   };
 };
 
@@ -109,7 +114,10 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
   let atm: Atmosphere | null = null;
   let pts: Particles | null = null;
   let land: Landscape | null = null;
+  let life: Life | null = null;
+  let lifeFrame: LifeFrame | null = null;
   let lastLight = -Infinity;
+  let takeoffUntil = -Infinity;
   const sunR = () => (view.vw < COLUMN_BREAK ? 13 : 16);
   const sunLayer = createSun(() => Math.min(window.devicePixelRatio || 1, 2));
   const clouds = createCloudField();
@@ -136,6 +144,7 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
     nightArc = 0,
     lastScroll = -Infinity;
   let text = "rgb(230,234,242)";
+  let tx: [number, number, number] = [0.9, 0.92, 0.95];
   let pathKey = "";
   let dayPath: { x: number; y: number }[] = [];
   let nightPath: { x: number; y: number }[] = [];
@@ -280,8 +289,43 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
         land.setLighting({ horizon: hz, rim: n("uGlow") * smooth01(-2, 1, n("sunAlt")), sunX: v2("sunPos")[0]! * view.vw });
         lastLight = t;
       }
-      // Reduced motion: the landscape is static (no parallax).
-      land.draw(reduce ? 0 : view.y, () => {});
+      const world = land.world;
+      if (world && life) {
+        const at = skyTime();
+        const alt = n("sunAlt");
+        const ss = sunState(scrim);
+        const moonAlt = model.astro.moon.altitudeDeg;
+        const ps = particleState();
+        lifeFrame = {
+          t,
+          moving: !still,
+          w: view.vw,
+          world,
+          minutes: dhakaParts(at).minutes,
+          seed: dayOfYear(at),
+          dark: smooth01(2, -5, alt),
+          lamps: smooth01(0.5, -1.5, alt),
+          glints: [
+            { x: ss.x, k: ss.up && alt < 12 ? (1 - Math.max(0, alt) / 12) * (1 - ss.cloud) * smooth01(-0.9, 0.6, alt) : 0, rgb: sunColor(alt), r: ss.r },
+            {
+              x: ps.moon.x * view.vw,
+              k: ps.moon.up && moonAlt < 12 ? (1 - Math.max(0, moonAlt) / 12) * ps.moonVisible * (0.3 + 0.7 * ps.moon.fraction) : 0,
+              rgb: tx,
+              r: ps.moonR,
+            },
+          ],
+          l3: land.colorOf("L3"),
+        };
+        const f = lifeFrame;
+        // Reduced motion: the landscape is static (no parallax).
+        const walk = reduce ? 0 : view.y;
+        land.draw(walk, (g, layer, o) => life!.between(g, layer, o, f));
+        if (TEST && w2.__sky)
+          w2.__sky.land = {
+            offsets: [PARALLAX.L1, PARALLAX.L2, PARALLAX.L3, PARALLAX.L4].map((k) => walk * k),
+            marks: world.marks.map((m) => ({ id: m.id, x: ((m.x0 + m.x1) / 2) * world.s - walk * PARALLAX.L3 })),
+          };
+      }
     }
     frames++;
     if (TEST && w2.__sky) w2.__sky.frames = frames;
@@ -300,7 +344,8 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
     const s = skyStore.get();
     const raining = model.rainDensity > 0;
     const scrolling = t - lastScroll < 0.25;
-    const busy = raining || (pts?.meteorActive(t) ?? false) || (strikeAt >= 0 && t - strikeAt < 0.3) || forceBolt || s.scrubbing || scrolling;
+    const busy =
+      raining || (pts?.meteorActive(t) ?? false) || (strikeAt >= 0 && t - strikeAt < 0.3) || forceBolt || s.scrubbing || scrolling || t < takeoffUntil;
     const cap = coarse ? (raining || scrolling || s.scrubbing ? 30 : 20) : busy ? 60 : 24;
     if (TEST && w2.__sky) w2.__sky.cap = cap;
     if (cap < 60 && dt < 1 / cap - 0.004) return;
@@ -370,6 +415,16 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
       stillTimer = window.setTimeout(still, 150);
     }
   });
+  // "Book 30 min" hovered or focused with the airport on screen: the parked plane takes off.
+  const onIntent = (e: Event) => {
+    if (reduce || !(e.target instanceof Element) || !e.target.closest("[data-sky-takeoff]")) return;
+    if (life?.takeoff(now(), lifeFrame, view.y)) {
+      takeoffUntil = now() + TAKEOFF_S + 0.2;
+      if (TEST && w2.__sky) w2.__sky.takeoffs = (w2.__sky.takeoffs ?? 0) + 1;
+    }
+  };
+  document.addEventListener("pointerover", onIntent);
+  document.addEventListener("focusin", onIntent);
   const unsubBus = onSky((e) => {
     if (e.type === "meteor" && !reduce) pts?.meteor(now(), rng);
   });
@@ -398,8 +453,8 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
   let resizeTimer = 0;
   const relayoutLand = () => {
     if (!land) return;
-    const H = landCanvas.clientHeight || 1;
-    land.resize(view.vw, H, buildWorld(solveAnchors(view.sections, view.vw, view.vh), view.vw, view.vh, view.docH, H));
+    const H = Math.max(1, landCanvas.clientHeight - LIFT);
+    land.resize(view.vw, H, buildWorld(solveAnchors(view.sections, view.vw, view.vh, Math.max(0, view.docH - view.vh)), view.vw, view.vh, view.docH, H));
     lastLight = -Infinity;
   };
   const resize = () => {
@@ -416,10 +471,11 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
   });
 
   void (async () => {
-    const tx = readToken("--text");
+    tx = readToken("--text");
     text = `rgb(${tx.map((c) => Math.round(c * 255)).join(",")})`;
     pts = createParticles(ptsCanvas, tx);
     land = createLandscape(landCanvas);
+    life = createLife(tx);
     atm = await createAtmosphere(atmCanvas, SKY_DEBUG, isDead);
     if (dead) return;
     if (!atm) onNoWebGL();
@@ -446,6 +502,8 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
     runtime.cloudsIn = null;
     unsubGeom();
     unsubScroll();
+    document.removeEventListener("pointerover", onIntent);
+    document.removeEventListener("focusin", onIntent);
     unsubStore();
     unsubBus();
     ro.disconnect();

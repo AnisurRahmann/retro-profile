@@ -17,6 +17,8 @@ import { ridgeL1, ridgeL2, ridgeL4, type Placed, type World } from "@/lib/sky/la
 import type { Shape } from "@/lib/sky/landscape/shapes";
 
 const PAD = 256;
+/** Transparent headroom above the band, for the plane climbing out. */
+export const LIFT = 120;
 const LAYERS: LayerId[] = ["L1", "L2", "L3", "L4"];
 export const DEPTH: Record<LayerId, number> = { L1: 0.25, L2: 0.45, L3: 0.7, L4: 0.95 };
 /** Near colour: --ink darkened 15% (OKLab L × 0.85). */
@@ -180,12 +182,13 @@ export function createLandscape(canvas: HTMLCanvasElement) {
     get world() {
       return world;
     },
+    /** @param h the band height (the canvas is LIFT px taller). */
     resize(vw: number, h: number, wd: World) {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       w = vw;
       H = h;
       canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(H * dpr);
+      canvas.height = Math.round((H + LIFT) * dpr);
       world = wd;
       for (const l of LAYERS) strips[l].x0 = Number.NaN;
     },
@@ -204,9 +207,11 @@ export function createLandscape(canvas: HTMLCanvasElement) {
       return xU * (world?.s ?? 1) - scrollY * PARALLAX[layer];
     },
     /**
-     * Draw the band. `between(layer)` runs after each layer (night lights, fireflies, the rickshaw, reflections).
+     * Draw the band. `between(g, layer, offset)` runs after each layer (night lights, fireflies, the rickshaw,
+     * reflections) with the context in CSS px, origin at the band's top-left; a world-unit point x on that layer
+     * is at screen x · s − offset.
      */
-    draw(scrollY: number, between: (g: CanvasRenderingContext2D, layer: LayerId | "river") => void) {
+    draw(scrollY: number, between: (g: CanvasRenderingContext2D, layer: LayerId | "river", offset: number) => void) {
       if (!world) return;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -215,8 +220,8 @@ export function createLandscape(canvas: HTMLCanvasElement) {
         const st = strips[layer];
         if (!(o >= st.x0 + 8 && o + w <= st.x0 + w + 2 * PAD - 8) || st.key !== lightKey) renderStrip(layer, o);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.drawImage(st.c, Math.round((st.x0 - o) * dpr), 0);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.drawImage(st.c, Math.round((st.x0 - o) * dpr), Math.round(LIFT * dpr));
+        ctx.setTransform(dpr, 0, 0, dpr, 0, LIFT * dpr);
         if (layer === "L2") {
           // The Surma: a band across the whole width, in front of the tea hills and behind the town's bank.
           ctx.fillStyle = river;
@@ -226,9 +231,9 @@ export function createLandscape(canvas: HTMLCanvasElement) {
           ctx.globalAlpha = 0.45;
           ctx.fillRect(0, RIVER[0] * world.s, w, 2.2 * world.s);
           ctx.globalAlpha = 1;
-          between(ctx, "river");
+          between(ctx, "river", scrollY * PARALLAX.L3);
         }
-        between(ctx, layer);
+        between(ctx, layer, o);
       }
     },
     /** Re-render every strip now (the light changed while scrubbing). */
@@ -236,6 +241,7 @@ export function createLandscape(canvas: HTMLCanvasElement) {
       for (const l of LAYERS) strips[l].key = "";
     },
     placedOn: (layer: LayerId): Placed[] => world?.layers[layer] ?? [],
+    colorOf: (layer: LayerId) => colors[layer] ?? "rgba(0,0,0,1)",
   };
 }
 
