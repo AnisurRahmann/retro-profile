@@ -14,7 +14,7 @@ export default defineConfig({
       command: `next start -p ${PORT}`,
       url: `http://localhost:${PORT}`,
       reuseExistingServer: false,
-      env: { CHAT_MOCK: "1", CHAT_ENABLED: "true", NEXT_DIST_DIR: ".next-e2e" },
+      env: { CHAT_MOCK: "1", CHAT_ENABLED: "true", WEATHER_MOCK: "1", NEXT_DIST_DIR: ".next-e2e" },
       timeout: 60_000,
     },
     {
@@ -22,7 +22,7 @@ export default defineConfig({
       command: `next start -p ${DISABLED_PORT}`,
       url: `http://localhost:${DISABLED_PORT}`,
       reuseExistingServer: false,
-      env: { CHAT_MOCK: "1", CHAT_ENABLED: "false", NEXT_DIST_DIR: ".next-e2e" },
+      env: { CHAT_MOCK: "1", CHAT_ENABLED: "false", WEATHER_MOCK: "1", NEXT_DIST_DIR: ".next-e2e" },
       timeout: 60_000,
     },
   ],

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fixture from "@/server/fixtures/open-meteo-sylhet.json";
 import { compass, conditionFor, hasWeather, isWeather, upstreamUrl, weatherWord, type Condition } from "@/lib/sky/weather";
 import { normalise } from "@/lib/sky/weather-schema";
@@ -81,9 +81,12 @@ describe("label words", () => {
 });
 
 describe("getSylhetWeather", () => {
+  // vitest.config.ts sets WEATHER_MOCK=1; these tests inject their own fetch instead.
+  beforeEach(() => vi.stubEnv("WEATHER_MOCK", ""));
   afterEach(() => {
     _resetSylhetCache();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
   const ok = () => Promise.resolve(new Response(JSON.stringify(fixture), { status: 200 }));
   const boom = () => Promise.reject(new Error("network"));

@@ -25,6 +25,9 @@ export const toolInputSchemas = {
   leave_intro: z.object({ topic: z.string().min(1).max(200) }),
 } as const;
 
+/** Tools that only return data to the model (no UI card). The turn always continues with a second call. */
+export const DATA_TOOLS = new Set(["sylhet_now"]);
+
 export type ToolName = keyof typeof toolInputSchemas;
 export const TOOL_NAMES = Object.keys(toolInputSchemas) as ToolName[];
 
@@ -60,6 +63,12 @@ export const tools: Anthropic.Tool[] = [
       required: ["topic"],
       additionalProperties: false,
     },
+  },
+  {
+    name: "sylhet_now",
+    description:
+      "The current local time in Sylhet, Bangladesh (where Shakil is based), the weather there, and whether it's night. Use when the visitor asks whether Shakil is available, awake or around, where he is right now, or how fast he'll reply.",
+    input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
 ];
 

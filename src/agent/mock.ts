@@ -9,6 +9,11 @@ type Script = { match: RegExp; text: string; tool?: { name: string; input: Recor
 
 export const MOCK_SCRIPTS: Script[] = [
   {
+    match: /awake|asleep|sleep|where is (he|shakil)|available right now|how fast .*(reply|respond)/i,
+    text: "",
+    tool: { name: "sylhet_now", input: {} },
+  },
+  {
     match: /hiring|hire|role|recruit/i,
     text: "Good fit to check. Shakil is a **fullstack AI engineer** with about 10 years at early-stage startups, most recently the primary backend and AI engineer at Gerald (YC W21). He's open to conversations about AI engineering roles. The fastest way is a 30-minute call.",
     tool: { name: "book_call", input: { reason: "hiring" } },
@@ -55,6 +60,21 @@ function lastUserText(messages: Anthropic.MessageParam[]): string {
   return "";
 }
 
+/** The sylhet_now tool result in the last user turn, if that's what it is. */
+function sylhetResult(m: Anthropic.MessageParam | undefined): { time: string } | null {
+  if (!m || !Array.isArray(m.content)) return null;
+  for (const b of m.content) {
+    if (b.type !== "tool_result" || typeof b.content !== "string") continue;
+    try {
+      const v = JSON.parse(b.content) as { time?: unknown };
+      if (typeof v.time === "string" && /^\d\d:\d\d$/.test(v.time)) return { time: v.time };
+    } catch {
+      /* not JSON */
+    }
+  }
+  return null;
+}
+
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
     if (signal?.aborted) return reject(new DOMException("aborted", "AbortError"));
@@ -75,8 +95,14 @@ export function mockAdapter(opts: { delayMs?: number } = {}): ModelAdapter {
       const userText = lastUserText(req.messages);
       const script = MOCK_SCRIPTS.find((s) => s.match.test(userText));
 
-      // Follow-up call after a tool ran: the text was already streamed on call 1.
-      const text = afterTool ? "" : (script?.text ?? DEFAULT_TEXT);
+      // Follow-up call after a tool ran: the text was already streamed on call 1, except after sylhet_now,
+      // whose answer needs the data.
+      const now = afterTool ? sylhetResult(last) : null;
+      const text = now
+        ? `It's ${now.time} in Sylhet right now. He's based there and works overlapping US East Coast hours. Leave him a note or book a call and he'll pick it up.`
+        : afterTool
+          ? ""
+          : (script?.text ?? DEFAULT_TEXT);
       for (const token of text.match(/\S+\s*|\s+/g) ?? []) {
         await sleep(delay, req.signal);
         onText(token);

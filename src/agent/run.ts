@@ -3,7 +3,8 @@ import type { ModelAdapter, ModelResult } from "./model";
 import type { ChatEvent } from "./protocol";
 import type { ChatMessage } from "./request";
 import { buildSystem } from "./system";
-import { executeTool, tools } from "./tools";
+import { executeDataTool } from "./sylhet-now";
+import { DATA_TOOLS, executeTool, tools } from "./tools";
 
 export const MAX_MODEL_CALLS = 2;
 
@@ -27,6 +28,8 @@ export async function runTurn(opts: {
   history: ChatMessage[];
   emit: (e: ChatEvent) => void;
   signal?: AbortSignal;
+  /** Clock for data tools (tests and evals pin it). */
+  now?: () => Date;
 }): Promise<TurnStats> {
   const { adapter, emit, signal } = opts;
   const messages: Anthropic.MessageParam[] = opts.history.map((m) => ({ role: m.role, content: m.content }));
@@ -54,7 +57,18 @@ export async function runTurn(opts: {
 
   const toolUse = first.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
   // Never run a tool whose input may be truncated or that came with a refusal.
-  if (toolUse && first.stopReason === "tool_use" && calls < MAX_MODEL_CALLS) {
+  if (toolUse && first.stopReason === "tool_use" && calls < MAX_MODEL_CALLS && DATA_TOOLS.has(toolUse.name)) {
+    // Data tool (sylhet_now): no card; the answer needs the data, so always make the second call.
+    const { forModel, isError } = await executeDataTool(toolUse.name, toolUse.input, opts.now);
+    if (!isError) toolName = toolUse.name;
+    messages.push({ role: "assistant", content: first.content });
+    messages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: toolUse.id, content: forModel, is_error: isError }] });
+    if (text && !/\s$/.test(text)) onText(" ");
+    const second = await adapter.call({ system: systemBlocks(), messages, tools, toolChoice: "none", signal }, onText);
+    calls++;
+    add(second.usage);
+    stopReason = second.stopReason;
+  } else if (toolUse && first.stopReason === "tool_use" && calls < MAX_MODEL_CALLS) {
     const { result, forModel } = executeTool(toolUse.name, toolUse.input);
     if (result.kind !== "error") {
       toolName = toolUse.name;

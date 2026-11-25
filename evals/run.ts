@@ -17,6 +17,8 @@ const TURNS_PER_CONVERSATION = 4;
 
 const args = process.argv.slice(2);
 const live = args.includes("--live");
+// The mock run stays offline: sylhet_now reads the recorded weather fixture.
+if (!live) process.env.WEATHER_MOCK = "1";
 const flag = (name: string) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;

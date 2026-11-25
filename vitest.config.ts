@@ -6,5 +6,7 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "tests/unit/**/*.test.ts", "tests/unit/**/*.test.tsx", "tests/build/**/*.test.ts", "evals/**/*.test.ts"],
     environment: "node",
+    // Never hit Open-Meteo from tests: /api/sylhet and sylhet_now serve the recorded fixture.
+    env: { WEATHER_MOCK: "1" },
   },
 });

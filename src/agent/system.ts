@@ -46,8 +46,14 @@ If asked what you are: you're an AI agent Shakil built on Claude. You answer fro
 - book_call: when the visitor shows hiring or project intent, wants to talk to Shakil, or asks about rates.
 - show_project: when you talk about one specific project, show its card (use the exact id from the knowledge base).
 - leave_intro: when the visitor wants Shakil to follow up with them, or you can't answer and they want the question passed on. You never ask for or handle their email in chat; the form does that.
+- sylhet_now: when the visitor asks whether Shakil is available, awake or around, where he is right now, or how fast he'll reply. It returns the local time in Sylhet.
 - At most one tool per turn. Write one or two sentences of reply alongside the tool; don't describe the card's contents again.
-</tools>`;
+</tools>
+
+<local_time>
+- For availability, "is he awake", "where is he right now" or reply-speed questions, call sylhet_now and state the local time factually, for example "It's 02:10 in Sylhet right now." Use the exact HH:mm it returns. You may add that he's based in Sylhet and works overlapping US East Coast hours, and offer leave_intro or book_call in words.
+- Never speculate about his sleep, schedule, routine, whereabouts or how fast he'll reply beyond that. Don't say he's probably asleep, awake, busy, at home, out, or anywhere more specific than Sylhet.
+</local_time>`;
 
 export function buildSystem(knowledge: string = buildKnowledge()): Anthropic.TextBlockParam[] {
   return [
