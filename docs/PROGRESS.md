@@ -11,7 +11,8 @@ Branch `redesign/talk-to-my-agent` (off `main` @ 9fb4a5a). Nothing pushed, nothi
 - Phase 6: 39 eval cases, deterministic grader + groundedness judge, `pnpm eval:live`.
 - Phase 7: metadata, OG images (site + `/chat`), JSON-LD Person, sitemap, robots, SVG favicon, postbuild `[[placeholder]]` guard.
 
-- Signal Field + depth layer (2026-11-25): static depth layer (top light, vignette, grain), an interactive WebGL2 dot field with a CSS fallback, and three defect fixes. See "Signal Field" below.
+- Signal Field + depth layer (2026-11-25): static depth layer (top light, vignette, grain), an interactive WebGL2 dot field with a CSS fallback, and three defect fixes. See "Signal Field" below. **Replaced the same day by Sylhet Sky.**
+- Sylhet Sky (2026-11-25): the real sky over Sylhet as the background (sun, moon, live weather), the hero label with a day scrubber, the `sylhet_now` agent tool. See "Sylhet Sky" at the end.
 
 ## Next task
 
@@ -171,3 +172,37 @@ Accessibility, best practices and SEO are 100 on every after-run; CLS 0. `/chat`
 
 ### Unchanged
 Card titles align per row (e2e), the status line rotates about every 3.2 s, click ripples render, the canvas is aria-hidden / pointer-events none / z-index −1 (e2e), no horizontal scroll at 375px (e2e), theme-color `#0B1220` (e2e). `public/shakil.jpg` is still missing; the fallback stays (OPEN_QUESTIONS #1).
+
+## Sylhet Sky (2026-11-25)
+
+Replaces the Signal Field. Ten commits from `refactor(bg): remove the Signal Field` to `test(sky)`. Architecture and rules: CLAUDE.md "Design"; decisions #61–85.
+
+### Checks
+| Check | Result |
+|---|---|
+| typecheck / lint | clean |
+| unit (vitest) | 175 passed (WMO codes, OKLab, solstice geometry, sunrise vs Open-Meteo, first-paint script, contrast sweep, lightning, sylhet_now) |
+| e2e (Playwright) | 36 passed, two full runs in a row (11 new sky tests) |
+| `pnpm eval:mock` | the 3 new `availability` cases pass on the mock; `tool-show-project` fails as before (mock not scripted for it) |
+| Contrast sweep | −30°…90° × 8 conditions × dawn/dusk × 65 heights (+ moon at night): worst `--graphite` **4.64:1**, `--text` 11.47:1, at 8° fog dusk, bottom edge, scrim at its 0.82 cap |
+| First-paint script | 1,483 B production (+~120 B `?sky=` parser in dev/test builds); NOAA elevation within 0.41° of suncalc over 2026 |
+| Sky JS (esbuild, gzip, excl. suncalc/React) | renderer 8.8 kB (lazy) · controller + label 7.9 kB · unique total 13.4 kB (#80) |
+| GPU, atmosphere, 1920×1080 DPR 2, M2 | state 5: 1.42–1.61 ms · state 8: 1.42–1.72 ms (texture noise, 4 octaves, 0.4 × DPR; #83) |
+
+### Lighthouse, mobile (bundled Lighthouse, Playwright's Chromium, same machine, same session)
+| page | before (Signal Field build f666c26) | after |
+|---|---|---|
+| `/` | perf 96 · 97 · 97; TBT 57/39/31; LCP 2.67–2.76 s | perf 92 · 96 · 96 · 96 · 94 · 96 (median 96); TBT 94/37/33/40/20/29; LCP 2.81–3.17 s (median 2.82) |
+| `/chat` | 96 · 96 · 96; TBT 31/32/34; LCP 2.81–2.82 s | 94 · 96 · 96; TBT 28/31/33; LCP 2.82–3.01 s |
+A11y, best practices and SEO are 100 on every run; CLS 0.000 everywhere. The LCP element is still the hero text (status line on `/`, the sub on `/chat`). **Two of six `/` runs scored under 95 (92, 94)**; median 96. The absolute LCP (~2.7 s) is this session's Lighthouse/throttling setup, not the site: the same tool gives the old build 2.7 s too (the 0.77 s recorded above came from a different setup). `/` LCP moved +0.14 s at the median.
+
+### Visual review (`pnpm shots:sky` → `.shots/sky/`, 10 states × 1440/375 × `/` and `/chat`)
+- **Round 0 (building):** partly cloudy showed one blob (fbm too flat) → stretched fbm ×1.9 and smaller cloud scale. Day clouds were invisible (tinted like the sky) → greyed halfway, tops +12% L. Fog read as pink overcast → fog thins cloud alpha by 60%. The crescent moon showed through a 100% storm deck → hidden under full cover.
+- **Round 0, contrast:** the brief's golden horizons failed the sweep at the 0.82 cap (4.19:1) → retuned (#70). One scrim for the whole height made a dark lane from top to bottom → per-height scrim stops (#71), clouds/glow at 50% behind the column (#72), eased edge fade (#73).
+- **Round 1:** state 1 (night): stars natural, varied, no moon (correct: the 15 Dec waxing crescent has set by 02:00), dim header dot. State 7 (17:35): violet civil dusk into night, first stars. State 3 (06:25): dusty-rose dawn, glow bottom-left. State 8: storm deck with forced lightning (subtle by design: +0.12 L on clouds only), rain reads as rain, not static. State 10 (June monsoon noon): grey-blue rain deck. State 5: overcast deck drifts 9 px/s to the SW (measured diff between frames 1 s apart). **State 6 (dusk): amber over navy, not brown, but the column scrim is clearly visible as a darker lane in the lower half, and on 375 px the whole lower sky is dimmed** (the column is the full width). That's graphite text over an amber horizon: it needs ~0.8 ink. Tried tinting the scrim with the zenith colour instead of `--ink` (reads as deeper sky): fails the gate (3.34:1 in day/fog), reverted. Accessibility wins; logged as the main open trade-off.
+- **Round 2 (after the GPU changes):** texture noise at 0.4 × DPR: clouds keep their structure; dusk wisps, overcast deck and storm unchanged in character.
+
+### Open
+- The dusk lane (above). Options if it bothers you: accept; or lighten `--graphite` (a token change, needs the token tests); or put the bare-sky text (section heads, "Show N more", closer, footer) on small glass backings and drop the column scrim. Each is a design call, not a bug.
+- Open-Meteo commercial status (OPEN_QUESTIONS #13).
+- `pnpm eval:live` should include the 3 `availability` cases (real model; Shakil runs it).

@@ -1,5 +1,6 @@
 /** WebGL2 atmosphere layer. Returns null when WebGL2 or the shader is unavailable (the CSS gradient stays). */
-import { FRAG, VERT } from "./sky-shader";
+import { mulberry32 } from "./particles";
+import { FRAG, NOISE_SIZE, VERT } from "./sky-shader";
 
 /** Uniform values by GLSL name: numbers → float, [x, y] → vec2, [r, g, b] → vec3. */
 export type Uniforms = Record<string, number | number[]>;
@@ -10,6 +11,9 @@ export type Atmosphere = {
   /** Rebuild after a restored context. */
   restore(): Promise<boolean>;
 };
+
+/** Atmosphere backing scale, × DPR. */
+export const ATMOSPHERE_SCALE = 0.4;
 
 const nextTask = (ms = 0) => new Promise<void>((r) => window.setTimeout(r, ms));
 
@@ -48,13 +52,26 @@ export async function createAtmosphere(canvas: HTMLCanvasElement, debug: boolean
     gl.useProgram(prog);
     loc.clear();
     gl.bindVertexArray(gl.createVertexArray());
+    // Value-noise lattice as a texture: seeded, so the cloud field is the same on every load.
+    const rnd = mulberry32(1013);
+    const data = new Uint8Array(NOISE_SIZE * NOISE_SIZE).map(() => (rnd() * 256) | 0);
+    gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, NOISE_SIZE, NOISE_SIZE, 0, gl.RED, gl.UNSIGNED_BYTE, data);
+    for (const [k, v] of [
+      [gl.TEXTURE_MIN_FILTER, gl.LINEAR],
+      [gl.TEXTURE_MAG_FILTER, gl.LINEAR],
+      [gl.TEXTURE_WRAP_S, gl.REPEAT],
+      [gl.TEXTURE_WRAP_T, gl.REPEAT],
+    ]) gl.texParameteri(gl.TEXTURE_2D, k!, v!);
     return true;
   };
   if (!(await build())) return null;
 
   const resize = () => {
-    // Backing store at 0.5 × DPR: everything in this layer is soft and upscales cleanly.
-    scale = (qScale > 0 && qScale <= 2 ? qScale : 0.5) * (devicePixelRatio || 1);
+    // Backing store at 0.4 × DPR (brief: 0.5, lowered to meet the 2 ms GPU budget; DECISIONS #83). Everything in
+    // this layer is soft and upscales cleanly.
+    scale = (qScale > 0 && qScale <= 2 ? qScale : ATMOSPHERE_SCALE) * (devicePixelRatio || 1);
     canvas.width = Math.max(1, Math.round(canvas.clientWidth * scale));
     canvas.height = Math.max(1, Math.round(canvas.clientHeight * scale));
     gl.viewport(0, 0, canvas.width, canvas.height);

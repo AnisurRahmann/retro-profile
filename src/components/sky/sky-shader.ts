@@ -19,7 +19,9 @@
  */
 import { COLUMN_DAMP, MOON_COLUMN_PX } from "@/lib/sky/scrim";
 
-export const OCTAVES = 5;
+export const OCTAVES = 4;
+/** Side of the value-noise texture (R8, repeat, linear). One filtered fetch per noise lookup instead of 4 hashes. */
+export const NOISE_SIZE = 256;
 
 export const VERT = `#version 300 es
 void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.-1.,0.,1.);}`;
@@ -31,9 +33,8 @@ uniform float uScale,uTime,uSunX,uGlow,uCloudCover,uFog,uRainDark,uLightning,uMo
 uniform vec2 uWind,uMoonPos;
 uniform vec3 uZenith,uMid,uHorizon;
 out vec4 o;
-float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
-float noise(vec2 p){vec2 i=floor(p),f=fract(p),u=f*f*(3.-2.*f);
-return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);}
+uniform sampler2D uNoise;
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return texture(uNoise,(i+f+.5)/${NOISE_SIZE}.).r;}
 const mat2 R=mat2(1.6,1.2,-1.2,1.6);
 float fbm3(vec2 p){float v=0.,a=.5;for(int i=0;i<3;i++){v+=a*noise(p);p=R*p;a*=.5;}return v;}
 float detail(vec2 p){p=R*R*R*p;float v=0.,a=.0625;for(int i=3;i<${OCTAVES};i++){v+=a*noise(p);p=R*p;a*=.5;}return v;}

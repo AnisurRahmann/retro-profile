@@ -64,7 +64,7 @@ function readToken(name: string): [number, number, number] {
 }
 
 type Window2 = Window & {
-  __sky?: { state: string; elevation: number; scrimA: number; fps: number; condition: string; frames?: number; webgl?: boolean };
+  __sky?: { state: string; elevation: number; scrimA: number; fps: number; condition: string; frames?: number; webgl?: boolean; cap?: number };
 };
 
 function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoWebGL: () => void): () => void {
@@ -163,6 +163,7 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
     const raining = model.rainDensity > 0;
     const busy = raining || (pts?.meteorActive(t) ?? false) || (strikeAt >= 0 && t - strikeAt < 0.3) || forceBolt || s.scrubbing;
     const cap = coarse ? (raining ? 30 : 20) : busy ? 60 : 24;
+    if (TEST && w2.__sky) w2.__sky.cap = cap;
     if (cap < 60 && dt < 1 / cap - 0.004) return;
     approach(cur, target, 1 - Math.exp(-dt / (s.scrubbing || s.preview !== null ? 0.12 : 1)));
     if (model.night > 0.3 && model.cloudCover < 0.6 && !reduce) {

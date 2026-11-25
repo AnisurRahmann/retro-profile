@@ -21,7 +21,8 @@
     "postbuild": "tsx scripts/check-build-output.ts",
     "test:build": "pnpm build && vitest run tests/build",
     "build:e2e": "tsx scripts/build-knowledge.ts && NEXT_PUBLIC_E2E=1 NEXT_DIST_DIR=.next-e2e next build",
-    "e2e:only": "playwright test"
+    "e2e:only": "playwright test",
+    "shots:sky": "tsx scripts/shots-sky.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.14.0",

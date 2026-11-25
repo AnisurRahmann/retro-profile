@@ -52,7 +52,9 @@ export function SkyController() {
     const load = async () => {
       lastFetch = Date.now();
       try {
-        const res = await fetch("/api/sylhet", { headers: { accept: "application/json" } });
+        // no-cache: the response's stale-while-revalidate is for the CDN; in the browser it would serve the
+        // previous poll's copy and revalidate behind it, so every update would arrive one poll late.
+        const res = await fetch("/api/sylhet", { cache: "no-cache", headers: { accept: "application/json" } });
         const body: unknown = res.ok ? await res.json() : null;
         if (!dead) skyStore.set({ weather: isWeather(body) ? body : skyStore.get().weather, loaded: true });
       } catch {

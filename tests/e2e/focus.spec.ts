@@ -36,7 +36,8 @@ test("site-wide: clicking a button shows no ring, tabbing to it does", async ({ 
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Tab");
   await expect(toggle).toBeFocused();
-  expect(await ring(toggle)).toMatchObject({ style: "solid", color: AMBER });
+  // transition-colors also fades outline-color (150 ms), so wait for it to settle.
+  await expect.poll(() => ring(toggle)).toMatchObject({ style: "solid", color: AMBER });
 });
 
 test("intro form fields: no amber on click", async ({ page }) => {

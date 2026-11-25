@@ -40,7 +40,7 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
   Nothing else moves.
 - Background stack (all fixed, aria-hidden, pointer-events none), "Sylhet Sky": the real sky over Sylhet right now.
   z −4 CSS gradient (`--sky-zenith/mid/horizon`, set before paint by an inline script, the no-JS and reduced-motion
-  fallback) · z −3 WebGL2 atmosphere at 0.5 × DPR (clouds, fog, horizon glow, moon glow, lightning) · z −2 Canvas 2D
+  fallback) · z −3 WebGL2 atmosphere at 0.4 × DPR (clouds, fog, horizon glow, moon glow, lightning) · z −2 Canvas 2D
   particles (stars, moon, meteors, rain) · z −1 column scrim · z −1 grain. Body is transparent; `<html>` paints `--ink`.
 - Sky rules: state comes from sun elevation (suncalc), never clock hour. Every displayed time is Asia/Dhaka via Intl.
   Weather comes only from `/api/sylhet` (server-cached Open-Meteo, 15 min); the browser never calls Open-Meteo.
@@ -48,7 +48,8 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
   the contrast sweep green (`tests/unit/sky-contrast.test.ts`). `--scrim-a` is solved, never tuned by eye. Amber
   appears in the sky system only as the label's sun glyph at golden hour / civil twilight. Lightning never flashes
   the whole screen. Emit meteors through `emitSky` (`src/lib/signal-bus.ts`), never on scroll. Budget: sky JS ≤ 9 kB
-  gzip excluding suncalc, inline first-paint script < 1.5 kB, atmosphere GPU ≤ 2 ms at 1920×1080 DPR 2.
+  gzip excluding suncalc, inline first-paint script < 1.5 kB, atmosphere GPU ≤ 2 ms at 1920×1080 DPR 2
+  (`scripts/probe/gpu-sky.mts`). Tests and e2e run with `WEATHER_MOCK=1`; never hit Open-Meteo from a test.
 - Accessibility beats design when they conflict; log it.
 
 ## Docs
