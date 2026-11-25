@@ -5,7 +5,7 @@ import { brand } from "@/lib/brand";
 import { onSky } from "@/lib/signal-bus";
 import { hexToRgb, oklabToRgb, rgbToOklab, toGamma, toLinear, type Lab } from "@/lib/sky/color";
 import { dayness } from "@/lib/sky/gradient";
-import { skyModel, type SkyModel } from "@/lib/sky/model";
+import { driftVector, MIN_DRIFT, skyModel, type SkyModel } from "@/lib/sky/model";
 import { effectiveWeather, SKY_DEBUG, skyStore, skyTime } from "@/lib/sky/store";
 import { dayOfYear, dhakaParts } from "@/lib/sky/time";
 import { sunColor } from "@/lib/sky/gradient";
@@ -17,6 +17,8 @@ import { createSun, drawArc, type SunState } from "./bodies";
 import { CLOUD_REFRESH_S, createCloudField } from "./cloud-field";
 import { createLandscape, LIFT, type Landscape } from "./landscape";
 import { createLife, TAKEOFF_S, type Life, type LifeFrame } from "./life";
+import { createAmbient, type Ambient } from "./ambient";
+import { fireflyCount } from "@/lib/sky/landscape/lights";
 import { createParticles, mulberry32, type Particles, type ParticleState } from "./particles";
 import { PARALLAX, solveAnchors } from "@/lib/sky/landscape/anchors";
 import { buildWorld } from "@/lib/sky/landscape/world";
@@ -38,7 +40,7 @@ function targetsOf(m: SkyModel): Targets {
     uCloudCover: m.cloudCover,
     uFog: m.fog,
     uRainDark: m.rainDark,
-    uWind: m.wind,
+    uWind: driftVector(m.windKmh, m.windFromDeg, view.vw < COLUMN_BREAK ? MIN_DRIFT.mobile : MIN_DRIFT.desktop),
     uMoonPos: [m.moon.x, m.moon.y],
     sunPos: [m.sun.x, m.sun.y],
     sunAlt: m.sun.alt,
@@ -115,6 +117,7 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
   let pts: Particles | null = null;
   let land: Landscape | null = null;
   let life: Life | null = null;
+  let ambient: Ambient | null = null;
   let lifeFrame: LifeFrame | null = null;
   let lastLight = -Infinity;
   let takeoffUntil = -Infinity;
@@ -269,12 +272,25 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
       pts.step(still ? 0 : dt, ps);
       pts.draw(t, skyTime().getTime(), ps, !still, scrim, {
         back: (ctx) => drawArc(ctx, dayPath, nightPath, text, nightArc),
-        front: (ctx) =>
+        front: (ctx) => {
           sunLayer.draw(ctx, ss, still ? 0 : t, day, (a) => {
             const px = ss.x + Math.cos(a) * 180;
             const py = ss.y + Math.sin(a) * 180;
             return 1 - clouds.at(px, py);
-          }),
+          });
+          if (!still && ambient) {
+            const hero = view.hero;
+            ambient.sky(ctx, {
+              t,
+              w: view.vw,
+              h: view.vh,
+              birds: n("sunAlt") > 0 && model.rainDensity === 0 && model.condition !== "fog",
+              night: n("uNight") > 0.5,
+              hero: hero ? { y0: hero.y - view.y, y1: hero.y + hero.h - view.y } : null,
+              ink: land?.colorOf("L3") ?? text,
+            });
+          }
+        },
       });
       if (TEST && w2.__sky) {
         w2.__sky.sun = { x: ss.x, y: ss.y, up: ss.up, cloud: ss.cloud, dim: ss.dim };
@@ -319,7 +335,20 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
         const f = lifeFrame;
         // Reduced motion: the landscape is static (no parallax).
         const walk = reduce ? 0 : view.y;
-        land.draw(walk, (g, layer, o) => life!.between(g, layer, o, f));
+        const at2 = skyTime();
+        const mins = dhakaParts(at2).minutes;
+        const ll = {
+          t,
+          w: view.vw,
+          s: world.s,
+          fireflies: n("uNight") > 0.5 ? fireflyCount(dhakaParts(at2).m, model.rainDensity > 0) : 0,
+          rickshaw: mins >= 6 * 60 && mins < 21 * 60 + 30 && model.rainDensity < 20,
+          l4: land.colorOf("L4"),
+        };
+        land.draw(walk, (g, layer, o) => {
+          life!.between(g, layer, o, f);
+          if (!still && ambient && (layer === "L2" || layer === "L4")) ambient.land(g, layer, o, ll);
+        });
         if (TEST && w2.__sky)
           w2.__sky.land = {
             offsets: [PARALLAX.L1, PARALLAX.L2, PARALLAX.L3, PARALLAX.L4].map((k) => walk * k),
@@ -345,7 +374,7 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
     const raining = model.rainDensity > 0;
     const scrolling = t - lastScroll < 0.25;
     const busy =
-      raining || (pts?.meteorActive(t) ?? false) || (strikeAt >= 0 && t - strikeAt < 0.3) || forceBolt || s.scrubbing || scrolling || t < takeoffUntil;
+      raining || (pts?.meteorActive(t) ?? false) || (strikeAt >= 0 && t - strikeAt < 0.3) || forceBolt || s.scrubbing || scrolling || t < takeoffUntil || (ambient?.active() ?? false);
     const cap = coarse ? (raining || scrolling || s.scrubbing ? 30 : 20) : busy ? 60 : 24;
     if (TEST && w2.__sky) w2.__sky.cap = cap;
     if (cap < 60 && dt < 1 / cap - 0.004) return;
@@ -476,6 +505,7 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landC
     pts = createParticles(ptsCanvas, tx);
     land = createLandscape(landCanvas);
     life = createLife(tx);
+    ambient = createAmbient(rng, readToken("--signal"), tx, { force: SKY_DEBUG && q.get("life") === "1" });
     atm = await createAtmosphere(atmCanvas, SKY_DEBUG, isDead);
     if (dead) return;
     if (!atm) onNoWebGL();
