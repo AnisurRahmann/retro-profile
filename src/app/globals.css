@@ -1,0 +1,269 @@
+@import "tailwindcss";
+
+/* ── Design tokens ─────────────────────────────────────────────
+   The ONLY colour values in the codebase. Everything else reads
+   these variables (directly or through the Tailwind theme below). */
+:root {
+  color-scheme: dark;
+  --ink: #0b1220;
+  --surface: #111a2b;
+  --surface-2: #172236;
+  --hairline: #22304a;
+  --text: #e6eaf2;
+  --graphite: #8a96ad;
+  --mention-bg: rgba(245, 165, 36, 0.14);
+  --mention-text: #f5c46b;
+  --signal: #f5a524;
+  --highlight: rgba(255, 255, 255, 0.04);
+
+  /* Glyph tiles: muted mid-tones, all ≥ 4.5:1 against --text */
+  --tile-slate: #3e4c63;
+  --tile-teal: #2c5958;
+  --tile-plum: #563f60;
+  --tile-olive: #4b5232;
+  --tile-rust: #6a4231;
+  --tile-steel: #355273;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-hairline: var(--hairline);
+  --color-text: var(--text);
+  --color-graphite: var(--graphite);
+  --color-signal: var(--signal);
+  --color-mention-bg: var(--mention-bg);
+  --color-mention-text: var(--mention-text);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+html {
+  background: var(--ink);
+  color: var(--text);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--mention-bg);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Layout ─────────────────────────────────────────────────── */
+.column {
+  width: 100%;
+  max-width: 768px;
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+@media (min-width: 808px) {
+  .column {
+    padding-inline: 0;
+  }
+}
+
+.section + .section {
+  margin-top: 48px;
+}
+@media (min-width: 640px) {
+  .section + .section {
+    margin-top: 64px;
+  }
+}
+
+/* ── Card ───────────────────────────────────────────────────── */
+.card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--surface);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+a.card:hover {
+  background: var(--surface-2);
+  border-color: var(--hairline);
+}
+
+.tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.tile--sm {
+  width: 28px;
+  height: 28px;
+  font-size: 10px;
+  border-radius: 6px;
+}
+.tile-slate { background: var(--tile-slate); }
+.tile-teal { background: var(--tile-teal); }
+.tile-plum { background: var(--tile-plum); }
+.tile-olive { background: var(--tile-olive); }
+.tile-rust { background: var(--tile-rust); }
+.tile-steel { background: var(--tile-steel); }
+
+/* ── Show more ──────────────────────────────────────────────── */
+.collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 220ms ease;
+}
+.collapse[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.collapse > .collapse-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+/* Keep the focus ring visible on cards inside the clip */
+.collapse[data-open="true"] > .collapse-inner {
+  overflow: visible;
+}
+.collapse[data-open="false"] > .collapse-inner {
+  visibility: hidden;
+  transition: visibility 0s linear 220ms;
+}
+
+/* ── Receipts masonry ───────────────────────────────────────── */
+.masonry {
+  columns: 1;
+  column-gap: 10px;
+}
+@media (min-width: 640px) {
+  .masonry {
+    columns: 2;
+  }
+}
+.masonry > * {
+  break-inside: avoid;
+  margin-bottom: 10px;
+}
+
+.mention {
+  background: var(--mention-bg);
+  color: var(--mention-text);
+  border-radius: 3px;
+  padding: 0 3px;
+  font-weight: 500;
+}
+
+/* ── Waveform glyph ─────────────────────────────────────────── */
+.wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 10px;
+  flex: none;
+}
+.wave > span {
+  display: block;
+  width: 2px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--signal);
+  transform-origin: center;
+  animation: wave var(--d) ease-in-out var(--delay) infinite alternate;
+}
+.wave > span:nth-child(1) { --d: 900ms; --delay: -200ms; --s: 0.4; }
+.wave > span:nth-child(2) { --d: 700ms; --delay: -500ms; --s: 0.8; }
+.wave > span:nth-child(3) { --d: 1300ms; --delay: -100ms; --s: 1; }
+.wave > span:nth-child(4) { --d: 1100ms; --delay: -650ms; --s: 0.6; }
+.wave > span:nth-child(5) { --d: 800ms; --delay: -350ms; --s: 0.35; }
+@keyframes wave {
+  from { transform: scaleY(0.25); }
+  to { transform: scaleY(1); }
+}
+
+/* ── Status line ────────────────────────────────────────────── */
+.status-line {
+  display: block;
+  min-height: 28px;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+.status-line[data-leaving="true"] {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* ── Chat ───────────────────────────────────────────────────── */
+.ring-spin {
+  transform-origin: center;
+}
+.ring-spin[data-spinning="true"] {
+  animation: spin 20s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.dots {
+  display: inline-flex;
+  gap: 4px;
+  height: 24px;
+  align-items: center;
+}
+.dots > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--graphite);
+  animation: pulse 1s ease-in-out infinite;
+}
+.dots > span:nth-child(2) { animation-delay: 150ms; }
+.dots > span:nth-child(3) { animation-delay: 300ms; }
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+.dock-fade {
+  background: linear-gradient(to bottom, transparent, var(--ink) 40%);
+}
+
+/* ── Reduced motion ─────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .wave > span {
+    animation: none;
+    transform: scaleY(var(--s));
+  }
+  .status-line,
+  .collapse,
+  .card {
+    transition: none;
+  }
+  .ring-spin[data-spinning="true"],
+  .dots > span {
+    animation: none;
+  }
+  .dots > span { opacity: 0.6; }
+}
