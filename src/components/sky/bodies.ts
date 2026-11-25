@@ -1,5 +1,5 @@
 /**
- * The sun, its arc and the moon's extras, drawn on the particle canvas (above the atmosphere, below the scrim).
+ * The sun, its arc and the moon's extras, drawn on the particle canvas (above the atmosphere).
  *
  * Sun: a limb-darkened disc (edge at 82%) coloured by altitude (palette SUN_HIGH ≥ 30°, SUN_MID at 10°, SUN_LOW at 0°,
  * OKLab), three stacked blooms (3×, 8×, 20× the radius at 0.35, 0.12, 0.05, tinted toward the horizon colour
@@ -39,7 +39,7 @@ export type SunState = {
   cloud: number;
   fog: number;
   cover: number;
-  /** Extra multiplier: behind the column scrim or the hero text the sun is dimmed (the guard counts on it). */
+  /** Altitude fade 0..1 (only cloud and altitude change the sun; nothing dims it behind text). */
   dim: number;
 };
 

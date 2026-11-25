@@ -74,7 +74,9 @@ function ErrorReply({ code, copy, email, calendar }: { code?: ErrorCode; copy: C
         : copy.broken.replace("{email}", email);
   return (
     <div className="space-y-3" data-error={code ?? "upstream"}>
-      <p className="text-graphite">{text}</p>
+      <p className="w-fit text-graphite" data-on-sky="chat-error">
+        {text}
+      </p>
       <BookCard url={calendar} copy={copy} />
     </div>
   );
@@ -267,8 +269,12 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
         <Ring spinning={false} size={84}>
           {portrait}
         </Ring>
-        <h1 className="mt-6 text-[32px] leading-10 font-medium tracking-[-0.02em] text-text">{copy.heading}</h1>
-        <p className="mt-2 max-w-[44ch] text-[15px] leading-6 text-graphite">{copy.sub}</p>
+        <h1 className="mt-6 text-[32px] leading-10 font-medium tracking-[-0.02em] text-text" data-on-sky="chat-heading">
+          {copy.heading}
+        </h1>
+        <p className="mt-2 max-w-[44ch] text-[15px] leading-6 text-graphite" data-on-sky="chat-sub">
+          {copy.sub}
+        </p>
         <div className="mt-8 w-full text-left">
           {enabled ? (
             <>
@@ -279,7 +285,7 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
                     <button
                       type="button"
                       onClick={() => void send(chip)}
-                      className="rounded-full border border-hairline px-3.5 py-1.5 text-sm text-graphite transition-colors duration-150 hover:bg-surface-2 hover:text-text"
+                      className="glass rounded-full border border-hairline px-3.5 py-1.5 text-sm text-graphite transition-colors duration-150 hover:bg-surface-2 hover:text-text"
                     >
                       {chip}
                     </button>
@@ -290,7 +296,9 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
           ) : (
             <div className="space-y-3">
               <BookCard url={calendar} copy={copy} />
-              <p className="text-center text-sm text-graphite">{copy.disabled.replace("{email}", email)}</p>
+              <p className="mx-auto w-fit text-center text-sm text-graphite" data-on-sky="chat-disabled">
+                {copy.disabled.replace("{email}", email)}
+              </p>
             </div>
           )}
         </div>
@@ -306,7 +314,7 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
         <Ring spinning={streaming} size={48}>
           {portraitSmall}
         </Ring>
-        <button type="button" onClick={reset} className="font-mono text-xs text-graphite transition-colors duration-150 hover:text-text">
+        <button type="button" onClick={reset} className="font-mono text-xs text-graphite transition-colors duration-150 hover:text-text" data-on-sky="chat-new">
           {copy.newChat}
         </button>
       </div>
@@ -328,7 +336,7 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
               <div className="min-w-0 flex-1 space-y-3 text-base leading-6 text-text">
                 <p className="sr-only">{copy.agent}:</p>
                 {m.text ? (
-                  <div>
+                  <div data-on-sky="reply">
                     <Markdown text={m.text} allowedHosts={allowedHosts} />
                   </div>
                 ) : m.status === "streaming" ? (

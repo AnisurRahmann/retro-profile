@@ -20,7 +20,7 @@ export function CardSection({
   const headingId = `${id ?? heading.toLowerCase().replace(/\W+/g, "-")}-heading`;
   return (
     <section id={id} aria-labelledby={headingId} className="section scroll-mt-6">
-      <h2 id={headingId} className="mb-4 text-base font-medium text-text">
+      <h2 id={headingId} className="mb-4 w-fit text-base font-medium text-text" data-on-sky={`h-${id ?? "cards"}`}>
         {heading}
       </h2>
       <div className="grid gap-2.5 sm:grid-cols-2">
@@ -33,6 +33,7 @@ export function CardSection({
           count={rest.length}
           moreLabel={fill(ui.home.showMore, { n: rest.length })}
           lessLabel={ui.home.showLess}
+          sky={`more-${id ?? "cards"}`}
           hidden={rest.map((p) => (
             <ProjectCard key={p.id} project={p} labels={labels} />
           ))}

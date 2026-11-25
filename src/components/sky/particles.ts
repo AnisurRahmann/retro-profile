@@ -4,7 +4,6 @@
  */
 import { hexToRgb } from "@/lib/sky/color";
 import { STAR_COOL, STAR_WARM } from "@/lib/sky/palette";
-import { columnMask, MOON_IN_COLUMN, rampMask } from "@/lib/sky/scrim";
 import { drawHalo } from "./bodies";
 
 export { mulberry32 } from "@/lib/sky/random";
@@ -164,21 +163,19 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
         }
       }
     },
-    /** @param scrimTop viewport y where the column scrim starts (stars and the moon are dimmed under it). */
     /** @param hero the hero text block in viewport px: stars behind its text are dimmed (they read as dots in the copy). */
     draw(
       t: number,
       nowMs: number,
       s: ParticleState,
       twinkle: boolean,
-      scrimTop: number,
       hooks: DrawHooks = {},
       hero: { x0: number; y0: number; x1: number; y1: number } | null = null,
     ) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
       const under = (x: number, y: number) =>
-        hero && x > hero.x0 - 6 && x < hero.x1 + 6 && y > hero.y0 - 6 && y < hero.y1 + 6 ? 1 : columnMask(x, w) * rampMask(y, scrimTop);
+        hero && x > hero.x0 - 6 && x < hero.x1 + 6 && y > hero.y0 - 6 && y < hero.y1 + 6 ? 1 : 0;
       hooks.back?.(ctx);
 
       // Stars.
@@ -219,7 +216,7 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
           ctx.save();
           ctx.translate(cx, cy);
           if (!s.moon.waxing) ctx.scale(-1, 1); // waxing: lit limb toward the setting sun (west, right)
-          ctx.globalAlpha = (0.92 + (MOON_IN_COLUMN - 0.92) * under(cx, cy)) * s.moonVisible * s.moonDim;
+          ctx.globalAlpha = 0.92 * s.moonVisible * s.moonDim;
           ctx.beginPath();
           ctx.arc(0, 0, R, -Math.PI / 2, Math.PI / 2, false);
           ctx.ellipse(0, 0, R * Math.abs(1 - 2 * f), R, 0, Math.PI / 2, -Math.PI / 2, f <= 0.5);
@@ -254,7 +251,7 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
         ctx.stroke();
       }
 
-      // Rain: 1 px streaks in --text, alpha × 0.4 over the column.
+      // Rain: 1 px streaks in --text, alpha × 0.4 behind the hero text.
       if (nRain) {
         const slope = Math.tan(s.rainSlant);
         ctx.strokeStyle = text;

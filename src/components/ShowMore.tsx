@@ -7,11 +7,14 @@ export function ShowMore({
   count,
   moreLabel,
   lessLabel,
+  sky,
 }: {
   hidden: ReactNode;
   count: number;
   moreLabel: string;
   lessLabel: string;
+  /** data-on-sky id: the button sits on the sky. */
+  sky?: string;
 }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
@@ -29,6 +32,7 @@ export function ShowMore({
         onClick={() => setOpen((o) => !o)}
         className="mt-3 text-sm text-graphite transition-colors duration-150 hover:text-text"
         data-count={count}
+        data-on-sky={sky}
       >
         {open ? lessLabel : moreLabel}
       </button>

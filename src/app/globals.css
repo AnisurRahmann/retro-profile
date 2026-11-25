@@ -17,8 +17,8 @@
   --highlight: rgba(255, 255, 255, 0.04);
   /* Surfaces over the sky: --surface at 86%, blurred, so the sky tints them slightly. */
   --surface-glass: rgba(17, 26, 43, 0.86);
-  /* Secondary text over the open sky stage (the hero): lighter than --graphite so it needs less scrim.
-     src/lib/sky/scrim.ts mirrors the mix (ON_SKY_TEXT). */
+  /* Secondary text over the open sky stage (the hero): lighter than --graphite so it needs less backing.
+     src/lib/sky/backing.ts mirrors the mix (ON_SKY_TEXT). */
   --on-sky: color-mix(in srgb, var(--text) 82%, var(--graphite));
 
   /* Glyph tiles: muted mid-tones, all ≥ 4.5:1 against --text */
@@ -47,7 +47,7 @@
 
 html {
   /* With html's overflow set, body's own overflow-x: clip applies to body (it isn't propagated to the viewport):
-     the full-bleed stage and the text scrims' feathers never cause a horizontal scroll. */
+     the full-bleed stage and the chips' overhang never cause a horizontal scroll. */
   overflow-x: clip;
   background: var(--ink);
   color: var(--text);
@@ -107,7 +107,7 @@ html:not([data-input="pointer"]) .composer:has(textarea:focus-visible) {
 
 /* ── Sylhet Sky ─────────────────────────────────────────────
    The real sky over Sylhet (src/components/sky, src/lib/sky). Gradients are allowed only here.
-   z −4 gradient (this) · −3 atmosphere canvas · −2 particle canvas · −1 column scrim · −1 grain.
+   z −4 gradient (this) · −3 atmosphere canvas · −2 particle canvas and landscape · −1 grain.
    The three colours are set before first paint by the inline script in the root layout, then by the
    controller. The initial values (night) are the no-JS fallback. */
 @property --sky-zenith {
@@ -164,7 +164,7 @@ html[data-sky-scrub] .sky-gradient {
   opacity: 1;
 }
 /* The landscape band: fixed to the bottom, 18vh desktop / 14svh mobile, 110–200px (src/components/sky/landscape.ts
-   mirrors it). Above the particles, below the scrim. */
+   mirrors it). Above the particles. */
 .sky-landscape {
   position: fixed;
   left: 0;
@@ -184,52 +184,8 @@ html[data-sky-scrub] .sky-gradient {
   }
 }
 
-/* Column scrim: --ink behind the 768px column, its alpha solved per height (stops at 0/25/50/75/100% of the
-   viewport, src/lib/sky/scrim.ts) so it darkens only where the sky is bright. 0.82 (the maximum) is the no-JS
-   default. Two nested layers: the ramp starts at the stage bottom (--scrim-d, viewport px, set on scroll by
-   src/lib/sky/view.ts) and fades in over 160px; the fill is counter-translated so its height profile stays
-   fixed to the viewport, and on desktop its sides fall off over 220px (smootherstep). Below 808px the column is
-   the whole width, so the fill has no sides. */
-@property --scrim-0 {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0.82;
-}
-@property --scrim-1 {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0.82;
-}
-@property --scrim-2 {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0.82;
-}
-@property --scrim-3 {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0.82;
-}
-@property --scrim-4 {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0.82;
-}
-@property --hero-a {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0.82;
-}
-@property --head-a {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0.82;
-}
 html {
-  /* Before the controller solves them: the column stops at the same heights. */
-  --hero-a: var(--scrim-2);
-  --head-a: var(--scrim-0);
-  /* Stage height, mirrored by .sky-stage, so the scrim starts below it before any script runs. */
+  /* Stage height, mirrored by .sky-stage (src/lib/sky/arc.ts stageHeightFor). */
   --stage-h: max(460px, 70vh);
   --stage-h: max(460px, 70svh);
 }
@@ -239,124 +195,58 @@ html {
     --stage-h: max(460px, min(62svh, 640px));
   }
 }
-.sky-scrim {
-  position: fixed;
-  inset: 0;
+
+/* ── Loose text ─────────────────────────────────────────────
+   Text that sits directly on the sky carries data-on-sky. It gets backing only where it needs it, and only as much
+   as it needs (src/lib/sky/backing.ts decides per element, src/components/sky/backing-runner.ts writes it):
+   none · halo (a text-shadow in --ink at --halo-a) · chip (a crisp glass chip, --ink at --chip-a, blur 8px).
+   Until the module runs, every element wears the conservative default: the halo at 0.5. The chip is a
+   pseudo-element outside the box (inset −2px −8px), so switching modes never moves anything. */
+@property --halo-a {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.5;
+}
+@property --chip-a {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.62;
+}
+[data-on-sky] {
+  position: relative;
+  text-shadow:
+    0 0 1px color-mix(in srgb, var(--ink) calc(var(--halo-a) * 100%), transparent),
+    0 0 6px color-mix(in srgb, var(--ink) calc(var(--halo-a) * 100%), transparent),
+    0 0 16px color-mix(in srgb, var(--ink) calc(var(--halo-a) * 60%), transparent);
+  /* Unlayered, so it wins over Tailwind's transition utilities: keep their colour fade too. */
+  transition:
+    --halo-a 600ms ease,
+    color 150ms ease;
+}
+[data-on-sky] svg {
+  filter: drop-shadow(0 0 1px color-mix(in srgb, var(--ink) calc(var(--halo-a) * 100%), transparent))
+    drop-shadow(0 0 4px color-mix(in srgb, var(--ink) calc(var(--halo-a) * 100%), transparent));
+}
+[data-on-sky]::before {
+  content: "";
+  position: absolute;
+  inset: -2px -8px;
   z-index: -1;
-  overflow: hidden;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink) calc(var(--chip-a) * 100%), transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  transition: opacity 600ms ease;
   pointer-events: none;
 }
-.sky-scrim-ramp {
-  --scrim-d: -160px;
-  position: absolute;
-  inset: 0 0 auto;
-  height: calc(100lvh + 160px);
-  transform: translateY(var(--scrim-d));
-  will-change: transform;
-  /* Smootherstep over 160px (21 stops). */
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    rgb(0 0 0 / 0.001) 8px,
-    rgb(0 0 0 / 0.009) 16px,
-    rgb(0 0 0 / 0.027) 24px,
-    rgb(0 0 0 / 0.058) 32px,
-    rgb(0 0 0 / 0.104) 40px,
-    rgb(0 0 0 / 0.163) 48px,
-    rgb(0 0 0 / 0.235) 56px,
-    rgb(0 0 0 / 0.317) 64px,
-    rgb(0 0 0 / 0.407) 72px,
-    rgb(0 0 0 / 0.500) 80px,
-    rgb(0 0 0 / 0.593) 88px,
-    rgb(0 0 0 / 0.683) 96px,
-    rgb(0 0 0 / 0.765) 104px,
-    rgb(0 0 0 / 0.837) 112px,
-    rgb(0 0 0 / 0.896) 120px,
-    rgb(0 0 0 / 0.942) 128px,
-    rgb(0 0 0 / 0.973) 136px,
-    rgb(0 0 0 / 0.991) 144px,
-    rgb(0 0 0 / 0.999) 152px,
-    #000 160px
-  );
+[data-on-sky][data-backing="chip"]::before {
+  opacity: 1;
 }
-html:has(.sky-stage) .sky-scrim-ramp {
-  --scrim-d: var(--stage-h);
-}
-.sky-scrim-fill {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  height: 100lvh;
-  transform: translateY(calc(-1 * var(--scrim-d)));
-  will-change: transform;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--ink) calc(var(--scrim-0) * 100%), transparent),
-    color-mix(in srgb, var(--ink) calc(var(--scrim-1) * 100%), transparent) 25%,
-    color-mix(in srgb, var(--ink) calc(var(--scrim-2) * 100%), transparent) 50%,
-    color-mix(in srgb, var(--ink) calc(var(--scrim-3) * 100%), transparent) 75%,
-    color-mix(in srgb, var(--ink) calc(var(--scrim-4) * 100%), transparent)
-  );
-  transition:
-    --scrim-0 4s ease,
-    --scrim-1 4s ease,
-    --scrim-2 4s ease,
-    --scrim-3 4s ease,
-    --scrim-4 4s ease;
-}
-@media (min-width: 808px) {
-  .sky-scrim-fill {
-    left: 50%;
-    width: calc(768px + 2 * 220px);
-    transform: translate(-50%, calc(-1 * var(--scrim-d)));
-    /* Smootherstep over 220px each side (21 stops, so no linear segment shows a kink): no visible edge. */
-    mask-image: linear-gradient(
-      to right,
-      transparent,
-      rgb(0 0 0 / 0.001) 11px,
-      rgb(0 0 0 / 0.009) 22px,
-      rgb(0 0 0 / 0.027) 33px,
-      rgb(0 0 0 / 0.058) 44px,
-      rgb(0 0 0 / 0.104) 55px,
-      rgb(0 0 0 / 0.163) 66px,
-      rgb(0 0 0 / 0.235) 77px,
-      rgb(0 0 0 / 0.317) 88px,
-      rgb(0 0 0 / 0.407) 99px,
-      rgb(0 0 0 / 0.500) 110px,
-      rgb(0 0 0 / 0.593) 121px,
-      rgb(0 0 0 / 0.683) 132px,
-      rgb(0 0 0 / 0.765) 143px,
-      rgb(0 0 0 / 0.837) 154px,
-      rgb(0 0 0 / 0.896) 165px,
-      rgb(0 0 0 / 0.942) 176px,
-      rgb(0 0 0 / 0.973) 187px,
-      rgb(0 0 0 / 0.991) 198px,
-      rgb(0 0 0 / 0.999) 209px,
-      #000 220px,
-      #000 calc(100% - 220px),
-      rgb(0 0 0 / 0.999) calc(100% - 209px),
-      rgb(0 0 0 / 0.991) calc(100% - 198px),
-      rgb(0 0 0 / 0.973) calc(100% - 187px),
-      rgb(0 0 0 / 0.942) calc(100% - 176px),
-      rgb(0 0 0 / 0.896) calc(100% - 165px),
-      rgb(0 0 0 / 0.837) calc(100% - 154px),
-      rgb(0 0 0 / 0.765) calc(100% - 143px),
-      rgb(0 0 0 / 0.683) calc(100% - 132px),
-      rgb(0 0 0 / 0.593) calc(100% - 121px),
-      rgb(0 0 0 / 0.500) calc(100% - 110px),
-      rgb(0 0 0 / 0.407) calc(100% - 99px),
-      rgb(0 0 0 / 0.317) calc(100% - 88px),
-      rgb(0 0 0 / 0.235) calc(100% - 77px),
-      rgb(0 0 0 / 0.163) calc(100% - 66px),
-      rgb(0 0 0 / 0.104) calc(100% - 55px),
-      rgb(0 0 0 / 0.058) calc(100% - 44px),
-      rgb(0 0 0 / 0.027) calc(100% - 33px),
-      rgb(0 0 0 / 0.009) calc(100% - 22px),
-      rgb(0 0 0 / 0.001) calc(100% - 11px),
-      transparent
-    );
+@media (prefers-reduced-motion: reduce) {
+  [data-on-sky],
+  [data-on-sky]::before {
+    transition: none;
   }
 }
 
@@ -410,47 +300,6 @@ main:has(> .sky-stage) {
 }
 .sky-hint[data-show] {
   opacity: 1;
-}
-/* Text scrims over the open stage: --ink behind the hero block and the header row, alpha solved by the contrast
-   guard (--hero-a, --head-a). An ellipse: the box is the text block grown by --fx/--fy, the plateau (to 64% of
-   the radius) covers the block's corners, and the rest is a smootherstep feather, so it reads as the sky
-   darkening, not as a card. */
-.text-scrim {
-  --fx: 220px;
-  --fy: 200px;
-  position: absolute;
-  inset: calc(-1 * var(--fy)) calc(-1 * var(--fx));
-  pointer-events: none;
-  mask-image: radial-gradient(
-    closest-side,
-    #000 64%,
-    rgb(0 0 0 / 0.97) 68.5%,
-    rgb(0 0 0 / 0.9) 73%,
-    rgb(0 0 0 / 0.71) 77.5%,
-    rgb(0 0 0 / 0.5) 82%,
-    rgb(0 0 0 / 0.29) 86.5%,
-    rgb(0 0 0 / 0.1) 91%,
-    rgb(0 0 0 / 0.03) 95.5%,
-    transparent
-  );
-}
-.hero-scrim {
-  background: color-mix(in srgb, var(--ink) calc(var(--hero-a) * 100%), transparent);
-  transition: --hero-a 4s ease;
-}
-.head-scrim {
-  --fx: 200px;
-  --fy: 72px;
-  display: none;
-  background: color-mix(in srgb, var(--ink) calc(var(--head-a) * 100%), transparent);
-  transition: --head-a 4s ease;
-}
-/* Scrubbing: follow the time closely. */
-html[data-sky-scrub] :is(.sky-scrim-fill, .hero-scrim, .head-scrim) {
-  transition-duration: 150ms;
-}
-html:has(.sky-stage) .head-scrim {
-  display: block;
 }
 /* Over the open stage the header's secondary text is --on-sky, like the hero's (solved together, HERO_TARGETS). */
 html:has(.sky-stage) [data-sky-head] nav a:not(:hover) {
@@ -628,9 +477,11 @@ a.card:hover {
 
 /* ── Status line ────────────────────────────────────────────── */
 .status-line {
-  display: block;
+  /* Inline-block so its box (and its backing) hugs the text. */
+  display: inline-block;
   min-height: 28px;
   transition:
+    --halo-a 600ms ease,
     opacity 180ms ease,
     transform 180ms ease;
 }

@@ -102,6 +102,7 @@ export function SkyLabel({ copy }: { copy: Copy }) {
         className="sky-label inline-flex flex-wrap items-center gap-x-1.5 text-left font-mono text-xs leading-5 whitespace-nowrap text-on-sky transition-colors duration-150 hover:text-text"
         data-wraps=""
         data-testid="sky-label"
+        data-on-sky="label"
       >
         {hydrated ? <SkyGlyph kind={glyph} fraction={m.fraction} waxing={m.waxing} amber={amber} /> : <span className="size-2.5 flex-none" />}
         {/* While scrubbing, "preview 18:40" is laid over the clock and the place (they keep their space, hidden),

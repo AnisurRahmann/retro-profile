@@ -13,7 +13,7 @@ const HINT_MS = 4000;
 
 /**
  * The sky stage: the top of the home page, full-bleed, where nothing covers the sky. The hero sits at its bottom,
- * in the column; the top is open sky. Its bottom edge is where the column scrim starts (src/lib/sky/view.ts).
+ * in the column; the top is open sky.
  *
  * Drag the sky: a horizontal drag on the open sky (the stage itself or a sky placeholder, never text, links or
  * buttons) scrubs time, 1 viewport width = 12 hours; vertical swipes scroll (touch-action: pan-y).
@@ -163,11 +163,10 @@ export function SkyStage({ copy, children }: { copy: Content["ui"]["sky"]; child
       <div aria-hidden="true" className="sky-stage-open" data-sky-open="" />
       <div className="column" data-sky-open="">
         <div className="relative w-fit max-w-full" data-sky-hero="">
-          <div aria-hidden="true" className="text-scrim hero-scrim" />
-          <div className="relative">{children}</div>
+          {children}
         </div>
       </div>
-      <p aria-hidden="true" className="sky-hint" data-show={hint ? "" : undefined} data-testid="sky-hint">
+      <p aria-hidden="true" className="sky-hint" data-show={hint ? "" : undefined} data-testid="sky-hint" data-on-sky="hint">
         {hint === "touch" ? copy.hintTouch : copy.hint}
       </p>
     </section>

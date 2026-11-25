@@ -33,7 +33,7 @@ export default function Home() {
           <div className="sm:row-span-2 max-sm:[&>*]:!size-14 max-sm:[&>*]:!text-[17px]">
             <Portrait size={88} priority />
           </div>
-          <h1 className="text-[36px] leading-10 font-medium tracking-[-0.02em] text-text sm:self-end">
+          <h1 className="w-fit text-[36px] leading-10 font-medium tracking-[-0.02em] text-text sm:self-end" data-on-sky="name">
             {profile.name}
           </h1>
           <div className="col-span-2 mt-3 min-w-0 sm:col-span-1 sm:col-start-2 sm:mt-0 sm:self-start">
@@ -43,7 +43,9 @@ export default function Home() {
               </span>
               <StatusLine lines={profile.statusLines} />
             </p>
-            <p className="mt-1 text-sm text-on-sky">{profile.oneLiner}</p>
+            <p className="mt-1 w-fit text-sm text-on-sky" data-on-sky="one-liner">
+              {profile.oneLiner}
+            </p>
             <SkyLabel copy={ui.sky} />
           </div>
         </div>
@@ -54,7 +56,7 @@ export default function Home() {
 
       {receipts.length > 0 ? (
         <section id="receipts" aria-labelledby="receipts-heading" className="section">
-          <h2 id="receipts-heading" className="mb-4 text-base font-medium text-text">
+          <h2 id="receipts-heading" className="mb-4 w-fit text-base font-medium text-text" data-on-sky="h-receipts">
             {ui.home.receipts}
           </h2>
           <div className="masonry">
@@ -62,7 +64,9 @@ export default function Home() {
               <ReceiptCard key={r.id} receipt={r} />
             ))}
           </div>
-          <p className="mt-2 font-mono text-xs leading-5 text-graphite">{ui.home.receiptsNote}</p>
+          <p className="mt-2 w-fit font-mono text-xs leading-5 text-graphite" data-on-sky="receipts-note">
+            {ui.home.receiptsNote}
+          </p>
         </section>
       ) : null}
 

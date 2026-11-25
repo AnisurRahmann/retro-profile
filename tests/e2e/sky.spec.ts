@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 type Sky = {
   state: string;
   elevation: number;
-  scrimA: number;
+  backing?: { id: string; mode: string; a: number; contrast: number; bg: string }[];
   fps: number;
   condition: string;
   frames?: number;
@@ -326,7 +326,7 @@ test("sky layers are decorative, fixed, behind content and never intercept click
   await page.goto("/?sky=2026-12-15T16:55&wx=partly");
   await page.waitForFunction(() => (window.__sky?.frames ?? 0) >= 1, null, { timeout: 8000 });
   const layers = await page.evaluate(() =>
-    ["[data-sky-gradient]", "[data-sky-atmosphere]", "[data-sky-particles]", "[data-sky-landscape]", "[data-sky-scrim]", ".grain"].map((sel) => {
+    ["[data-sky-gradient]", "[data-sky-atmosphere]", "[data-sky-particles]", "[data-sky-landscape]", ".grain"].map((sel) => {
       const el = document.querySelector(sel)!;
       const s = getComputedStyle(el);
       return { sel, hidden: el.getAttribute("aria-hidden"), pe: s.pointerEvents, pos: s.position, z: s.zIndex };
@@ -337,10 +337,11 @@ test("sky layers are decorative, fixed, behind content and never intercept click
     { sel: "[data-sky-atmosphere]", hidden: "true", pe: "none", pos: "fixed", z: "-3" },
     { sel: "[data-sky-particles]", hidden: "true", pe: "none", pos: "fixed", z: "-2" },
     { sel: "[data-sky-landscape]", hidden: "true", pe: "none", pos: "fixed", z: "-2" },
-    { sel: "[data-sky-scrim]", hidden: "true", pe: "none", pos: "fixed", z: "-1" },
     { sel: ".grain", hidden: "true", pe: "none", pos: "fixed", z: "-1" },
   ]);
-  expect((await sky(page))!.scrimA).toBeGreaterThan(0.5); // dusk: the column needs the scrim
+  // No column scrim: loose text gets its own backing, solved per element.
+  await page.waitForFunction(() => (window.__sky?.backing?.length ?? 0) > 3, null, { timeout: 8000 });
+  expect(await page.locator("[data-sky-scrim], .text-scrim").count()).toBe(0);
   await page.getByRole("link", { name: /Support Agent/ }).first().click();
   await expect(page).toHaveURL(/\/work\/support-agent$/);
 });

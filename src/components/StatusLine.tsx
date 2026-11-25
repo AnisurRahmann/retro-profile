@@ -72,7 +72,7 @@ export function StatusLine({ lines }: { lines: string[] }) {
   const hidden = shown === null ? "" : text.slice(shown);
 
   return (
-    <span className="status-line" data-leaving={leaving} data-testid="status-line">
+    <span className="status-line" data-leaving={leaving} data-testid="status-line" data-on-sky="status">
       {visible}
       {hidden ? (
         <span aria-hidden="true" className="invisible">

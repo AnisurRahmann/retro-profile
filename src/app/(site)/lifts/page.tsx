@@ -11,10 +11,14 @@ export default function LiftsPage() {
   return (
     <>
       <div className="section">
-        <h1 className="text-[36px] leading-10 font-medium tracking-[-0.02em] text-text">{ui.lifts.heading}</h1>
-        <p className="mt-3 max-w-[62ch] text-graphite">{lifts.intro}</p>
+        <h1 className="w-fit text-[36px] leading-10 font-medium tracking-[-0.02em] text-text" data-on-sky="h1">
+          {ui.lifts.heading}
+        </h1>
+        <p className="mt-3 w-fit max-w-[62ch] text-graphite" data-on-sky="intro">
+          {lifts.intro}
+        </p>
         {lifts.routines.length === 0 && liftHref ? (
-          <a href={liftHref} target="_blank" rel="noopener" className="mt-3 inline-block text-text underline underline-offset-4">
+          <a href={liftHref} target="_blank" rel="noopener" className="mt-3 inline-block text-text underline underline-offset-4" data-on-sky="lift-link">
             {ui.lifts.liftLink}
           </a>
         ) : null}
@@ -23,15 +27,21 @@ export default function LiftsPage() {
       {lifts.routines.map((day) => (
         <section key={day.id} id={day.id} aria-labelledby={`${day.id}-h`} className="section scroll-mt-6">
           <div className="mb-3 flex items-baseline justify-between gap-4">
-            <h2 id={`${day.id}-h`} className="text-base font-medium text-text">
+            <h2 id={`${day.id}-h`} className="text-base font-medium text-text" data-on-sky="h2">
               {day.weekday} <span className="text-graphite">· {day.title}</span>
             </h2>
-            {day.duration ? <span className="font-mono text-xs text-graphite">{day.duration}</span> : null}
+            {day.duration ? (
+              <span className="font-mono text-xs text-graphite" data-on-sky="duration">
+                {day.duration}
+              </span>
+            ) : null}
           </div>
           {day.rest ? (
-            <p className="border-y border-hairline py-3 text-sm text-graphite">{day.restLine}</p>
+            <p className="border-y border-hairline py-3 text-sm text-graphite" data-on-sky="rest">
+              {day.restLine}
+            </p>
           ) : (
-            <table className="w-full border-collapse text-sm">
+            <table className="w-full border-collapse text-sm" data-on-sky="table">
               <thead className="sr-only">
                 <tr>
                   <th scope="col">{ui.lifts.exercise}</th>
@@ -58,7 +68,7 @@ export default function LiftsPage() {
 
       {lifts.rules.length > 0 ? (
         <section className="section">
-          <ul className="space-y-1 font-mono text-xs leading-5 text-graphite">
+          <ul className="w-fit space-y-1 font-mono text-xs leading-5 text-graphite" data-on-sky="rules">
             {lifts.rules.map((r) => (
               <li key={r}>{r}</li>
             ))}

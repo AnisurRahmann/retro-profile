@@ -1,10 +1,14 @@
 /**
- * Live page geometry the sky needs (client only): scroll position, the sky stage, the hero and header text blocks
+ * Live page geometry the sky needs (client only): scroll position, the sky stage, the hero and header blocks
  * and the section tops the landscape anchors to. Rects are in document px. Updated on resize and layout changes
  * (ResizeObserver on <body>); scrollY is stored by a passive listener and applied in rAF.
  */
 import { arcGeom, stageHeightFor, type ArcGeom } from "./arc";
-import { SCRIM_RAMP_PX } from "./scrim";
+
+/** Below this viewport width the 768px column (+ 20px padding each side) is the whole width. */
+export const COLUMN_BREAK = 808;
+/** The content column's width, CSS px. */
+export const COLUMN_PX = 768;
 
 export type Rect = { x: number; y: number; w: number; h: number };
 export type View = {
@@ -22,9 +26,6 @@ export type View = {
 };
 
 export const view: View = { y: 0, vw: 1440, vh: 900, stage: 0, hero: null, head: null, sections: {}, docH: 0 };
-
-/** Where the column scrim starts, in viewport px: the stage bottom as it scrolls up, or fully on when there's no stage. */
-export const scrimTop = (v: View = view) => (v.stage ? Math.max(-SCRIM_RAMP_PX, v.stage - v.y) : -SCRIM_RAMP_PX);
 
 const geometry = new Set<() => void>();
 const scrolls = new Set<() => void>();
@@ -61,19 +62,12 @@ function measure() {
   view.docH = document.documentElement.scrollHeight;
 }
 
-/** The ramp's offset: the scrim fades in from the stage bottom over SCRIM_RAMP_PX. */
-function applyScrim() {
-  const ramp = document.querySelector<HTMLElement>("[data-sky-scrim-ramp]");
-  ramp?.style.setProperty("--scrim-d", `${scrimTop()}px`);
-}
-
 export function startView(): () => void {
   let raf = 0;
   let pending = false;
   const frame = () => {
     pending = false;
     view.y = window.scrollY;
-    applyScrim();
     scrolls.forEach((l) => l());
   };
   const onScroll = () => {
@@ -84,7 +78,6 @@ export function startView(): () => void {
   let last = "";
   const relayout = () => {
     measure();
-    applyScrim();
     // Only real layout changes reach the listeners (the iOS URL bar resizes the window, not the layout).
     const key = JSON.stringify([view.vw, view.vh, view.stage, view.hero, view.head, view.sections, view.docH]);
     if (key !== last) {
@@ -114,7 +107,7 @@ export function startView(): () => void {
 /** What the renderer knows that the guard can use: cloud opacity over a viewport rect (null until it runs). */
 export const runtime: { cloudsIn: ((x0: number, y0: number, x1: number, y1: number) => number) | null } = { cloudsIn: null };
 
-/** Ask the controller to re-solve the scrims (the renderer's cloud field became available or changed a lot). */
+/** Tell geometry listeners to recompute (the renderer's cloud field became available). */
 export const notifyGeometry = () => geometry.forEach((l) => l());
 
 /** The arc's geometry from the live layout (the stage at scroll 0; a stage-sized horizon on pages without one). */

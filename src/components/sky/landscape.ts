@@ -10,7 +10,8 @@
  * the sun.
  */
 import { brand } from "@/lib/brand";
-import { hexToLab, mixLab, oklabToRgb, scaleL, type Lab, type RGB } from "@/lib/sky/color";
+import { hexToLab, mixLab, oklabToRgb, type Lab, type RGB } from "@/lib/sky/color";
+import { layerColor, riverColor } from "@/lib/sky/landscape/colors";
 import { PARALLAX, type LayerId } from "@/lib/sky/landscape/anchors";
 import { RIVER } from "@/lib/sky/landscape/shapes";
 import { ridgeL1, ridgeL2, ridgeL4, type Placed, type World } from "@/lib/sky/landscape/world";
@@ -20,13 +21,7 @@ const PAD = 256;
 /** Transparent headroom above the band, for the plane climbing out. */
 export const LIFT = 120;
 const LAYERS: LayerId[] = ["L1", "L2", "L3", "L4"];
-export const DEPTH: Record<LayerId, number> = { L1: 0.25, L2: 0.45, L3: 0.7, L4: 0.95 };
-/** Near colour: --ink darkened 15% (OKLab L × 0.85). */
-export const NEAR: Lab = scaleL(hexToLab(brand.ink), -0.15);
-
-export const layerColor = (horizon: Lab, layer: LayerId): Lab => mixLab(horizon, NEAR, DEPTH[layer]);
-/** The river reflects the sky: lighter than the hills behind it (horizon mixed 30% toward near). */
-export const riverColor = (horizon: Lab): Lab => mixLab(horizon, NEAR, 0.3);
+export { DEPTH, layerColor, NEAR, riverColor } from "@/lib/sky/landscape/colors";
 
 /** Band height for a viewport: 18vh desktop, 14svh mobile, clamped to 110–200 px (CSS mirrors it). */
 export const bandHeight = (vw: number, vh: number) => Math.round(Math.min(200, Math.max(110, (vw < 808 ? 0.14 : 0.18) * vh)));

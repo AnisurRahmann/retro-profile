@@ -24,7 +24,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 function Heading({ children }: { children: React.ReactNode }) {
-  return <h2 className="mb-4 text-base font-medium text-text">{children}</h2>;
+  return (
+    <h2 className="mb-4 w-fit text-base font-medium text-text" data-on-sky="h2">
+      {children}
+    </h2>
+  );
 }
 
 export default async function CaseStudyPage({ params }: Props) {
@@ -41,23 +45,30 @@ export default async function CaseStudyPage({ params }: Props) {
         <Link
           href="/#shipped"
           className="font-mono text-xs text-graphite transition-colors duration-150 hover:text-text"
+          data-on-sky="back"
         >
           {ui.work.back}
         </Link>
-        <h1 className="mt-6 text-[28px] leading-9 font-medium tracking-[-0.01em] text-text">
+        <h1 className="mt-6 w-fit text-[28px] leading-9 font-medium tracking-[-0.01em] text-text" data-on-sky="h1">
           {study.title}
         </h1>
-        <p className="mt-2 font-mono text-xs text-graphite">{meta}</p>
+        <p className="mt-2 w-fit font-mono text-xs text-graphite" data-on-sky="meta">
+          {meta}
+        </p>
       </div>
 
       <section className="section">
         <Heading>{ui.work.problem}</Heading>
-        <p className="max-w-[62ch] text-graphite">{study.problem}</p>
+        <p className="w-fit max-w-[62ch] text-graphite" data-on-sky="body">
+          {study.problem}
+        </p>
       </section>
 
       <section className="section">
         <Heading>{ui.work.built}</Heading>
-        <p className="max-w-[62ch] text-graphite">{study.built}</p>
+        <p className="w-fit max-w-[62ch] text-graphite" data-on-sky="body">
+          {study.built}
+        </p>
       </section>
 
       <section className="section">
@@ -66,7 +77,7 @@ export default async function CaseStudyPage({ params }: Props) {
           {study.flow.map((step, i) => (
             <li key={step} className="flex flex-col items-start sm:flex-row sm:items-center">
               {i > 0 ? (
-                <span aria-hidden="true" className="px-3 font-mono text-xs leading-5 text-graphite sm:px-1.5">
+                <span aria-hidden="true" className="px-3 font-mono text-xs leading-5 text-graphite sm:px-1.5" data-on-sky="arrow">
                   <span className="sm:hidden">↓</span>
                   <span className="hidden sm:inline">→</span>
                 </span>
@@ -81,7 +92,7 @@ export default async function CaseStudyPage({ params }: Props) {
 
       <section className="section">
         <Heading>{ui.work.result}</Heading>
-        <ul className="divide-y divide-hairline border-y border-hairline">
+        <ul className="divide-y divide-hairline border-y border-hairline" data-on-sky="results">
           {study.results.map((r) => (
             <li key={r.label} className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-3">
               <span className="text-sm text-graphite">{r.label}</span>
@@ -114,7 +125,7 @@ export default async function CaseStudyPage({ params }: Props) {
       </section>
 
       <p className="section">
-        <Link href={ask} className="text-text underline decoration-hairline underline-offset-4 hover:decoration-text">
+        <Link href={ask} className="text-text underline decoration-hairline underline-offset-4 hover:decoration-text" data-on-sky="ask">
           {ui.work.askLine}
         </Link>
       </p>

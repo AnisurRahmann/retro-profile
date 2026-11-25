@@ -117,17 +117,9 @@ describe("first-paint script", () => {
     expect(firstPaintScript(true).length - firstPaintScript(false).length).toBeLessThan(140);
   });
 
-  it("sets scrim stops no lighter than the solved profile", async () => {
-    const { scrimProfile } = await import("@/lib/sky/scrim");
-    const { smoothstep } = await import("@/lib/sky/gradient");
-    for (const mins of [6 * 60 + 25, 11 * 60, 16 * 60 + 55, 17 * 60 + 35]) {
-      const t = dhakaDate(2026, 12, 15, mins);
-      const { props } = run(firstPaintScript(false), "", t.getTime());
-      const s = sun(t);
-      const e = s.elevationDeg;
-      const want = scrimProfile({ colors: clearSky(e, s.phase), glow: smoothstep(-8, -2, e) * (1 - smoothstep(4, 10, e)), cloudCover: 0, fog: 0, astro: { elevation: e } as never });
-      want.forEach((a, i) => expect(Number(props[`--scrim-${i}`]), `${mins} stop ${i}`).toBeGreaterThanOrEqual(a - 0.02));
-    }
+  it("sets only the gradient (no scrim: loose text gets per-element backing)", () => {
+    const { props } = run(firstPaintScript(false), "", dhakaDate(2026, 12, 15, 11 * 60).getTime());
+    expect(Object.keys(props).sort()).toEqual(["--sky-horizon", "--sky-mid", "--sky-zenith"]);
   });
 
   it("sets the three sky variables close to the full OKLab pipeline", () => {

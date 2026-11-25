@@ -1,6 +1,7 @@
 /**
- * Sylhet Sky v2 review shots: 8 states × 1440×900 and 375×812 × three scroll positions (top, "Shipped" with
- * Keane Bridge centred, the closer with the airport) of the home page, into .shots/sky-v2/.
+ * Sylhet Sky review shots: 8 states × 1440×900 and 375×812 × three scroll positions (top, "Shipped" with
+ * Keane Bridge in its gutter, the closer with the airport) of the home page, plus 1024×768 (the scene-mode
+ * threshold) at 16:45, into .shots/sky-v3/ (OUT= to change).
  * Needs the test build running with mocks (debug overrides are on in test builds):
  *   pnpm build:e2e && CHAT_MOCK=1 WEATHER_MOCK=1 NEXT_DIST_DIR=.next-e2e pnpm start -p 3101
  * Usage: pnpm shots:sky [state-number ...]
@@ -10,7 +11,7 @@ import fs from "node:fs";
 import { chromium } from "@playwright/test";
 
 const BASE = process.env.SHOTS_URL ?? "http://localhost:3101";
-const OUT = ".shots/sky-v2";
+const OUT = process.env.OUT ?? ".shots/sky-v3";
 const only = process.argv.slice(2).map(Number);
 
 const STATES = [
@@ -26,16 +27,18 @@ const STATES = [
 const SIZES = [
   { w: 1440, h: 900 },
   { w: 375, h: 812 },
+  { w: 1024, h: 768, only: 3 },
 ];
 const SPOTS = ["top", "shipped", "closer"] as const;
 
 fs.mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({ args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
 for (const s of STATES.filter((x) => !only.length || only.includes(x.n))) {
-  for (const { w, h } of SIZES) {
+  for (const { w, h, only: just } of SIZES) {
+    if (just && just !== s.n) continue;
     const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: w < 640 ? 2 : 1 });
     await page.goto(`${BASE}/?${s.q}&life=1`, { waitUntil: "networkidle" });
-    // Colours and scrims transition over 4 s after the weather arrives.
+    // Colours transition over 4 s after the weather arrives; backings over 600 ms.
     await page.waitForTimeout(5000);
     for (const spot of SPOTS) {
       if (spot !== "top")

@@ -12,8 +12,8 @@ p.on("pageerror", (e) => console.log("pageerror", e.message));
 const q = process.argv[2] ?? "sky=2026-12-15T16:45&wx=clear";
 await p.goto(`http://localhost:${port}/?${q}`, { waitUntil: "load" });
 await p.waitForTimeout(4000);
-// HIDE=1: hide the content and the scrim to look at the landscape alone.
-if (process.env.HIDE) await p.addStyleTag({ content: "main, footer, header, .sky-scrim { visibility: hidden !important }" });
+// HIDE=1: hide the content to look at the landscape alone.
+if (process.env.HIDE) await p.addStyleTag({ content: "main, footer, header { visibility: hidden !important }" });
 for (const id of (process.argv[3] ?? "shipped,closer").split(",")) {
   await p.evaluate((id) => {
     const el = document.getElementById(id) ?? document.querySelector(id);

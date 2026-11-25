@@ -25,3 +25,7 @@ export const SUN_MID = "#FFD58A";
 export const SUN_LOW = "#FF9B4A";
 /** Lit windows in the city at night. */
 export const WINDOW_LIT = "#FFD9A0";
+/** Night light pollution over the city: warm sodium, at the horizon behind the landscape (sunset → sunrise). */
+export const CITY_GLOW = "#E8A15A";
+/** Cool white TV light in a few windows, flickering gently. */
+export const TV_LIT = "#CFDDFF";

@@ -1,17 +1,31 @@
 /**
- * The gate for any sky palette retuning: sweep every sun elevation, condition and half of the day, solve the
- * column scrim, and check text over the brightest sky the renderer can put behind the column.
+ * The backing model (src/lib/sky/backing.ts): for every sun elevation, condition, half of the day and height, the
+ * backing it picks keeps loose text readable over the brightest sky the renderer can put behind it. The pixel
+ * test (tests/e2e/sky-backing.spec.ts) is the gate against what the browser paints; this sweep is the model's own
+ * guarantee and the gate for any palette retune.
  */
 import { describe, expect, it } from "vitest";
 import type { Phase } from "@/lib/sky/astro";
-import { skyColors, smoothstep } from "@/lib/sky/gradient";
+import { skyColors, smoothstep, sunColor } from "@/lib/sky/gradient";
 import { fogAmount } from "@/lib/sky/model";
-import { brand } from "@/lib/brand";
-import { contrast, hexToRgb, labToHex, oklabToRgb, over } from "@/lib/sky/color";
-import { brightestSky, compositeOverScrim, HERO_TARGETS, ON_SKY, regionScrim, SCRIM_MAX, SCRIM_STOPS, scrimProfile, SUN_UNDER_TEXT } from "@/lib/sky/scrim";
-import { layerColor, riverColor } from "@/components/sky/landscape";
-import { sunColor } from "@/lib/sky/gradient";
-import { mixLab, rgbToOklab } from "@/lib/sky/color";
+import { contrast, over, rgbToHex } from "@/lib/sky/color";
+import {
+  aaMix,
+  backgroundFor,
+  CHIP_ALPHA,
+  CHIP_MAX,
+  decide,
+  GRAPHITE,
+  haloFor,
+  haloInk,
+  INK,
+  ON_SKY,
+  parseCssColor,
+  sizeBucket,
+  skyAt,
+  TEXT,
+  type Scene,
+} from "@/lib/sky/backing";
 import { CONDITIONS, type Condition } from "@/lib/sky/weather";
 
 /** Worst plausible cloud cover per condition (clear can still carry 20% wisps). */
@@ -34,121 +48,115 @@ function model(e: number, phase: Phase, c: Condition) {
     glow: smoothstep(-8, -2, e) * (1 - smoothstep(4, 10, e)),
     cloudCover: COVER[c],
     fog,
-    thunder: c === "thunder",
     astro: { elevation: e } as never,
   };
 }
 
-describe("column contrast over the sky", () => {
-  it("keeps --graphite ≥ 4.5:1 and --text ≥ 7:1 at every elevation, condition, phase and height", () => {
-    const INK = hexToRgb(brand.ink);
-    const TEXT = hexToRgb(brand.text);
-    const GRAPHITE = hexToRgb(brand.graphite);
-    let worst = { graphite: Infinity, text: Infinity, where: "", a: 0, sky: "" };
-    let maxA = { a: 0, where: "" };
-    const fails: string[] = [];
-    for (let e = -30; e <= 90; e++) {
-      for (const c of CONDITIONS) {
-        for (const phase of ["morning", "evening"] as const) {
-          // The moon disc can sit behind the column at night (here at 30% height); include it as the worst case.
-          for (const moon of e < -6 ? [0, 1] : e > 0 ? [0, -1] : [0]) {
-            const m = model(e, phase, c);
-            // moon −1: the sun disc behind the column instead (dimmed to SUN_UNDER_TEXT), at 30% height.
-            const sun = moon === -1 ? { y: 0.3, rgb: sunColor(e), alpha: SUN_UNDER_TEXT } : null;
-            const profile = scrimProfile(m, Math.max(0, moon), 0.3, sun);
-            for (let i = 0; i <= 64; i++) {
-              const y = i / 64;
-              const k = Math.min(SCRIM_STOPS.length - 2, Math.floor(y * 4));
-              const a = profile[k]! + (profile[k + 1]! - profile[k]!) * ((y - SCRIM_STOPS[k]!) / 0.25);
-              const sky = oklabToRgb(brightestSky(m, Math.abs(y - 0.3) < 0.08 ? Math.max(0, moon) : 0, y, undefined, sun));
-              const comp = over(sky, INK, a);
-              const g = contrast(GRAPHITE, comp);
-              const t = contrast(TEXT, comp);
-              const where = `${e}° ${c} ${phase}${moon === 1 ? " +moon" : moon === -1 ? " +sun" : ""} y=${y.toFixed(2)}`;
-              if (g < worst.graphite) worst = { graphite: g, text: t, where, a, sky: labToHex(brightestSky(m, 0, y)) };
-              if (a > maxA.a) maxA = { a, where };
-              if (g < 4.5 || t < 7) fails.push(`${where}: graphite ${g.toFixed(2)} text ${t.toFixed(2)} (a ${a.toFixed(3)})`);
-            }
-          }
-        }
-      }
-    }
-    console.info(
-      `[sky-contrast] worst: graphite ${worst.graphite.toFixed(2)}:1, text ${worst.text.toFixed(2)}:1 at ${worst.where} (scrim ${worst.a.toFixed(3)}, sky ${worst.sky}); max scrim ${maxA.a.toFixed(3)} at ${maxA.where}`,
-    );
-    expect(fails.slice(0, 20)).toEqual([]);
-  });
+/** Contrast of the text as rendered (anti-aliased toward the background at DPR 1) over its backing. */
+const effective = (bg: [number, number, number], text: [number, number, number], d: ReturnType<typeof decide>, px: number, dpr = 2) => {
+  const b = over(bg, INK, d.mode === "none" ? 0 : d.mode === "halo" ? haloInk(d.a, sizeBucket(px)) : d.a);
+  return contrast(over(text, b, aaMix(px, dpr)), b);
+};
 
-  it("keeps the hero readable over the open stage, with the sun beside or behind it (mobile)", () => {
-    const INK = hexToRgb(brand.ink);
-    const TEXT = hexToRgb(brand.text);
-    // A 375×812 hero block spans roughly 32–65% of the viewport height; on desktop 42–58%.
-    const blocks = [
-      [0.32, 0.65],
-      [0.42, 0.58],
-    ] as const;
-    let worst = { onSky: Infinity, text: Infinity, where: "", a: 0 };
+describe("per-element backing", () => {
+  it("keeps --text ≥ 7, --on-sky and --graphite ≥ 4.5 at every elevation, condition, phase and height", () => {
+    const tones = [
+      { name: "text", rgb: TEXT, min: 7 },
+      { name: "on-sky", rgb: ON_SKY, min: 4.5 },
+      { name: "graphite", rgb: GRAPHITE, min: 4.5 },
+    ];
     const fails: string[] = [];
-    for (let e = -30; e <= 90; e += 2) {
+    const count = { none: 0, halo: 0, chip: 0 };
+    let worst = { c: Infinity, where: "" };
+    for (let e = -30; e <= 90; e += 1) {
       for (const c of CONDITIONS) {
         for (const phase of ["morning", "evening"] as const) {
           const m = model(e, phase, c);
-          for (const [y0, y1] of blocks) {
-            // The sun near the block: drawn dimmed, its bloom reaching the text at up to 0.2 (the controller's guard).
-            for (const sun of e > -1 ? [null, { y: (y0 + y1) / 2, rgb: sunColor(e), alpha: Math.max(SUN_UNDER_TEXT, 0.2) }] : [null]) {
-              const a = regionScrim(m, y0, y1, HERO_TARGETS, sun);
-              for (let i = 0; i <= 16; i++) {
-                const y = y0 + ((y1 - y0) * i) / 16;
-                const disc = sun ? { ...sun, y } : null;
-                const comp = over(oklabToRgb(brightestSky(m, 0, y, 1, disc)), INK, a);
-                const g = contrast(ON_SKY, comp);
-                const t = contrast(TEXT, comp);
-                const where = `${e}° ${c} ${phase} block ${y0}–${y1}${sun ? " +sun" : ""} y=${y.toFixed(2)}`;
-                if (g < worst.onSky) worst = { onSky: g, text: t, where, a };
-                if (g < 4.5 || t < 7) fails.push(`${where}: on-sky ${g.toFixed(2)} text ${t.toFixed(2)} (a ${a.toFixed(3)})`);
+          for (let i = 0; i <= 32; i++) {
+            const y = i / 32;
+            const bg = skyAt(m, y);
+            for (const t of tones)
+              for (const [px, dpr] of [[12, 1], [12, 2], [16, 1], [36, 1]] as const) {
+                const d = decide(bg, t.rgb, px, dpr);
+                count[d.mode]++;
+                const k = effective(bg, t.rgb, d, px, dpr);
+                const where = `${e}° ${c} ${phase} y=${y.toFixed(2)} ${t.name} ${px}px@${dpr} ${d.mode} ${d.a}`;
+                if (k < worst.c) worst = { c: k, where };
+                if (k < t.min) fails.push(`${where}: ${k.toFixed(2)} over ${rgbToHex(bg)}`);
               }
-            }
           }
         }
       }
     }
-    console.info(`[sky-contrast] hero worst: --on-sky ${worst.onSky.toFixed(2)}:1, --text ${worst.text.toFixed(2)}:1 at ${worst.where} (scrim ${worst.a.toFixed(3)})`);
+    console.info(`[backing] worst ${worst.c.toFixed(2)}:1 at ${worst.where}; modes ${JSON.stringify(count)}`);
     expect(fails.slice(0, 20)).toEqual([]);
-  });
+  }, 30_000);
 
-  it("keeps text over the landscape band readable: every layer, the river and the golden rim, under the scrim", () => {
-    const INK = hexToRgb(brand.ink);
-    const TEXT = hexToRgb(brand.text);
-    const GRAPHITE = hexToRgb(brand.graphite);
-    let worst = { g: Infinity, where: "" };
+  it("keeps text readable with the sun's disc or bloom and the moon behind it", () => {
     const fails: string[] = [];
-    for (let e = -30; e <= 90; e += 2) {
-      for (const c of CONDITIONS) {
-        for (const phase of ["morning", "evening"] as const) {
-          const m = model(e, phase, c);
-          // The band covers the bottom of the viewport; the scrim there is at least the lower stops' alpha.
-          const a = Math.min(...scrimProfile(m).slice(3));
-          const h = m.colors.horizon;
-          const colors = (["L1", "L2", "L3", "L4"] as const).map((l) => layerColor(h, l));
-          colors.push(riverColor(h), mixLab(layerColor(h, "L2"), h, 0.5)); // the rim at its brightest
-          // The city's night glow, as drawn: the lifted horizon at ≤ 0.45 over the sky.
-          if (e < -6) colors.push(rgbToOklab(over(oklabToRgb(h), oklabToRgb(mixLab(h, [0.62, 0.01, 0.03], 0.16)), 0.45)));
-          for (const col of colors) {
-            const comp = over(oklabToRgb(col), INK, a);
-            const g = contrast(GRAPHITE, comp);
-            const t = contrast(TEXT, comp);
-            if (g < worst.g) worst = { g, where: `${e}° ${c} ${phase}` };
-            if (g < 4.5 || t < 7) fails.push(`${e}° ${c} ${phase}: graphite ${g.toFixed(2)} text ${t.toFixed(2)}`);
+    for (let e = -1; e <= 60; e += 3) {
+      for (const c of ["clear", "partly", "fog"] as const) {
+        const s: Scene = {
+          m: model(e, "evening", c),
+          vw: 1440,
+          vh: 900,
+          sun: { x: 700, y: 500, r: 16, alt: e, cloud: 0, fog: 0 },
+          moon: { x: 300, y: 300, r: 14, visible: 1, glow: 1 },
+          glows: [],
+        };
+        // Boxes on the sun, in its 3× bloom, its 8× bloom, and on the moon.
+        for (const [x0, y0] of [
+          [690, 490],
+          [730, 500],
+          [800, 500],
+          [295, 295],
+        ] as const) {
+          const box = { x0, y0, x1: x0 + 80, y1: y0 + 16 };
+          const bg = backgroundFor(s, box);
+          for (const t of [TEXT, GRAPHITE]) {
+            const d = decide(bg, t, 12, 1);
+            const k = effective(bg, t, d, 12, 1);
+            if (k < 4.5) fails.push(`${e}° ${c} box ${x0},${y0}: ${k.toFixed(2)} (${d.mode} ${d.a})`);
           }
         }
       }
     }
-    console.info(`[sky-contrast] landscape worst: --graphite ${worst.g.toFixed(2)}:1 at ${worst.where}`);
-    expect(fails.slice(0, 20)).toEqual([]);
+    expect(fails).toEqual([]);
   });
 
-  it("needs no scrim on a clear night and clamps at the maximum", () => {
-    expect(compositeOverScrim(model(-30, "evening", "clear")).a).toBe(0);
-    expect(compositeOverScrim(model(0, "evening", "clear")).a).toBeLessThanOrEqual(SCRIM_MAX);
+  it("picks none on a clear night, a halo for a small deficit, and a chip for graphite low over dusk", () => {
+    expect(decide(skyAt(model(-30, "evening", "clear"), 0.5), GRAPHITE, 14).mode).toBe("none");
+    // A grey just too light for --graphite at 4.8:1: the halo covers it.
+    let t = 0;
+    while (contrast(GRAPHITE, over(INK, [1, 1, 1], t + 0.001)) >= 4.79) t += 0.001;
+    const small = decide(over(INK, [1, 1, 1], t + 0.004), GRAPHITE, 14);
+    expect(small.mode).toBe("halo");
+    const dusk = decide(skyAt(model(2, "evening", "clear"), 0.95), GRAPHITE, 14);
+    expect(dusk.mode).toBe("chip");
+    expect(dusk.a).toBeGreaterThanOrEqual(CHIP_ALPHA);
+    expect(dusk.a).toBeLessThanOrEqual(CHIP_MAX);
+  });
+
+  it("solves the smallest halo on the calibrated curve", () => {
+    for (const b of [1, 2, 3]) {
+      expect(haloFor(0, b)).toBe(0);
+      const need = haloInk(0.6, b);
+      const a = haloFor(need, b)!;
+      expect(haloInk(a, b)).toBeGreaterThanOrEqual(need);
+      expect(haloInk(a - 0.05, b)).toBeLessThan(need);
+      expect(haloFor(haloInk(1, b) + 0.01, b)).toBeNull();
+    }
+  });
+
+  it("reads computed colours in both forms Chrome returns", () => {
+    expect(parseCssColor("rgb(230, 234, 242)")).toEqual([230 / 255, 234 / 255, 242 / 255]);
+    expect(parseCssColor("color(srgb 0.9 0.91 0.94)")).toEqual([0.9, 0.91, 0.94]);
+    expect(parseCssColor("oklch(0.5 0.1 200)")).toBeNull();
+  });
+
+  it("counts the sun's colour from its altitude", () => {
+    const s: Scene = { m: model(5, "evening", "clear"), vw: 1440, vh: 900, sun: { x: 100, y: 100, r: 16, alt: 5, cloud: 0, fog: 0 }, moon: null, glows: [] };
+    const on = backgroundFor(s, { x0: 95, y0: 95, x1: 105, y1: 105 });
+    expect(contrast(on, sunColor(5))).toBeLessThan(1.1);
   });
 });

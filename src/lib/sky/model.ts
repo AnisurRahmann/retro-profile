@@ -1,5 +1,5 @@
 /**
- * Everything the sky draws, derived from (time, weather). Pure; shared by the controller (CSS gradient, scrim,
+ * Everything the sky draws, derived from (time, weather). Pure; shared by the controller (CSS gradient, backing,
  * label) and the renderer (shader uniforms, particles).
  * Screen convention: the viewer faces south (the sun's side of the sky at 24.9° N), so east is at the left and
  * west at the right: the dawn glow sits bottom-left, the dusk glow bottom-right.

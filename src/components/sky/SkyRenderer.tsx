@@ -10,16 +10,16 @@ import { effectiveWeather, SKY_DEBUG, skyStore, skyTime } from "@/lib/sky/store"
 import { dayOfYear, dhakaParts } from "@/lib/sky/time";
 import { sunColor } from "@/lib/sky/gradient";
 import { ALT_REF, nightPoint, sunPath, type ArcGeom } from "@/lib/sky/arc";
-import { columnMask, COLUMN_BREAK, rampMask, SUN_UNDER_TEXT } from "@/lib/sky/scrim";
 import {
+  COLUMN_BREAK,
   geomNow,
   notifyGeometry,
   onViewGeometry,
   onViewScroll,
   runtime,
-  scrimTop,
   view,
 } from "@/lib/sky/view";
+import { startBacking, type BackingRunner } from "./backing-runner";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createSun, drawArc, type SunState } from "./bodies";
 import { CLOUD_REFRESH_S, createCloudField } from "./cloud-field";
@@ -97,7 +97,6 @@ type Window2 = Window & {
   __sky?: {
     state: string;
     elevation: number;
-    scrimA: number;
     fps: number;
     condition: string;
     frames?: number;
@@ -139,6 +138,7 @@ function start(
   let land: Landscape | null = null;
   let life: Life | null = null;
   let ambient: Ambient | null = null;
+  let backing: BackingRunner | null = null;
   let lifeFrame: LifeFrame | null = null;
   let lastLight = -Infinity;
   let takeoffUntil = -Infinity;
@@ -182,6 +182,7 @@ function start(
     model = skyModel(skyTime(s), effectiveWeather(s), geom);
     target = targetsOf(model);
     pts?.ensureDay(dayOfYear(skyTime(s)));
+    backing?.update();
     if (TEST && w2.__sky)
       Object.assign(w2.__sky, {
         state: model.astro.state,
@@ -192,22 +193,6 @@ function start(
 
   const n = (k: string) => cur[k] as number;
   const v2 = (k: string) => cur[k] as number[];
-
-  /** Dimming of a body at (x, y) with radius r: under the column scrim, and behind the hero text block. */
-  const textDim = (x: number, y: number, r: number, scrim: number) => {
-    let k = 1 - (1 - SUN_UNDER_TEXT) * columnMask(x, view.vw) * rampMask(y, scrim);
-    const h = view.hero;
-    if (h) {
-      const hy = h.y - view.y;
-      const dx = Math.max(h.x - x, 0, x - (h.x + h.w));
-      const dy = Math.max(hy - y, 0, y - (hy + h.h));
-      k = Math.min(
-        k,
-        SUN_UNDER_TEXT + (1 - SUN_UNDER_TEXT) * smooth01(0.5 * r, 2 * r, Math.hypot(dx, dy)),
-      );
-    }
-    return k;
-  };
 
   const refreshClouds = (t: number) => {
     clouds.resize(view.vw, view.vh);
@@ -242,11 +227,11 @@ function start(
       Math.max(0, 1 - 1.05 * occlusion(v2("uMoonPos")[0]! * view.vw, v2("uMoonPos")[1]! * view.vh)) ** 0.7 *
       (1 - 0.6 * n("uFog")),
     moonR: moonR(),
-    moonDim: textDim(v2("uMoonPos")[0]! * view.vw, v2("uMoonPos")[1]! * view.vh, moonR(), Infinity),
+    moonDim: 1,
     halo: { r: (22 / ALT_REF) * (geom.horizonY - geom.apexY), a: model.humidity > 85 ? 1 : 0 },
   });
 
-  const sunState = (scrim: number): SunState => {
+  const sunState = (): SunState => {
     const [fx, fy] = v2("sunPos");
     const x = fx! * view.vw;
     const y = fy! * view.vh;
@@ -263,7 +248,31 @@ function start(
       cloud: occlusion(x, y),
       fog: n("uFog"),
       cover: n("uCloudCover"),
-      dim: textDim(x, y, r, scrim) * smooth01(-0.9, 0.6, alt),
+      // Only cloud and altitude change the sun: nothing dims it behind text (loose text gets its own backing).
+      dim: smooth01(-0.9, 0.6, alt),
+    };
+  };
+
+  /**
+   * What the backing model needs from the renderer: the model's targets (not the smoothed values, so a weather or
+   * preview change is judged where it's heading), the sun and moon as drawn, the city glows.
+   */
+  const backingScene = () => {
+    const m = model;
+    const sx = m.sun.x * view.vw;
+    const sy = m.sun.y * view.vh;
+    const mx = m.moon.x * view.vw;
+    const my = m.moon.y * view.vh;
+    const moonVis = m.night * Math.max(0, 1 - 1.05 * occlusion(mx, my)) ** 0.7 * (1 - 0.6 * m.fog);
+    return {
+      m,
+      sun: m.sun.up ? { x: sx, y: sy, r: sunR(), alt: m.sun.alt, cloud: occlusion(sx, sy), fog: m.fog } : null,
+      moon:
+        m.moon.up && moonVis > 0.01
+          ? { x: mx, y: my, r: moonR(), visible: moonVis, glow: m.moon.fraction * m.night * (1 - 0.7 * m.cloudCover) }
+          : null,
+      glows: [],
+      lands: land ? [{ top: landCanvas.getBoundingClientRect().top + LIFT, h: land.height }] : [],
     };
   };
 
@@ -294,7 +303,6 @@ function start(
         lightning = strikeAt >= 0 ? lightningEnvelope(t - strikeAt) : 0;
       }
     } else if (still && model.thunder && forceBolt) lightning = 1;
-    const scrim = scrimTop();
     if (!still) {
       drift[0] += v2("uWind")[0]! * dt;
       drift[1] += v2("uWind")[1]! * dt;
@@ -304,14 +312,13 @@ function start(
       ...cur,
       uTime: still ? 0 : t,
       uLightning: lightning,
-      uScrimTop: scrim,
       uDrift: drift,
       uZ: 0.015 * t,
     };
     if (atm && !lost) atm.draw(u);
     if (pts) {
       const ps = particleState();
-      const ss = sunState(scrim);
+      const ss = sunState();
       const scrubbing = skyStore.get().preview !== null;
       nightArc += ((scrubbing ? 1 : 0) - nightArc) * (still ? 1 : 1 - Math.exp(-dt / 0.3));
       arcPaths();
@@ -323,7 +330,6 @@ function start(
         skyTime().getTime(),
         ps,
         !still,
-        scrim,
         {
           back: (ctx) => drawArc(ctx, dayPath, nightPath, text, nightArc),
           front: (ctx) => {
@@ -377,7 +383,7 @@ function start(
       if (world && life) {
         const at = skyTime();
         const alt = n("sunAlt");
-        const ss = sunState(scrim);
+        const ss = sunState();
         const moonAlt = model.astro.moon.altitudeDeg;
         const ps = particleState();
         lifeFrame = {
@@ -531,7 +537,7 @@ function start(
     if (reduce) still();
   });
   // Layout and scroll: the arc follows the stage; under reduced motion the static frame is redrawn once scrolling
-  // stops (the column dimming depends on where the scrim is), never during.
+  // stops, never during.
   let stillTimer = 0;
   const unsubGeom = onViewGeometry(() => {
     recompute();
@@ -635,12 +641,12 @@ function start(
       w2.__sky = {
         state: model.astro.state,
         elevation: model.astro.elevation,
-        scrimA: w2.__sky?.scrimA ?? 0,
         fps: 0,
         condition: model.condition,
         webgl: !!atm,
       };
     resize();
+    backing = startBacking(backingScene);
     ro.observe(ptsCanvas);
     ro.observe(landCanvas);
     motion.addEventListener("change", applyMotion);
@@ -660,6 +666,7 @@ function start(
     window.clearTimeout(resizeTimer);
     window.clearTimeout(stillTimer);
     runtime.cloudsIn = null;
+    backing?.stop();
     unsubGeom();
     unsubScroll();
     vv?.removeEventListener("resize", onVV);

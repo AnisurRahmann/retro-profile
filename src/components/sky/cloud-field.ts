@@ -119,7 +119,7 @@ export function createCloudField() {
       const bot = g(i, j + 1) + (g(i + 1, j + 1) - g(i, j + 1)) * fx;
       return top + (bot - top) * fy;
     },
-    /** Maximum over a rectangle (grid cells it touches), for the text-scrim guard. */
+    /** Maximum over a rectangle (grid cells it touches), for the backing model (src/lib/sky/backing.ts). */
     maxIn(x0: number, y0: number, x1: number, y1: number): number {
       if (!ready) return -1;
       let m = 0;

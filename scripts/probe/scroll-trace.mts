@@ -18,7 +18,7 @@ const chunks = await p.evaluate(() => performance.getEntriesByType("resource").m
 const sky: string[] = [];
 for (const url of chunks) {
   const src = await (await fetch(url)).text();
-  if (/data-sky-landscape|\[sky\] CPU|sky-scrim-ramp|createCloudField|data-sky-takeoff|sky-place/.test(src)) sky.push(url);
+  if (/data-sky-landscape|\[sky\] CPU|data-on-sky|createCloudField|data-sky-takeoff|sky-place/.test(src)) sky.push(url);
 }
 await b.startTracing(p, { categories: ["devtools.timeline", "disabled-by-default-devtools.timeline", "v8.execute"] });
 await p.mouse.move(720, 450);

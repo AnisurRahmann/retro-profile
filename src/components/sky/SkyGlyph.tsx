@@ -3,7 +3,7 @@ export type Glyph = "sun" | "moon" | "cloud" | "rain" | "bolt";
 
 /** 10px sky glyph in currentColor. The moon shows the real phase (lit limb right while waxing). */
 export function SkyGlyph({ kind, fraction = 1, waxing = true, amber }: { kind: Glyph; fraction?: number; waxing?: boolean; amber: boolean }) {
-  const common = { width: 10, height: 10, viewBox: "0 0 10 10", "aria-hidden": true as const, className: "flex-none", style: amber ? { color: "var(--signal)" } : undefined };
+  const common = { width: 10, height: 10, viewBox: "0 0 10 10", "aria-hidden": true as const, "data-sky-glyph": "", className: "flex-none", style: amber ? { color: "var(--signal)" } : undefined };
   const s = { fill: "none", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   if (kind === "sun")
     return (
