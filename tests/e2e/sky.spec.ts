@@ -275,11 +275,15 @@ test("on a phone a vertical swipe on the sky scrolls the page and doesn't scrub;
     }).observe(document.body, { childList: true, subtree: true });
   });
   const cdp = await page.context().newCDPSession(page);
+  // The postcard stage (v5.1 T3): the text block is at the top, so the open sky (the handle) is under it.
+  const hero = (await page.locator("[data-sky-hero]").boundingBox())!;
+  const skyY = hero.y + hero.height + 70;
+  expect(skyY).toBeLessThan(500);
   // Headless Chromium sometimes drops the first synthetic gesture of a session: retry until the page moves.
   for (let i = 0; i < 3 && (await page.evaluate(() => window.scrollY)) < 100; i++) {
     await cdp.send("Input.synthesizeScrollGesture", {
       x: 180,
-      y: 160,
+      y: skyY,
       yDistance: -300,
       gestureSourceType: "touch",
       speed: 600,
@@ -294,12 +298,12 @@ test("on a phone a vertical swipe on the sky scrolls the page and doesn't scrub;
   await page.evaluate(() => window.scrollTo(0, 0));
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchStart",
-    touchPoints: [{ x: 100, y: 160 }],
+    touchPoints: [{ x: 100, y: skyY }],
   });
   for (let i = 1; i <= 10; i++)
     await cdp.send("Input.dispatchTouchEvent", {
       type: "touchMove",
-      touchPoints: [{ x: 100 + 18 * i, y: 161 }],
+      touchPoints: [{ x: 100 + 18 * i, y: skyY + 1 }],
     });
   await expect(preview(page)).toBeVisible();
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
