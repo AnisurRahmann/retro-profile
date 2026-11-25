@@ -1,6 +1,6 @@
 export function Waveform() {
   return (
-    <span className="wave" aria-hidden="true" data-signal-wave="">
+    <span className="wave" aria-hidden="true">
       <span />
       <span />
       <span />

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AMBIENT_AMP, emitFrom } from "@/lib/signal-bus";
 
 const CYCLE_MS = 3200;
 const LEAVE_MS = 180;
@@ -41,7 +40,6 @@ export function StatusLine({ lines }: { lines: string[] }) {
         const step = Math.min(CHAR_MS, MAX_TYPE_MS / Math.max(text.length, 1));
         setIndex(current);
         setShown(0);
-        emitFrom(document.querySelector("[data-signal-wave]"), AMBIENT_AMP, { kind: "ambient" });
         setLeaving(false);
         for (let c = 1; c <= text.length; c++) later(() => setShown(c), Math.round(c * step));
         later(() => setShown(null), Math.round(text.length * step) + 20);

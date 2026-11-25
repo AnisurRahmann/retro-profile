@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createEventParser, type ErrorCode } from "@/agent/protocol";
-import { emitFrom } from "@/lib/signal-bus";
 import type { ToolEventResult } from "@/agent/tools";
 import type { StatusLabels } from "@/lib/project";
 import { Markdown } from "./Markdown";
@@ -61,15 +60,6 @@ function Ring({ spinning, size, children }: { spinning: boolean; size: number; c
     </div>
   );
 }
-
-/** Emits one ripple from its top-left corner when a tool card first renders. */
-function Emitting({ children }: { children: ReactNode }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  useEffect(() => emitFrom(ref.current, 0.5, { corner: true }), []);
-  return <div ref={ref}>{children}</div>;
-}
-
-const STREAM_EMIT_MS = 120;
 
 /** Maps an error code to what the visitor sees. Every branch leaves a next action. */
 function ErrorReply({ code, copy, email, calendar }: { code?: ErrorCode; copy: ChatCopy; email: string; calendar: string }) {
@@ -154,7 +144,6 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
       const text = raw.trim().slice(0, MAX_CHARS);
       if (!text || streaming || !enabled) return;
       const history = [...toHistory(messages), { role: "user" as const, content: text }].slice(-30);
-      emitFrom(document.querySelector("[data-signal-send]"), 0.5);
       const userMsg: UIMessage = { id: uid(), role: "user", text };
       const agentMsg: UIMessage = { id: uid(), role: "assistant", text: "", tools: [], status: "streaming" };
       setMessages((prev) => [...prev, userMsg, agentMsg]);
@@ -165,7 +154,6 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
       const controller = new AbortController();
       abortRef.current = controller;
       let finished = false;
-      let lastEmit = 0;
       const fail = (code: ErrorCode) => {
         finished = true;
         patchLast(() => ({ status: "error", error: code }));
@@ -180,15 +168,7 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
         });
         if (!res.body) throw new Error("no body");
         const parser = createEventParser((event) => {
-          if (event.type === "text") {
-            patchLast((m) => ({ text: m.text + event.delta }));
-            const t = performance.now();
-            if (t - lastEmit >= STREAM_EMIT_MS) {
-              lastEmit = t;
-              const avatars = document.querySelectorAll("[data-signal-avatar]");
-              emitFrom(avatars[avatars.length - 1], 0.22);
-            }
-          }
+          if (event.type === "text") patchLast((m) => ({ text: m.text + event.delta }));
           else if (event.type === "tool") patchLast((m) => ({ tools: [...m.tools, event.result] }));
           else if (event.type === "done") {
             finished = true;
@@ -267,7 +247,6 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
         <button
           type="submit"
           aria-label={copy.send}
-          data-signal-send=""
           disabled={!draft.trim()}
           className="absolute right-3 bottom-3 grid size-8 place-items-center rounded-full bg-text text-ink transition-opacity duration-150 disabled:opacity-40"
         >
@@ -338,7 +317,7 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
             </li>
           ) : (
             <li key={m.id} className="flex gap-3" data-testid={m.status === "done" ? "agent-done" : undefined}>
-              <span className="mt-0.5 flex-none" data-signal-avatar="">
+              <span className="mt-0.5 flex-none">
                 {avatar}
               </span>
               <div className="min-w-0 flex-1 space-y-3 text-base leading-6 text-text">
@@ -355,9 +334,7 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
                   </span>
                 ) : null}
                 {m.tools.map((t, i) => (
-                  <Emitting key={i}>
-                    <ToolCard result={t} copy={copy} labels={labels} sessionId={sessionId} context={history} email={email} />
-                  </Emitting>
+                  <ToolCard key={i} result={t} copy={copy} labels={labels} sessionId={sessionId} context={history} email={email} />
                 ))}
                 {m.status === "error" ? <ErrorReply code={m.error} copy={copy} email={email} calendar={calendar} /> : null}
               </div>

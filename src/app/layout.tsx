@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { Header } from "@/components/Header";
-import { SignalFieldMount } from "@/components/signal-field/SignalFieldMount";
 import { brand } from "@/lib/brand";
 import { links, profile, ui } from "@/site";
 import "./globals.css";
@@ -45,12 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: INPUT_MODALITY }} />
       </head>
       <body className="flex min-h-dvh flex-col text-text">
-        <div aria-hidden="true" className="depth">
-          <div className="depth-light" />
-          <div className="depth-vignette" />
-          <div className="depth-grain" />
-        </div>
-        <SignalFieldMount />
+        <div aria-hidden="true" className="grain" />
         <Header />
         {children}
       </body>
