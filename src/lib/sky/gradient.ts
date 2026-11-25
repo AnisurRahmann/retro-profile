@@ -1,6 +1,6 @@
 /** The CSS sky gradient: keyframes interpolated in OKLab by sun elevation, then modulated by the weather. */
-import { desaturate, hexToLab, labToHex, mixLab, scaleL, type Lab } from "./color";
-import { SKY_KEYFRAMES } from "./palette";
+import { desaturate, hexToLab, hexToRgb, labToHex, mixLab, oklabToRgb, rgbToOklab, scaleL, type Lab, type RGB } from "./color";
+import { SKY_KEYFRAMES, SUN_HIGH, SUN_LOW, SUN_MID } from "./palette";
 import type { Phase } from "./astro";
 import type { Condition } from "./weather";
 
@@ -71,4 +71,12 @@ export function skyColors(elevationDeg: number, phase: Phase, condition: Conditi
 
 export function toCss(c: SkyColors): { zenith: string; mid: string; horizon: string } {
   return { zenith: labToHex(c.zenith), mid: labToHex(c.mid), horizon: labToHex(c.horizon) };
+}
+
+/** Sun disc colour for an altitude (degrees): SUN_HIGH ≥ 30°, SUN_MID at 10°, SUN_LOW at 0°, mixed in OKLab. */
+export function sunColor(alt: number): RGB {
+  const [low, mid, high] = [SUN_LOW, SUN_MID, SUN_HIGH].map((h) => rgbToOklab(hexToRgb(h))) as [Lab, Lab, Lab];
+  if (alt >= 30) return oklabToRgb(high);
+  if (alt >= 10) return oklabToRgb(mixLab(mid, high, (alt - 10) / 20));
+  return oklabToRgb(mixLab(low, mid, Math.max(0, alt) / 10));
 }

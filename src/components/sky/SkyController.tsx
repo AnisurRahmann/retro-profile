@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+import { sunColor } from "@/lib/sky/gradient";
 import { skyModel } from "@/lib/sky/model";
-import { columnMask, HERO_TARGETS, regionScrim, scrimProfile } from "@/lib/sky/scrim";
+import { columnMask, HERO_TARGETS, MOON_COLUMN_PX, regionScrim, scrimProfile, SCRIM_FALLOFF_PX, SUN_UNDER_TEXT, type Disc } from "@/lib/sky/scrim";
 import { effectiveWeather, parseOverrides, skyStore, skyTime } from "@/lib/sky/store";
-import { onViewGeometry, startView, view } from "@/lib/sky/view";
+import { geomNow, onViewGeometry, runtime, startView, view } from "@/lib/sky/view";
 import { isWeather } from "@/lib/sky/weather";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
@@ -15,23 +16,35 @@ const ASTRO_TICK_MS = 60_000;
 /** Applies the sky model to the CSS layer: gradient colours and the state attribute (header dot). */
 function paint() {
   const s = skyStore.get();
-  const m = skyModel(skyTime(s), effectiveWeather(s));
+  const m = skyModel(skyTime(s), effectiveWeather(s), geomNow());
   const html = document.documentElement;
   html.style.setProperty("--sky-zenith", m.css.zenith);
   html.style.setProperty("--sky-mid", m.css.mid);
   html.style.setProperty("--sky-horizon", m.css.horizon);
   // How much of the moon disc can sit behind the column scrim (it's dimmed there, and the scrim accounts for it).
-  const inColumn = m.moon.up && columnMask(m.moon.x * view.vw, view.vw) > 0;
+  const { vw, vh } = view;
+  const inColumn = m.moon.up && columnMask(m.moon.x * vw, vw) > 0;
   const moon = inColumn ? m.night * Math.max(0, 1 - 1.05 * m.cloudCover) ** 0.7 * (1 - 0.6 * m.fog) : 0;
-  const profile = scrimProfile(m, moon, m.moon.y);
+  // The sun, dimmed to SUN_UNDER_TEXT behind text, counts where it can sit under the column or the hero.
+  const sunDisc: Disc | null = m.sun.up ? { y: m.sun.y, rgb: sunColor(m.sun.alt), alpha: SUN_UNDER_TEXT } : null;
+  const sunInColumn = sunDisc && columnMask(m.sun.x * vw, vw) > 0 ? sunDisc : null;
+  // Measured cloud presence (the renderer's cloud field), when it runs: over the column band, and around the
+  // hero and header with a 200px margin for a minute of drift.
+  const cloudsIn = runtime.cloudsIn;
+  const half = vw < 808 ? vw / 2 : MOON_COLUMN_PX / 2 + SCRIM_FALLOFF_PX;
+  const colClouds = cloudsIn ? Math.max(0, cloudsIn(vw / 2 - half, 0, vw / 2 + half, vh)) : undefined;
+  const profile = scrimProfile({ ...m, clouds: colClouds }, moon, m.moon.y, sunInColumn);
   profile.forEach((a, i) => html.style.setProperty(`--scrim-${i}`, String(a)));
   const scrim = Math.max(...profile);
   // Text scrims over the open stage, solved at scroll 0 (document px = viewport px there).
-  const vh = view.vh;
-  const hero = view.hero;
-  const head = view.head;
-  html.style.setProperty("--hero-a", String(hero ? regionScrim(m, hero.y / vh, (hero.y + hero.h) / vh, HERO_TARGETS) : 0));
-  html.style.setProperty("--head-a", String(head ? regionScrim(m, head.y / vh, (head.y + head.h) / vh, HERO_TARGETS) : 0));
+  const block = (r: typeof view.hero) => {
+    if (!r) return 0;
+    const clouds = cloudsIn ? Math.max(0, cloudsIn(r.x - 200, r.y - 200, r.x + r.w + 200, r.y + r.h + 200)) : undefined;
+    const near = sunDisc && m.sun.x * vw > r.x - 60 && m.sun.x * vw < r.x + r.w + 60 ? sunDisc : null;
+    return regionScrim({ ...m, clouds }, r.y / vh, (r.y + r.h) / vh, HERO_TARGETS, near);
+  };
+  html.style.setProperty("--hero-a", String(block(view.hero)));
+  html.style.setProperty("--head-a", String(block(view.head)));
   html.dataset.sky = m.astro.state;
   if (TEST) {
     const w = window as Window & { __sky?: Record<string, unknown> };

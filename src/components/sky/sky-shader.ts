@@ -5,7 +5,9 @@
  * OKLab lightness ≈ cbrt(linear luminance), so "raise OKLab L by k%" ≈ scale linear RGB by (1 + k)³.
  *
  * Layers, nearest first:
- * - Clouds: q = CSS px drifting with the wind, squashed toward the horizon. fbm (3 + 2 octaves) on a domain warped
+ * - Clouds: q = CSS px drifting with the wind (uDrift, integrated on the CPU so a wind change never jumps the
+ *   field), squashed toward the horizon. uZ (0.015/s) moves the warp fields' inputs in two directions, a cheap
+ *   third noise dimension: clouds change shape, not just slide. src/components/sky/cloud-field.ts mirrors this. fbm (3 + 2 octaves) on a domain warped
  *   once by two 3-octave fbms; the sum is stretched (×1.9 around 0.48) so the coverage threshold
  *   mix(0.85, 0.25, cover) means what it says. Tops are where density falls off upward (one extra 3-octave sample).
  *   Day: the sky greyed halfway, cores level, tops +12% L; golden hour leans the undersides to the horizon colour.
@@ -20,9 +22,21 @@
  */
 import { COLUMN_BREAK, COLUMN_DAMP, MOON_COLUMN_PX, SCRIM_FALLOFF_PX, SCRIM_RAMP_PX } from "@/lib/sky/scrim";
 
+import { mulberry32 } from "./particles";
+
 export const OCTAVES = 4;
 /** Side of the value-noise texture (R8, repeat, linear). One filtered fetch per noise lookup instead of 4 hashes. */
 export const NOISE_SIZE = 256;
+
+let noise: Uint8Array | null = null;
+/** The value-noise lattice (seeded, so the cloud field is the same on every load). Shared with the CPU mirror. */
+export function noiseData(): Uint8Array {
+  if (!noise) {
+    const rnd = mulberry32(1013);
+    noise = new Uint8Array(NOISE_SIZE * NOISE_SIZE).map(() => (rnd() * 256) | 0);
+  }
+  return noise;
+}
 
 export const VERT = `#version 300 es
 void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.-1.,0.,1.);}`;
@@ -31,7 +45,8 @@ export const FRAG = `#version 300 es
 precision highp float;
 uniform vec2 uRes;
 uniform float uScale,uScrimTop,uTime,uSunX,uGlow,uCloudCover,uFog,uRainDark,uLightning,uMoonIllum,uMoonUp,uNight,uDay,uGolden;
-uniform vec2 uWind,uMoonPos;
+uniform vec2 uDrift,uMoonPos;
+uniform float uZ;
 uniform vec3 uZenith,uMid,uHorizon;
 out vec4 o;
 uniform sampler2D uNoise;
@@ -54,8 +69,8 @@ float cm=vp.x<${COLUMN_BREAK}.?1.:1.-sst(${MOON_COLUMN_PX / 2}.,${MOON_COLUMN_PX
 float col=1.-${(1 - COLUMN_DAMP).toFixed(3)}*cm*sst(uScrimTop,uScrimTop+${SCRIM_RAMP_PX}.,css.y);
 float cloudA=0.;
 if(uCloudCover>.005){
-vec2 q=(css-uWind*uTime)/vec2(400.,190.+210.*(1.-uv.y));
-vec2 w=vec2(fbm3(q*.6+vec2(1.7,9.2)),fbm3(q*.6+vec2(8.3,2.8)+uTime*.004));
+vec2 q=(css-uDrift)/vec2(400.,190.+210.*(1.-uv.y));
+vec2 w=vec2(fbm3(q*.6+vec2(1.7,9.2)+uZ*vec2(1.,.6)),fbm3(q*.6+vec2(8.3,2.8)-uZ*vec2(.7,1.)));
 vec2 qw=q+1.6*(w-.5);
 float lo=fbm3(qw);
 float d=(lo+detail(qw)-.48)*1.9+.5;

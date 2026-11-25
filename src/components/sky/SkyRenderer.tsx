@@ -8,9 +8,12 @@ import { dayness } from "@/lib/sky/gradient";
 import { skyModel, type SkyModel } from "@/lib/sky/model";
 import { effectiveWeather, SKY_DEBUG, skyStore, skyTime } from "@/lib/sky/store";
 import { dayOfYear } from "@/lib/sky/time";
-import { scrimTop } from "@/lib/sky/view";
-import { SCRIM_RAMP_PX } from "@/lib/sky/scrim";
+import { ALT_REF, nightPoint, sunPath, type ArcGeom } from "@/lib/sky/arc";
+import { columnMask, COLUMN_BREAK, rampMask, SUN_UNDER_TEXT } from "@/lib/sky/scrim";
+import { geomNow, notifyGeometry, onViewGeometry, onViewScroll, runtime, scrimTop, view } from "@/lib/sky/view";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
+import { createSun, drawArc, type SunState } from "./bodies";
+import { CLOUD_REFRESH_S, createCloudField } from "./cloud-field";
 import { createParticles, mulberry32, type Particles, type ParticleState } from "./particles";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
@@ -32,6 +35,8 @@ function targetsOf(m: SkyModel): Targets {
     uRainDark: m.rainDark,
     uWind: m.wind,
     uMoonPos: [m.moon.x, m.moon.y],
+    sunPos: [m.sun.x, m.sun.y],
+    sunAlt: m.sun.alt,
     uMoonIllum: m.moon.fraction,
     uMoonUp: m.moon.up ? 1 : 0,
     uZenith: linear(m.colors.zenith),
@@ -65,7 +70,25 @@ function readToken(name: string): [number, number, number] {
 }
 
 type Window2 = Window & {
-  __sky?: { state: string; elevation: number; scrimA: number; fps: number; condition: string; frames?: number; webgl?: boolean; cap?: number };
+  __sky?: {
+    state: string;
+    elevation: number;
+    scrimA: number;
+    fps: number;
+    condition: string;
+    frames?: number;
+    webgl?: boolean;
+    cap?: number;
+    sun?: { x: number; y: number; up: boolean; cloud: number; dim: number };
+    moon?: { x: number; y: number; up: boolean };
+    geom?: ArcGeom;
+  };
+};
+
+
+const smooth01 = (e0: number, e1: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+  return t * t * (3 - 2 * t);
 };
 
 function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoWebGL: () => void): () => void {
@@ -82,7 +105,13 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
 
   let atm: Atmosphere | null = null;
   let pts: Particles | null = null;
-  let model = skyModel(skyTime(), effectiveWeather(skyStore.get()));
+  const sunR = () => (view.vw < COLUMN_BREAK ? 13 : 16);
+  const sunLayer = createSun(() => Math.min(window.devicePixelRatio || 1, 2));
+  const clouds = createCloudField();
+  const drift: [number, number] = [0, 0];
+  let lastClouds = -Infinity;
+  let geom = geomNow();
+  let model = skyModel(skyTime(), effectiveWeather(skyStore.get()), geom);
   let target = targetsOf(model);
   const cur = clone(target);
   let raf = 0,
@@ -98,20 +127,53 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
     nextStrike = 0,
     strikeAt = -1,
     nextMeteor = 0,
-    astroTimer = 0;
+    astroTimer = 0,
+    nightArc = 0,
+    lastScroll = -Infinity;
+  let text = "rgb(230,234,242)";
+  let pathKey = "";
+  let dayPath: { x: number; y: number }[] = [];
+  let nightPath: { x: number; y: number }[] = [];
 
   const scheduleStrike = (t: number) => (nextStrike = t + 18 + rng() * 27);
   const scheduleMeteor = (t: number) => (nextMeteor = t + 40 + rng() * 50);
 
   const recompute = () => {
     const s = skyStore.get();
-    model = skyModel(skyTime(s), effectiveWeather(s));
+    geom = geomNow();
+    model = skyModel(skyTime(s), effectiveWeather(s), geom);
     target = targetsOf(model);
     pts?.ensureDay(dayOfYear(skyTime(s)));
     if (TEST && w2.__sky) Object.assign(w2.__sky, { state: model.astro.state, elevation: model.astro.elevation, condition: model.condition });
   };
 
   const n = (k: string) => cur[k] as number;
+  const v2 = (k: string) => cur[k] as number[];
+
+  /** Dimming of a body at (x, y) with radius r: under the column scrim, and behind the hero text block. */
+  const textDim = (x: number, y: number, r: number, scrim: number) => {
+    let k = 1 - (1 - SUN_UNDER_TEXT) * columnMask(x, view.vw) * rampMask(y, scrim);
+    const h = view.hero;
+    if (h) {
+      const hy = h.y - view.y;
+      const dx = Math.max(h.x - x, 0, x - (h.x + h.w));
+      const dy = Math.max(hy - y, 0, y - (hy + h.h));
+      k = Math.min(k, SUN_UNDER_TEXT + (1 - SUN_UNDER_TEXT) * smooth01(0, 3 * r, Math.hypot(dx, dy)));
+    }
+    return k;
+  };
+
+  const refreshClouds = (t: number) => {
+    clouds.resize(view.vw, view.vh);
+    clouds.update({ drift, z: 0.015 * t, cover: n("uCloudCover"), rainDark: n("uRainDark") });
+    lastClouds = t;
+    if (!runtime.cloudsIn) {
+      runtime.cloudsIn = (x0, y0, x1, y1) => clouds.maxIn(x0, y0, x1, y1);
+      notifyGeometry();
+    }
+  };
+
+  const moonR = () => (view.vw < COLUMN_BREAK ? 12 : 14);
   const particleState = (): ParticleState => ({
     night: n("uNight"),
     cloudCover: n("uCloudCover"),
@@ -119,12 +181,48 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
     rainDensity: model.rainDensity,
     rainSlant: model.rainSlant,
     moon: { ...model.moon, x: (cur.uMoonPos as number[])[0]!, y: (cur.uMoonPos as number[])[1]! },
-    moonVisible: n("uMoonUp") * n("uNight") * Math.max(0, 1 - 1.05 * n("uCloudCover")) ** 0.7 * (1 - 0.6 * n("uFog")),
+    moonVisible:
+      n("uMoonUp") *
+      n("uNight") *
+      (clouds.ready ? 1 - 0.85 * clouds.at(v2("uMoonPos")[0]! * view.vw, v2("uMoonPos")[1]! * view.vh) : Math.max(0, 1 - 1.05 * n("uCloudCover")) ** 0.7) *
+      (1 - 0.6 * n("uFog")),
+    moonR: moonR(),
+    moonDim: textDim(v2("uMoonPos")[0]! * view.vw, v2("uMoonPos")[1]! * view.vh, moonR(), Infinity),
+    halo: { r: (22 / ALT_REF) * (geom.horizonY - geom.apexY), a: model.humidity > 85 ? 1 : 0 },
   });
 
-  // Under reduced motion nothing redraws on scroll, so the static frame assumes the page is scrolled (the scrim
-  // everywhere): the moon and stars stay dimmed behind the column even over the stage.
-  const top = (still: boolean) => (still ? -SCRIM_RAMP_PX : scrimTop());
+  const sunState = (scrim: number): SunState => {
+    const [fx, fy] = v2("sunPos");
+    const x = fx! * view.vw;
+    const y = fy! * view.vh;
+    const alt = n("sunAlt");
+    const r = sunR();
+    return {
+      x,
+      y,
+      r,
+      alt,
+      up: model.sun.up,
+      glow: n("uGlow"),
+      horizon: oklabToRgb(model.colors.horizon),
+      cloud: clouds.ready ? clouds.at(x, y) : n("uCloudCover") > 0.9 ? n("uCloudCover") : 0,
+      fog: n("uFog"),
+      cover: n("uCloudCover"),
+      dim: textDim(x, y, r, scrim) * smooth01(-0.9, 0.6, alt),
+    };
+  };
+
+  const arcPaths = () => {
+    const d = skyTime();
+    const key = `${d.toISOString().slice(0, 10)}|${geom.w}|${geom.h}|${geom.horizonY}`;
+    if (key !== pathKey) {
+      pathKey = key;
+      dayPath = sunPath(d, geom);
+      const depth = Math.min(70, (view.vh - geom.horizonY) * 0.45);
+      nightPath = Array.from({ length: 33 }, (_, i) => nightPoint(i / 32, geom, depth));
+    }
+  };
+
 
   const draw = (t: number, dt: number, still: boolean) => {
     let lightning = 0;
@@ -139,12 +237,36 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
         lightning = strikeAt >= 0 ? lightningEnvelope(t - strikeAt) : 0;
       }
     } else if (still && model.thunder && forceBolt) lightning = 1;
-    const u: Targets = { ...cur, uTime: still ? 0 : t, uLightning: lightning, uScrimTop: top(still) };
+    const scrim = scrimTop();
+    if (!still) {
+      drift[0] += v2("uWind")[0]! * dt;
+      drift[1] += v2("uWind")[1]! * dt;
+    }
+    if (still || t - lastClouds >= CLOUD_REFRESH_S) refreshClouds(t);
+    const u: Targets = { ...cur, uTime: still ? 0 : t, uLightning: lightning, uScrimTop: scrim, uDrift: drift, uZ: 0.015 * t };
     if (atm && !lost) atm.draw(u);
     if (pts) {
       const ps = particleState();
+      const ss = sunState(scrim);
+      const scrubbing = skyStore.get().preview !== null;
+      nightArc += ((scrubbing ? 1 : 0) - nightArc) * (still ? 1 : 1 - Math.exp(-dt / 0.3));
+      arcPaths();
+      const day = dayOfYear(skyTime());
       pts.step(still ? 0 : dt, ps);
-      pts.draw(t, skyTime().getTime(), ps, !still, top(still));
+      pts.draw(t, skyTime().getTime(), ps, !still, scrim, {
+        back: (ctx) => drawArc(ctx, dayPath, nightPath, text, nightArc),
+        front: (ctx) =>
+          sunLayer.draw(ctx, ss, still ? 0 : t, day, (a) => {
+            const px = ss.x + Math.cos(a) * 180;
+            const py = ss.y + Math.sin(a) * 180;
+            return 1 - clouds.at(px, py);
+          }),
+      });
+      if (TEST && w2.__sky) {
+        w2.__sky.sun = { x: ss.x, y: ss.y, up: ss.up, cloud: ss.cloud, dim: ss.dim };
+        w2.__sky.moon = { x: ps.moon.x * view.vw, y: ps.moon.y * view.vh, up: ps.moon.up };
+        w2.__sky.geom = geom;
+      }
     }
     frames++;
     if (TEST && w2.__sky) w2.__sky.frames = frames;
@@ -161,7 +283,8 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
     const dt = Math.min(t - lastDraw, 0.1);
     const s = skyStore.get();
     const raining = model.rainDensity > 0;
-    const busy = raining || (pts?.meteorActive(t) ?? false) || (strikeAt >= 0 && t - strikeAt < 0.3) || forceBolt || s.scrubbing;
+    const scrolling = t - lastScroll < 0.25;
+    const busy = raining || (pts?.meteorActive(t) ?? false) || (strikeAt >= 0 && t - strikeAt < 0.3) || forceBolt || s.scrubbing || scrolling;
     const cap = coarse ? (raining ? 30 : 20) : busy ? 60 : 24;
     if (TEST && w2.__sky) w2.__sky.cap = cap;
     if (cap < 60 && dt < 1 / cap - 0.004) return;
@@ -216,6 +339,20 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
     recompute();
     if (reduce) still();
   });
+  // Layout and scroll: the arc follows the stage; under reduced motion the static frame is redrawn once scrolling
+  // stops (the column dimming depends on where the scrim is), never during.
+  let stillTimer = 0;
+  const unsubGeom = onViewGeometry(() => {
+    recompute();
+    if (reduce) still();
+  });
+  const unsubScroll = onViewScroll(() => {
+    lastScroll = now();
+    if (reduce) {
+      window.clearTimeout(stillTimer);
+      stillTimer = window.setTimeout(still, 150);
+    }
+  });
   const unsubBus = onSky((e) => {
     if (e.type === "meteor" && !reduce) pts?.meteor(now(), rng);
   });
@@ -255,7 +392,9 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
   });
 
   void (async () => {
-    pts = createParticles(ptsCanvas, readToken("--text"));
+    const tx = readToken("--text");
+    text = `rgb(${tx.map((c) => Math.round(c * 255)).join(",")})`;
+    pts = createParticles(ptsCanvas, tx);
     atm = await createAtmosphere(atmCanvas, SKY_DEBUG, isDead);
     if (dead) return;
     if (!atm) onNoWebGL();
@@ -277,6 +416,10 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
     cancelAnimationFrame(raf);
     window.clearTimeout(astroTimer);
     window.clearTimeout(resizeTimer);
+    window.clearTimeout(stillTimer);
+    runtime.cloudsIn = null;
+    unsubGeom();
+    unsubScroll();
     unsubStore();
     unsubBus();
     ro.disconnect();

@@ -5,6 +5,7 @@
 import { hexToRgb } from "@/lib/sky/color";
 import { STAR_COOL, STAR_WARM } from "@/lib/sky/palette";
 import { columnMask, MOON_IN_COLUMN, rampMask } from "@/lib/sky/scrim";
+import { drawHalo } from "./bodies";
 
 /** mulberry32: small, fast, seedable. */
 export function mulberry32(seed: number): () => number {
@@ -31,7 +32,16 @@ export type ParticleState = {
   rainSlant: number;
   moon: { x: number; y: number; up: boolean; fraction: number; waxing: boolean };
   moonVisible: number;
+  /** Moon disc radius, CSS px. */
+  moonR: number;
+  /** Extra dimming of the moon (behind the hero text), 0..1. */
+  moonDim: number;
+  /** 22° halo: radius in px and strength (0 unless humidity > 85%). */
+  halo: { r: number; a: number };
 };
+
+/** Extra drawing between layers: `back` before the stars (the arc), `front` after the moon (sun, birds, planes). */
+export type DrawHooks = { back?: (ctx: CanvasRenderingContext2D) => void; front?: (ctx: CanvasRenderingContext2D) => void };
 
 const css = (rgb: [number, number, number], a = 1) =>
   `rgba(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)},${a})`;
@@ -161,10 +171,11 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
       }
     },
     /** @param scrimTop viewport y where the column scrim starts (stars and the moon are dimmed under it). */
-    draw(t: number, nowMs: number, s: ParticleState, twinkle: boolean, scrimTop: number) {
+    draw(t: number, nowMs: number, s: ParticleState, twinkle: boolean, scrimTop: number, hooks: DrawHooks = {}) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
       const under = (x: number, y: number) => columnMask(x, w) * rampMask(y, scrimTop);
+      hooks.back?.(ctx);
 
       // Stars.
       const vis = s.night * (1 - s.cloudCover * 0.9) * (1 - s.fog * 0.8);
@@ -190,10 +201,11 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
 
       // Moon: lit disc + terminator ellipse; earthshine on the dark limb.
       if (s.moon.up && s.moonVisible > 0.01) {
-        const R = 14;
+        const R = s.moonR;
         const cx = s.moon.x * w;
         const cy = s.moon.y * h;
-        ctx.globalAlpha = 0.06 * s.moonVisible;
+        drawHalo(ctx, cx, cy, s.halo.r, s.halo.a * s.moonVisible, text);
+        ctx.globalAlpha = 0.06 * s.moonVisible * s.moonDim;
         ctx.fillStyle = text;
         ctx.beginPath();
         ctx.arc(cx, cy, R, 0, Math.PI * 2);
@@ -203,7 +215,7 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
           ctx.save();
           ctx.translate(cx, cy);
           if (!s.moon.waxing) ctx.scale(-1, 1); // waxing: lit limb toward the setting sun (west, right)
-          ctx.globalAlpha = (0.92 + (MOON_IN_COLUMN - 0.92) * under(cx, cy)) * s.moonVisible;
+          ctx.globalAlpha = (0.92 + (MOON_IN_COLUMN - 0.92) * under(cx, cy)) * s.moonVisible * s.moonDim;
           ctx.beginPath();
           ctx.arc(0, 0, R, -Math.PI / 2, Math.PI / 2, false);
           ctx.ellipse(0, 0, R * Math.abs(1 - 2 * f), R, 0, Math.PI / 2, -Math.PI / 2, f <= 0.5);
@@ -211,6 +223,8 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
           ctx.restore();
         }
       }
+
+      hooks.front?.(ctx);
 
       // Meteors.
       for (const m of meteors) {

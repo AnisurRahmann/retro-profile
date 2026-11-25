@@ -4,6 +4,7 @@
  * Screen convention: the viewer faces south (the sun's side of the sky at 24.9° N), so east is at the left and
  * west at the right: the dawn glow sits bottom-left, the dusk glow bottom-right.
  */
+import { arcPoint, DEFAULT_GEOM, moonPass, sunPass, type ArcGeom, type Pass } from "./arc";
 import { astro, type Astro } from "./astro";
 import { toCss, skyColors, smoothstep, type SkyColors } from "./gradient";
 import type { Condition, SylhetWeather } from "./weather";
@@ -15,8 +16,12 @@ export type SkyModel = {
   css: { zenith: string; mid: string; horizon: string };
   /** Star and moon visibility 0..1 (fades in from −6° to −14°). */
   night: number;
-  /** Sun bearing on screen, 0 = left edge (east) … 1 = right edge (west). */
+  /** Sun x on screen (arc), 0 = left edge (east) … 1 = right edge (west). */
   sunX: number;
+  /** Sun position on the arc, fractions of the viewport; `up` between sunrise and sunset. */
+  sun: { x: number; y: number; up: boolean; alt: number };
+  sunPass: Pass;
+  moonPass: Pass;
   /** Horizon glow intensity 0..1 (sun between −8° and +10°). */
   glow: number;
   cloudCover: number;
@@ -31,7 +36,10 @@ export type SkyModel = {
   /** Signed rain slant (radians, + leans right). */
   rainSlant: number;
   thunder: boolean;
+  /** x, y: the disc on the arc, fractions of the viewport. */
   moon: { x: number; y: number; up: boolean; fraction: number; waxing: boolean; phase: number };
+  windFromDeg: number;
+  humidity: number;
 };
 
 /** Compass bearing → screen x (E 0, S 0.5, W 1). */
@@ -60,11 +68,15 @@ export function windVector(kmh: number, fromDeg: number): [number, number] {
   return [-east * speed, -north * speed * 0.25];
 }
 
-export function skyModel(date: Date, w: SylhetWeather): SkyModel {
+export function skyModel(date: Date, w: SylhetWeather, g: ArcGeom = DEFAULT_GEOM): SkyModel {
   const a = astro(date);
+  const sp = sunPass(date);
+  const mp = moonPass(date);
+  const sunPt = arcPoint(sp.u, sp.alt, sp.maxAlt, g);
+  const moonPt = arcPoint(mp.u, mp.alt, mp.maxAlt, g);
   const colors = skyColors(a.elevation, a.phase, w.condition);
   const rain = RAIN[w.condition];
-  const moonUp = a.moon.altitudeDeg > 0;
+  const moonUp = mp.up && a.moon.altitudeDeg > 0;
   const toward = ((w.windFromDeg + 180) * Math.PI) / 180;
   return {
     astro: a,
@@ -72,7 +84,10 @@ export function skyModel(date: Date, w: SylhetWeather): SkyModel {
     colors,
     css: toCss(colors),
     night: smoothstep(-6, -14, a.elevation),
-    sunX: bearingToX(a.azimuth),
+    sunX: sunPt.x / g.w,
+    sun: { x: sunPt.cx / g.w, y: sunPt.y / g.h, up: sp.up && a.elevation > -0.83, alt: a.elevation },
+    sunPass: sp,
+    moonPass: mp,
     glow: smoothstep(-8, -2, a.elevation) * (1 - smoothstep(4, 10, a.elevation)),
     cloudCover: w.cloudCover,
     wind: windVector(w.windKmh, w.windFromDeg),
@@ -83,12 +98,14 @@ export function skyModel(date: Date, w: SylhetWeather): SkyModel {
     rainSlant: Math.atan((0.6 * w.windKmh) / 1100) * -Math.sign(Math.sin(toward) || 0),
     thunder: w.condition === "thunder",
     moon: {
-      x: Math.min(0.94, Math.max(0.06, bearingToX(a.moon.azimuthDeg))),
-      y: 0.85 - (Math.min(Math.max(a.moon.altitudeDeg, 0), 60) / 60) * 0.73,
+      x: moonPt.cx / g.w,
+      y: moonPt.y / g.h,
       up: moonUp,
       fraction: a.moon.fraction,
       waxing: a.moon.waxing,
       phase: a.moon.phase,
     },
+    windFromDeg: w.windFromDeg,
+    humidity: w.humidity ?? 0,
   };
 }

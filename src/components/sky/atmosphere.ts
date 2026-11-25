@@ -1,6 +1,5 @@
 /** WebGL2 atmosphere layer. Returns null when WebGL2 or the shader is unavailable (the CSS gradient stays). */
-import { mulberry32 } from "./particles";
-import { FRAG, NOISE_SIZE, VERT } from "./sky-shader";
+import { FRAG, NOISE_SIZE, noiseData, VERT } from "./sky-shader";
 
 /** Uniform values by GLSL name: numbers → float, [x, y] → vec2, [r, g, b] → vec3. */
 export type Uniforms = Record<string, number | number[]>;
@@ -53,8 +52,7 @@ export async function createAtmosphere(canvas: HTMLCanvasElement, debug: boolean
     loc.clear();
     gl.bindVertexArray(gl.createVertexArray());
     // Value-noise lattice as a texture: seeded, so the cloud field is the same on every load.
-    const rnd = mulberry32(1013);
-    const data = new Uint8Array(NOISE_SIZE * NOISE_SIZE).map(() => (rnd() * 256) | 0);
+    const data = noiseData();
     gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, NOISE_SIZE, NOISE_SIZE, 0, gl.RED, gl.UNSIGNED_BYTE, data);

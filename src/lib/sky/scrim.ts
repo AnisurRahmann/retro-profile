@@ -3,7 +3,7 @@
  * the renderer can put there. Computed, never tuned by eye.
  */
 import { brand } from "../brand";
-import { contrast, desaturate, hexToRgb, labToHex, mixLab, oklabToRgb, over, rgbToOklab, scaleL, type Lab, type RGB } from "./color";
+import { contrast, hexToRgb, labToHex, luminance, oklabToRgb, over, rgbToOklab, toGamma, toLinear, type Lab, type RGB } from "./color";
 import { dayness } from "./gradient";
 import type { SkyModel } from "./model";
 
@@ -27,6 +27,13 @@ export const SCRIM_RAMP_PX = 160;
 export const SCRIM_FALLOFF_PX = 220;
 /** Below this viewport width the column is the whole width: the scrim has no sides. */
 export const COLUMN_BREAK = 808;
+/**
+ * The sun disc and bloom are drawn at this fraction behind the column scrim and behind the hero text (the particle
+ * layer dims them), so text never sits on a full sun. The guard composites the disc at this alpha.
+ */
+export const SUN_UNDER_TEXT = 0.08;
+/** A body behind text, for the guard: its colour, its height (viewport fraction) and the alpha it's drawn at. */
+export type Disc = { y: number; rgb: RGB; alpha: number };
 /** Text scrims (hero block, header row) may go darker than the column: they're small and feathered. */
 export const TEXT_SCRIM_MAX = 0.9;
 
@@ -66,12 +73,6 @@ export const HERO_TARGETS: InkTarget[] = [
   { rgb: TEXT, min: 7.5 },
 ];
 
-/** Lighten in linear light by factor k (k = 1.405 ≈ +12% OKLab L), back to OKLab. */
-function linScale(c: Lab, k: number): Lab {
-  return scaleL(c, Math.cbrt(k) - 1);
-}
-
-const lum = (c: Lab) => c[0];
 
 type ScrimInput = Pick<SkyModel, "colors" | "glow" | "cloudCover" | "fog" | "astro"> & {
   /** Measured cloud presence 0..1 over the region (the renderer's cloud field); else estimated from cover. */
@@ -89,32 +90,53 @@ export function gradientAt(m: Pick<SkyModel, "colors">, y: number): Lab {
 }
 
 /**
- * The brightest colour the sky can show behind the column at height y (default: the bottom, the worst case):
- * the gradient there, lifted by the horizon glow, the brightest cloud tops and the fog for the current weather,
- * mirroring the shader's falloffs. Lightning is left out: a ≤ 260 ms double pulse on the cloud layer, not a
- * state text has to be read against.
+ * The brightest colour the sky can show behind text at height y (default: the bottom, the worst case): the
+ * gradient there, with the horizon glow, the brightest cloud tops and undersides and the fog composited exactly
+ * as the shader does (colours in linear light, layered at their maximum alpha, then composited in sRGB by the
+ * browser). `damp` is the fraction clouds and glow are drawn at behind the column (COLUMN_DAMP); cloud alpha
+ * scales with cloud presence. Lightning is left out: a ≤ 260 ms double pulse on the cloud layer, not a state
+ * text has to be read against.
  */
-export function brightestSky(m: ScrimInput, moonInColumn = 0, y = 1, damp = COLUMN_DAMP): Lab {
-  const h = y >= 1 ? m.colors.horizon : gradientAt(m, y);
+export function brightestSky(m: ScrimInput, moonInColumn = 0, y = 1, damp = COLUMN_DAMP, sun?: Disc | null): Lab {
+  const hRgb = oklabToRgb(y >= 1 ? m.colors.horizon : gradientAt(m, y));
+  const base = lin(hRgb);
+  const H = lin(oklabToRgb(m.colors.horizon));
   const day = dayness(m.astro.elevation);
-  const candidates: Lab[] = [h];
-  // Horizon glow: up to +10% L at its centre (horizon × 1.331 linear at alpha ≤ 0.75), falling off upward.
-  const g = damp * Math.min(1, m.glow) * Math.exp(-(((1 - y) / 0.42) ** 2) * 2.2);
-  if (g > 0) candidates.push(mixLab(h, linScale(m.colors.horizon, 1.331), g));
+  const candidates: RGB[] = [hRgb];
+  // Horizon glow: horizon × 1.331 (linear) at alpha 0.75 · glow · exp(−((1 − y) / 0.42)² · 2.2), under the sun.
+  const g = damp * Math.min(1, m.glow) * 0.75 * Math.exp(-(((1 - y) / 0.42) ** 2) * 2.2);
+  if (g > 0) candidates.push(over(hRgb, gam(scale(H, 1.331)), g));
   const cp = m.clouds ?? cloudPresence(m.cloudCover);
   if (cp > 0) {
-    // Day cloud tops: the local sky greyed halfway, +12% L. Golden undersides lean to horizon × 1.1.
-    const top = linScale(desaturate(h, 0.5), 1.405);
-    candidates.push(mixLab(h, top, damp * 0.85 * day * cp));
-    candidates.push(mixLab(h, linScale(m.colors.horizon, 1.1), damp * 0.85 * m.glow * 0.9 * cp));
+    // Shader: grey = base desaturated halfway; tops grey × 1.405; golden undersides mix(grey × .95, H × 1.1,
+    // .55 · golden · .9); night clouds base × .55; mixed by dayness; alpha up to 0.85.
+    const l = luma(base);
+    const grey = base.map((v) => l + (v - l) * 0.5) as RGB;
+    const night = scale(base, 0.55);
+    const golden = Math.min(1, m.glow) * 0.495;
+    const tops = scale(grey, 1.405);
+    const under = mixRgb(scale(grey, 0.95), scale(H, 1.1), golden);
+    for (const c of [tops, under]) candidates.push(over(hRgb, gam(mixRgb(night, c, day)), 0.85 * cp * damp));
   }
-  const fy = m.fog * smoothstepY(0.35, 1, y);
-  if (fy > 0) candidates.push(mixLab(h, linScale(desaturate(h, 0.6), 1.19), Math.min(1, fy * 0.55)));
-  let best = candidates.reduce((a, b) => (lum(b) > lum(a) ? b : a));
+  // Fog: base desaturated 60%, × 1.19, at alpha fog · 0.55 · smoothstep(.35, 1, y).
+  const fy = m.fog * smoothstepY(0.35, 1, y) * 0.55;
+  if (fy > 0) {
+    const l = luma(base);
+    candidates.push(over(hRgb, gam(scale(base.map((v) => l + (v - l) * 0.4) as RGB, 1.19)), fy));
+  }
+  let best = candidates.reduce((p, q) => (luminance(q) > luminance(p) ? q : p));
   // The moon disc, dimmed inside the column.
-  if (moonInColumn > 0) best = rgbToOklab(over(oklabToRgb(best), TEXT, MOON_IN_COLUMN * moonInColumn));
-  return best;
+  if (moonInColumn > 0) best = over(best, TEXT, MOON_IN_COLUMN * moonInColumn);
+  // The sun disc, dimmed behind text, near its own height.
+  if (sun && Math.abs(y - sun.y) < 0.06) best = over(best, sun.rgb, sun.alpha);
+  return rgbToOklab(best);
 }
+
+const lin = (c: RGB): RGB => c.map(toLinear) as RGB;
+const gam = (c: RGB): RGB => c.map((v) => toGamma(Math.min(1, Math.max(0, v)))) as RGB;
+const scale = (c: RGB, k: number): RGB => c.map((v) => v * k) as RGB;
+const mixRgb = (p: RGB, q: RGB, t: number): RGB => p.map((v, i) => v + (q[i]! - v) * t) as RGB;
+const luma = (c: RGB) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 
 function smoothstepY(e0: number, e1: number, x: number): number {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
@@ -152,12 +174,12 @@ export const SCRIM_STOPS = [0, 0.25, 0.5, 0.75, 1];
  * of the height up to the neighbouring stops), so linear interpolation between stops never undershoots.
  * The moon only counts near its own height.
  */
-export function scrimProfile(m: ScrimInput, moonInColumn = 0, moonY = 0.5): number[] {
+export function scrimProfile(m: ScrimInput, moonInColumn = 0, moonY = 0.5, sun?: Disc | null): number[] {
   const N = 32;
   const need: number[] = [];
   for (let i = 0; i <= N; i++) {
     const y = i / N;
-    need.push(solveScrim(oklabToRgb(brightestSky(m, Math.abs(y - moonY) < 0.08 ? moonInColumn : 0, y))));
+    need.push(solveScrim(oklabToRgb(brightestSky(m, Math.abs(y - moonY) < 0.08 ? moonInColumn : 0, y, COLUMN_DAMP, sun))));
   }
   return SCRIM_STOPS.map((y, k) => {
     const lo = Math.round((SCRIM_STOPS[k - 1] ?? y) * N);
@@ -177,22 +199,21 @@ export function compositeOverScrim(m: Parameters<typeof brightestSky>[0], moonIn
 /**
  * Alpha for a text scrim (hero block, header row) over the open stage sky: the maximum solve over the block's
  * height range (viewport fractions), with clouds and glow at full strength (nothing is damped over the stage).
- * `extra(y)` can add a brighter candidate at a height (the sun or moon disc and bloom behind the block).
+ * `sun`: the sun disc when it overlaps the block (drawn there at SUN_UNDER_TEXT).
  */
 export function regionScrim(
   m: ScrimInput,
   y0: number,
   y1: number,
   targets: InkTarget[] = COLUMN_TARGETS,
-  extra?: (y: number) => Lab | null,
+  sun?: Disc | null,
 ): number {
   let a = 0;
   for (let i = 0; i <= 8; i++) {
     const y = Math.min(1, Math.max(0, y0 + ((y1 - y0) * i) / 8));
-    let sky = brightestSky(m, 0, y, 1);
-    const e = extra?.(y);
-    if (e && lum(e) > lum(sky)) sky = e;
-    a = Math.max(a, solveScrim(oklabToRgb(sky), TEXT_SCRIM_MAX, targets));
+    // A disc overlapping the block counts anywhere in its height range.
+    const disc = sun && sun.y > y0 - 0.06 && sun.y < y1 + 0.06 ? { ...sun, y } : null;
+    a = Math.max(a, solveScrim(oklabToRgb(brightestSky(m, 0, y, 1, disc)), TEXT_SCRIM_MAX, targets));
   }
   return a;
 }

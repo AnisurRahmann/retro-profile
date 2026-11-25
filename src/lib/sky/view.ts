@@ -3,6 +3,7 @@
  * and the section tops the landscape anchors to. Rects are in document px. Updated on resize and layout changes
  * (ResizeObserver on <body>); scrollY is stored by a passive listener and applied in rAF.
  */
+import { arcGeom, stageHeightFor, type ArcGeom } from "./arc";
 import { SCRIM_RAMP_PX } from "./scrim";
 
 export type Rect = { x: number; y: number; w: number; h: number };
@@ -102,3 +103,12 @@ export function startView(): () => void {
     window.removeEventListener("resize", relayout);
   };
 }
+
+/** What the renderer knows that the guard can use: cloud opacity over a viewport rect (null until it runs). */
+export const runtime: { cloudsIn: ((x0: number, y0: number, x1: number, y1: number) => number) | null } = { cloudsIn: null };
+
+/** Ask the controller to re-solve the scrims (the renderer's cloud field became available or changed a lot). */
+export const notifyGeometry = () => geometry.forEach((l) => l());
+
+/** The arc's geometry from the live layout (the stage at scroll 0; a stage-sized horizon on pages without one). */
+export const geomNow = (v: View = view): ArcGeom => arcGeom(v.vw, v.vh, v.stage || stageHeightFor(v.vw, v.vh));

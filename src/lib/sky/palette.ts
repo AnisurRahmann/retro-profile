@@ -18,3 +18,10 @@ export const SKY_KEYFRAMES: SkyKeyframe[] = [
 export const STAR_WARM = "#FFE2B8";
 /** Cool star white. */
 export const STAR_COOL = "#E4ECFF";
+
+/** Sun disc by altitude (interpolated in OKLab): ≥ 30°, 10°, 0°. */
+export const SUN_HIGH = "#FFF6E0";
+export const SUN_MID = "#FFD58A";
+export const SUN_LOW = "#FF9B4A";
+/** Lit windows in the city at night. */
+export const WINDOW_LIT = "#FFD9A0";
