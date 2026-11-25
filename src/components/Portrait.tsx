@@ -8,9 +8,12 @@ import { profile } from "@/site";
  * public/shakil.jpg exists. Checked per render: at build time for static pages, and live in `pnpm dev`, so adding
  * the file needs a rebuild in production but no dev-server restart.
  */
+/** Whether public/shakil.jpg exists (checked per render, see below). */
+export const hasPortrait = () => fs.existsSync(path.join(process.cwd(), "public", profile.portrait));
+
 export function Portrait({ size, priority = false }: { size: number; priority?: boolean }) {
   const style = { width: size, height: size };
-  if (fs.existsSync(path.join(process.cwd(), "public", profile.portrait))) {
+  if (hasPortrait()) {
     return (
       <Image
         src={profile.portrait}

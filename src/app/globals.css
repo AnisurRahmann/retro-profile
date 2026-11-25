@@ -235,16 +235,23 @@ html {
   html:has(.sky-stage) .sky-landscape {
     display: none;
   }
-  /* The hero floats over the lower sky, its bottom just above the far hills. */
+  /* The hero floats over the lower sky, its bottom at the far hills' tops. */
   .sky-stage {
-    padding-bottom: calc(0.55 * var(--band-h));
+    padding-bottom: calc(0.8 * var(--band-h));
   }
 }
 
 html {
-  /* Stage height, mirrored by .sky-stage (src/lib/sky/arc.ts stageHeightFor). */
-  --stage-h: max(460px, 70vh);
-  --stage-h: max(460px, 70svh);
+  /* Stage height, mirrored by .sky-stage (src/lib/sky/arc.ts stageHeightFor). Phones get a tall stage: the sky
+     arc needs room above the hero. */
+  --stage-h: max(560px, 80vh);
+  --stage-h: max(560px, 80svh);
+}
+@media (min-width: 640px) {
+  html {
+    --stage-h: max(460px, 70vh);
+    --stage-h: max(460px, 70svh);
+  }
 }
 @media (min-width: 808px) {
   html {
@@ -536,11 +543,16 @@ a.card:hover {
 .status-line {
   /* Inline-block so its box (and its backing) hugs the text. */
   display: inline-block;
-  min-height: 28px;
+  min-height: 24px;
   transition:
     --halo-a 600ms ease,
     opacity 180ms ease,
     transform 180ms ease;
+}
+@media (min-width: 640px) {
+  .status-line {
+    min-height: 28px;
+  }
 }
 .status-line[data-leaving="true"] {
   opacity: 0;
@@ -589,7 +601,8 @@ a.card:hover {
 }
 @media (max-width: 807px) {
   .sky-strip {
-    width: 100%;
+    /* Not the full width: the low sun keeps open sky right of the hero. */
+    width: min(100%, 260px);
     height: 44px;
     padding-block: 4px;
   }

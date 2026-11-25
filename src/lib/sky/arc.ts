@@ -51,7 +51,8 @@ export function arcGeom(vw: number, vh: number, stageBottom: number, scene = fal
 export const SCENE_HORIZON = 0.4;
 
 /** Stage height as CSS computes it (for pages without a stage, the sun still needs a horizon). */
-export const stageHeightFor = (vw: number, vh: number) => (vw >= 808 ? Math.max(460, Math.min(0.62 * vh, 640)) : Math.max(460, 0.7 * vh));
+export const stageHeightFor = (vw: number, vh: number) =>
+  vw >= 808 ? Math.max(460, Math.min(0.62 * vh, 640)) : vw >= 640 ? Math.max(460, 0.7 * vh) : Math.max(560, 0.8 * vh);
 
 /** Geometry for pure contexts (tests, the guard's defaults): a 1440×900 desktop. */
 export const DEFAULT_GEOM: ArcGeom = arcGeom(1440, 900, stageHeightFor(1440, 900));
