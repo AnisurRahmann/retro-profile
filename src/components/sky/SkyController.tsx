@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { skyModel } from "@/lib/sky/model";
 import { effectiveWeather, parseOverrides, skyStore, skyTime } from "@/lib/sky/store";
-import { nearestPlace, solveAnchors, type Anchor } from "@/lib/sky/landscape/anchors";
+import { landMode, nearestPlace, scenePlace, solveAnchors, type Anchor } from "@/lib/sky/landscape/anchors";
 import { geomNow, onViewGeometry, onViewScroll, startView, view } from "@/lib/sky/view";
 import { isWeather } from "@/lib/sky/weather";
 
@@ -75,10 +75,11 @@ export function SkyController() {
       astroLoop();
     };
 
-    // The label's place name follows the landmark nearest the viewport centre (also under reduced motion).
+    // The label's place name follows the landmark nearest its target (also under reduced motion).
     let anchors: Anchor[] = [];
     const place = () => {
-      const p = nearestPlace(anchors, view.y);
+      // Scene mode: the label follows the stage's horizon scene.
+      const p = landMode(view.vw, !!view.stage) === "scene" ? scenePlace(view.y, view.stage - (view.sections.stage ?? 0), view.vw) : nearestPlace(anchors, view.y);
       skyStore.set({ place: p });
       if (TEST) {
         const w = window as unknown as { __sky?: Record<string, unknown> };
@@ -86,7 +87,8 @@ export function SkyController() {
       }
     };
     const unsubAnchors = onViewGeometry(() => {
-      anchors = solveAnchors(view.sections, view.vw, view.vh, Math.max(0, view.docH - view.vh));
+      const mode = landMode(view.vw, !!view.stage);
+      anchors = solveAnchors(view.sections, view.vw, view.vh, Math.max(0, view.docH - view.vh), mode === "scene" ? "centre" : mode);
       place();
     });
     const unsubPlace = onViewScroll(place);

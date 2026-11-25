@@ -71,6 +71,8 @@ export default function Home() {
       ) : null}
 
       <Closer />
+      {/* Scene mode (< 1100px): the closing scene, the city and the airport (the renderer draws into this slot). */}
+      <div aria-hidden="true" className="sky-scene sky-scene-closing" data-sky-scene="closing" />
     </>
   );
 }

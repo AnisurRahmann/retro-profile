@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { ANCHOR_AT, nearestPlace, PARALLAX, screenX, solveAnchors } from "@/lib/sky/landscape/anchors";
+import { ANCHOR_AT, closingWalk, gutterCentre, gutterWidth, landMode, nearestPlace, PARALLAX, scenePlace, screenX, solveAnchors, stageWalk } from "@/lib/sky/landscape/anchors";
 import { fireflyCount, LIT_SHARE, windowLit, windowSchedule } from "@/lib/sky/landscape/lights";
-import { buildWorld } from "@/lib/sky/landscape/world";
+import { buildClosingScene, buildStageScene, buildWorld } from "@/lib/sky/landscape/world";
 
 // Section tops (document px) for a 1440×900 home page.
 const SECTIONS = { stage: 0, shipped: 622, bench: 1010, receipts: 1460, closer: 2100, footer: 2480 };
 const VW = 1440;
 const VH = 900;
 
-describe("landmark anchors", () => {
+describe("landmark anchors, centre mode (pages without a stage, < 1100px)", () => {
   const anchors = solveAnchors(SECTIONS, VW, VH);
 
   it("centres each landmark when its section's top reaches 40% of the viewport", () => {
@@ -16,18 +16,9 @@ describe("landmark anchors", () => {
     for (const a of anchors) {
       const top = SECTIONS[a.section as keyof typeof SECTIONS];
       const scrollY = Math.max(0, top - ANCHOR_AT * VH);
-      // At that scroll the section top is at 40% of the viewport …
       if (top > ANCHOR_AT * VH) expect(top - scrollY).toBeCloseTo(ANCHOR_AT * VH, 9);
-      // … and the landmark is at the viewport centre on its own layer.
       expect(screenX(a.x, scrollY, PARALLAX[a.layer])).toBeCloseTo(VW / 2, 9);
     }
-  });
-
-  it("puts the bridge with Shipped, the city with the bench and receipts, the airport with the closer", () => {
-    const by = Object.fromEntries(anchors.map((a) => [a.id, a]));
-    expect(by.bridge!.layer).toBe("L3");
-    expect(by.tea!.layer).toBe("L2");
-    expect(by.airport!.s).toBeCloseTo(2100 - 360, 9);
   });
 
   it("names the place whose section is nearest its 40% line", () => {
@@ -46,16 +37,113 @@ describe("landmark anchors", () => {
     expect(PARALLAX.L3).toBeLessThan(PARALLAX.L4);
     expect(screenX(500, 1000, 0)).toBe(500);
   });
+});
+
+describe("landmark anchors, gutter mode (≥ 1100px)", () => {
+  const anchors = solveAnchors(SECTIONS, VW, VH, Infinity, "gutter");
+  const g = gutterWidth(VW);
+
+  it("picks the mode from the width and the stage", () => {
+    expect(landMode(1440, true)).toBe("gutter");
+    expect(landMode(1100, true)).toBe("gutter");
+    expect(landMode(1099, true)).toBe("scene");
+    expect(landMode(375, true)).toBe("scene");
+    expect(landMode(375, false)).toBe("centre");
+  });
+
+  it("solves each landmark onto its gutter centre when its section's top is at 40%, alternating sides", () => {
+    expect(g).toBe(336);
+    const sides = Object.fromEntries(anchors.map((a) => [a.id, a.side]));
+    expect(sides).toEqual({ tea: "left", bridge: "right", city: "left", city2: "left", airport: "right", tea2: "left" });
+    for (const a of anchors) {
+      const want = a.side === "left" ? g / 2 : VW - g / 2;
+      expect(gutterCentre(VW, a.side)).toBe(want);
+      expect(screenX(a.x, a.s, PARALLAX[a.layer])).toBeCloseTo(want, 9);
+      // The centre is outside the 768px column.
+      expect(Math.abs(want - VW / 2)).toBeGreaterThan(384);
+    }
+  });
+
+  it("keeps landmarks out from behind the cards: each fits 90% of its gutter at its anchor (the bridge may run under)", () => {
+    for (const vw of [1100, 1440, 1920]) {
+      const an = solveAnchors(SECTIONS, vw, VH, Infinity, "gutter");
+      const w = buildWorld(an, vw, VH, 3200, 162, "gutter");
+      const gw = gutterWidth(vw);
+      for (const m of w.marks) {
+        const a = an.find((x) => (m.id === "clock" ? x.id === "bridge" : m.id === "city" ? x.id === "city" || x.id === "city2" : x.id === m.id))!;
+        // Screen extent at the anchor's scroll.
+        const x0 = m.x0 * w.s - a.s * PARALLAX.L3;
+        const x1 = m.x1 * w.s - a.s * PARALLAX.L3;
+        if (m.id === "bridge") {
+          // It reaches into the gutter from under the column, ending at the clock tower.
+          expect(x1).toBeGreaterThan(vw - gw);
+          continue;
+        }
+        if (m.id === "city") continue; // two clusters share the id; checked below
+        expect(x1 - x0, `${m.id} at ${vw}`).toBeLessThanOrEqual(0.9 * gw + 0.5);
+        const inLeft = x0 >= -0.5 && x1 <= gw + 0.5;
+        const inRight = x0 >= vw - gw - 0.5 && x1 <= vw + 0.5;
+        expect(inLeft || inRight, `${m.id} at ${vw}: ${x0.toFixed(0)}–${x1.toFixed(0)}`).toBe(true);
+      }
+      const cities = w.marks.filter((m) => m.id === "city");
+      expect(cities).toHaveLength(2);
+      for (const [m, id] of [
+        [cities[0]!, "city"],
+        [cities[1]!, "city2"],
+      ] as const) {
+        const a = an.find((x) => x.id === id)!;
+        const x0 = m.x0 * w.s - a.s * PARALLAX.L3;
+        const x1 = m.x1 * w.s - a.s * PARALLAX.L3;
+        expect(x0).toBeGreaterThanOrEqual(-0.5);
+        expect(x1).toBeLessThanOrEqual(gw + 0.5);
+      }
+      expect(w.plane).not.toBeNull();
+      expect(w.planeK).toBeLessThanOrEqual(1);
+    }
+  });
 
   it("builds a world whose landmarks don't overlap and are long enough for the page", () => {
-    const w = buildWorld(anchors, VW, VH, 3200, 162);
+    const w = buildWorld(anchors, VW, VH, 3200, 162, "gutter");
     const marks = [...w.marks].sort((a, b) => a.x0 - b.x0);
-    expect(marks.map((m) => m.id)).toEqual(["clock", "bridge", "city", "airport"]);
-    for (let i = 1; i < marks.length; i++) expect(marks[i]!.x0).toBeGreaterThanOrEqual(marks[i - 1]!.x1);
-    // L4 must cover the viewport at the bottom of the page.
+    for (let i = 1; i < marks.length; i++) expect(marks[i]!.x0).toBeGreaterThanOrEqual(marks[i - 1]!.x1 - 0.01);
     expect(w.length.L4 * w.s).toBeGreaterThanOrEqual(VW + (3200 - VH) * PARALLAX.L4);
-    expect(w.lights.L3.filter((l) => l.kind === "window").length).toBeGreaterThan(40);
-    expect(w.plane).not.toBeNull();
+    expect(w.lights.L3.filter((l) => l.kind === "window").length).toBeGreaterThan(20);
+  });
+});
+
+describe("scene mode (< 1100px with a stage)", () => {
+  it("walks the stage scene as the stage scrolls away, and the closing scene as it crosses the viewport", () => {
+    expect(stageWalk(0, 650, 375)).toBe(0);
+    expect(stageWalk(325, 650, 375)).toBeCloseTo(187.5, 9);
+    expect(stageWalk(2000, 650, 375)).toBe(375);
+    // Centred in the viewport: no walk; entering and leaving: ±0.3 vw.
+    expect(closingWalk((812 - 200) / 2, 200, 812, 375)).toBeCloseTo(0, 9);
+    expect(closingWalk(812, 200, 812, 375)).toBeCloseTo(-0.3 * 375, 9);
+    expect(closingWalk(-200, 200, 812, 375)).toBeCloseTo(0.3 * 375, 9);
+  });
+
+  it("puts the tea gardens and Keane Bridge on the stage's horizon, the city and the airport in the closing band", () => {
+    const stage = buildStageScene(375, 114);
+    expect(stage.marks.map((m) => m.id).sort()).toEqual(["bridge", "clock"]);
+    const bridge = stage.marks.find((m) => m.id === "bridge")!;
+    // On screen at the top of the page.
+    expect(bridge.x0 * stage.s).toBeGreaterThan(0);
+    expect(bridge.x1 * stage.s).toBeLessThan(375 + 40);
+    expect(stage.layers.L2.length).toBeGreaterThan(3); // shade trees over the tea mounds
+    const closing = buildClosingScene(375, 200);
+    expect(closing.marks.map((m) => m.id).sort()).toEqual(["airport", "city"]);
+    for (const m of closing.marks) {
+      expect(m.x0 * closing.s).toBeGreaterThanOrEqual(-1);
+      expect(m.x1 * closing.s).toBeLessThanOrEqual(376);
+    }
+    expect(closing.plane).not.toBeNull();
+    expect(closing.plane![0] * closing.s).toBeGreaterThan(0);
+    expect(closing.plane![0] * closing.s).toBeLessThan(375);
+  });
+
+  it("names the stage scene's landmark nearest the centre", () => {
+    expect(scenePlace(0, 650, 375)).toBe("bridge");
+    expect(["tea", "bridge"]).toContain(scenePlace(650, 650, 375));
   });
 });
 

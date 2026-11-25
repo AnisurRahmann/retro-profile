@@ -160,6 +160,8 @@ export function SkyStage({ copy, children }: { copy: Content["ui"]["sky"]; child
       onPointerUp={onUp}
       onPointerCancel={onUp}
     >
+      {/* Scene mode (< 1100px): the landscape is the stage's horizon (the renderer draws into this slot). */}
+      <div aria-hidden="true" className="sky-scene sky-scene-stage" data-sky-scene="stage" />
       <div aria-hidden="true" className="sky-stage-open" data-sky-open="" />
       <div className="column" data-sky-open="">
         <div className="relative w-fit max-w-full" data-sky-hero="">

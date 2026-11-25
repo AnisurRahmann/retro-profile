@@ -11,7 +11,7 @@
  * Sprites are built once; frames allocate nothing.
  */
 import { hexToRgb, type RGB } from "@/lib/sky/color";
-import { PARALLAX, type LayerId } from "@/lib/sky/landscape/anchors";
+import type { LayerId } from "@/lib/sky/landscape/anchors";
 import { windowLit } from "@/lib/sky/landscape/lights";
 import { planePath, RIVER } from "@/lib/sky/landscape/shapes";
 import type { World } from "@/lib/sky/landscape/world";
@@ -77,10 +77,10 @@ export function createLife(textRgb: RGB) {
   };
 
   return {
-    /** Start the take-off if the airport's plane is on screen (and it isn't already flying). */
-    takeoff(t: number, f: LifeFrame | null, scrollY: number): boolean {
+    /** Start the take-off if the airport's plane is on screen (and it isn't already flying). o3: the L3 offset. */
+    takeoff(t: number, f: LifeFrame | null, o3: number): boolean {
       if (!f || t - lastTakeoff < TAKEOFF_S + AWAY_S) return false;
-      const p = planeAt(f, scrollY * PARALLAX.L3);
+      const p = planeAt(f, o3);
       if (!p || p.x < 0 || p.x > f.w) return false;
       takeoffAt = lastTakeoff = t;
       return true;
@@ -180,7 +180,7 @@ export function createLife(textRgb: RGB) {
             g.globalAlpha = alpha;
             g.translate(x, y);
             g.rotate(rot);
-            g.scale(s * 0.62, s * 0.62);
+            g.scale(s * 0.62 * f.world.planeK, s * 0.62 * f.world.planeK);
             g.fillStyle = f.l3;
             g.fill(plane);
             if (f.dark > 0.3) {

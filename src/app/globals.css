@@ -183,6 +183,63 @@ html[data-sky-scrub] .sky-gradient {
     height: calc(clamp(110px, 18vh, 200px) + 120px);
   }
 }
+/* Scene mode (< 1100px on pages with the sky stage, src/lib/sky/landscape/anchors.ts): the landscape isn't fixed.
+   It's drawn into two slots in the page: the stage's horizon and a 200px closing band above the footer. Each
+   canvas has 120px of transparent headroom above its band (the city glow, the take-off). */
+.sky-scene {
+  display: none;
+  pointer-events: none;
+}
+.sky-scene-canvas {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: calc(100% + 120px);
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+.sky-scene-canvas[data-ready] {
+  opacity: 1;
+}
+html {
+  /* The landscape band's height (src/lib/sky/landscape/anchors.ts bandHeight). */
+  --band-h: clamp(110px, 14vh, 200px);
+  --band-h: clamp(110px, 14svh, 200px);
+}
+@media (min-width: 808px) {
+  html {
+    --band-h: clamp(110px, 18vh, 200px);
+  }
+}
+.sky-scene-stage {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  height: var(--band-h);
+}
+.sky-scene-closing {
+  position: relative;
+  z-index: -1;
+  width: 100vw;
+  height: 200px;
+  margin-top: 48px;
+  margin-inline: calc(50% - 50vw);
+}
+@media (max-width: 1099px) {
+  .sky-scene {
+    display: block;
+  }
+  html:has(.sky-stage) .sky-landscape {
+    display: none;
+  }
+  /* The hero floats over the lower sky, its bottom just above the far hills. */
+  .sky-stage {
+    padding-bottom: calc(0.55 * var(--band-h));
+  }
+}
 
 html {
   /* Stage height, mirrored by .sky-stage (src/lib/sky/arc.ts stageHeightFor). */

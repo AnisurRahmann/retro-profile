@@ -12,6 +12,7 @@
 import SunCalc from "suncalc";
 import { sun, sunTimes } from "./astro";
 import { SYLHET } from "./weather";
+import { bandHeight } from "./landscape/anchors";
 
 const DEG = 180 / Math.PI;
 const RAD = Math.PI / 180;
@@ -26,8 +27,9 @@ export const ARC = {
   clamp: [0.08, 0.92] as const,
   /** Horizon height above the stage bottom, fraction of the viewport height. */
   horizonDrop: 0.08,
-  /** Apex below the header, px. */
+  /** Apex below the header, px (scene mode: sceneApexGap). */
   apexGap: 28,
+  sceneApexGap: 16,
   header: 64,
 };
 
@@ -35,15 +37,18 @@ export type ArcGeom = { w: number; h: number; horizonY: number; apexY: number };
 
 /**
  * Arc geometry for a viewport and the stage's bottom edge (document px at scroll 0, = viewport px there).
- * Mobile (< 808px): the hero fills the bottom of the stage across the whole width, so the horizon sits 20px
- * above the hero block instead (the sun sets behind the hero, never on its text).
+ * Scene mode (< 1100px with a stage, src/lib/sky/landscape/anchors.ts): the landscape is drawn at the bottom of the
+ * stage, so the horizon is in its hills (SCENE_HORIZON of the band down from its top) and the apex is header + 16:
+ * the sun sets behind the hero text and into the tea hills.
  */
-export function arcGeom(vw: number, vh: number, stageBottom: number, heroTop?: number): ArcGeom {
-  const apexY = ARC.header + ARC.apexGap;
-  let horizon = stageBottom - ARC.horizonDrop * vh;
-  if (vw < 808 && heroTop !== undefined) horizon = Math.min(horizon, heroTop - 20);
+export function arcGeom(vw: number, vh: number, stageBottom: number, scene = false): ArcGeom {
+  const apexY = ARC.header + (scene ? ARC.sceneApexGap : ARC.apexGap);
+  const horizon = scene ? stageBottom - (1 - SCENE_HORIZON) * bandHeight(vw, vh) : stageBottom - ARC.horizonDrop * vh;
   return { w: vw, h: vh, horizonY: Math.max(apexY + 80, horizon), apexY };
 }
+
+/** Where the horizon sits in the stage scene: this fraction of the band down from its top (the far hills). */
+export const SCENE_HORIZON = 0.4;
 
 /** Stage height as CSS computes it (for pages without a stage, the sun still needs a horizon). */
 export const stageHeightFor = (vw: number, vh: number) => (vw >= 808 ? Math.max(460, Math.min(0.62 * vh, 640)) : Math.max(460, 0.7 * vh));

@@ -13,7 +13,7 @@ type Sky = {
   moon?: { x: number; y: number; up: boolean };
   takeoffs?: number;
   place?: string | null;
-  land?: { offsets: number[]; marks: { id: string; x: number }[] };
+  land?: { mode: string; offsets: number[]; marks: { id: string; x: number }[]; closing?: { id: string; x: number }[] };
   geom?: { apexY: number; horizonY: number; w: number; h: number };
 };
 declare global {
@@ -253,11 +253,38 @@ test("the place name follows the landmarks as you walk down the page, without mo
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(place(page)).toHaveText("· tea gardens, Sylhet");
   expect(await weatherX()).toBe(x0);
-  // The landmarks really are centred on their sections.
+  // Desktop: each landmark reaches its gutter, never the middle of the column.
   await walkTo(page, "shipped");
   await page.waitForTimeout(300);
-  const bridge = (await sky(page))!.land!.marks.find((m) => m.id === "bridge")!;
-  expect(Math.abs(bridge.x - 720)).toBeLessThan(40);
+  const land = (await sky(page))!.land!;
+  expect(land.mode).toBe("gutter");
+  const clock = land.marks.find((m) => m.id === "clock")!;
+  expect(Math.abs(clock.x - (1440 - 336 / 2))).toBeLessThan(30);
+  await walkTo(page, "closer");
+  await page.waitForTimeout(300);
+  const airport = (await sky(page))!.land!.marks.find((m) => m.id === "airport")!;
+  expect(airport.x).toBeGreaterThan(1104);
+  expect(airport.x).toBeLessThan(1440);
+});
+
+test("scene mode (375): the landscape is the stage's horizon and a closing band; tapping Book 30 min flies the plane", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  await page.goto("/?sky=2026-12-15T16:45&wx=clear");
+  await page.waitForFunction(() => (window.__sky?.frames ?? 0) >= 1 && window.__sky?.land?.mode === "scene", null, { timeout: 8000 });
+  expect(await page.locator("[data-sky-landscape]").isVisible()).toBe(false);
+  await expect(page.locator("[data-sky-scene=stage] canvas")).toHaveAttribute("data-ready", "");
+  const stage = await page.locator("[data-sky-stage]").boundingBox();
+  const scene = await page.locator("[data-sky-scene=stage]").boundingBox();
+  expect(Math.abs(scene!.y + scene!.height - (stage!.y + stage!.height))).toBeLessThan(1);
+  // The bridge is on the stage's horizon; the closing band holds the city and the airport.
+  expect((await sky(page))!.land!.marks.map((m) => m.id)).toContain("bridge");
+  await page.locator("[data-sky-scene=closing]").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
+  expect(((await sky(page))!.land!.closing ?? []).map((m) => m.id).sort()).toEqual(["airport", "city"]);
+  await page.locator("[data-sky-takeoff]").dispatchEvent("pointerdown");
+  await expect.poll(async () => (await sky(page))!.takeoffs ?? 0).toBe(1);
+  await ctx.close();
 });
 
 test("the plane takes off when Book 30 min is hovered with the airport on screen", async ({ page }) => {

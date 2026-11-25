@@ -24,7 +24,7 @@ const LAYERS: LayerId[] = ["L1", "L2", "L3", "L4"];
 export { DEPTH, layerColor, NEAR, riverColor } from "@/lib/sky/landscape/colors";
 
 /** Band height for a viewport: 18vh desktop, 14svh mobile, clamped to 110–200 px (CSS mirrors it). */
-export const bandHeight = (vw: number, vh: number) => Math.round(Math.min(200, Math.max(110, (vw < 808 ? 0.14 : 0.18) * vh)));
+export { bandHeight } from "@/lib/sky/landscape/anchors";
 
 const css = (c: RGB, a = 1) => `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
 
@@ -40,7 +40,11 @@ export type Lighting = {
   night: number;
 };
 
-export function createLandscape(canvas: HTMLCanvasElement) {
+/**
+ * @param lift transparent headroom above the band (px).
+ * @param fadeBottom the bottom this many px fade out (the stage scene).
+ */
+export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBottom = 0) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
   const cache = new Map<Shape, Paths>();
@@ -87,10 +91,11 @@ export function createLandscape(canvas: HTMLCanvasElement) {
     }
     if (layer === "L3") g.fillRect(x0, 68.5, x1 - x0, RIVER[0] + 0.5 - 68.5); // the far bank under the town
     for (const it of world!.layers[layer]) {
-      if (it.x + it.shape.x1 < x0 || it.x + it.shape.x0 > x1) continue;
+      if (it.x + it.shape.x1 * it.k < x0 || it.x + it.shape.x0 * it.k > x1) continue;
       const p = paths(it.shape);
       g.save();
-      g.translate(it.x, it.y);
+      g.translate(it.x, it.y + it.base * (1 - it.k));
+      if (it.k !== 1) g.scale(it.k, it.k);
       if (p.fill) g.fill(p.fill);
       for (const [sp, lw] of p.strokes) {
         g.lineWidth = lw;
@@ -118,9 +123,10 @@ export function createLandscape(canvas: HTMLCanvasElement) {
       g.stroke();
     }
     for (const it of world!.layers[layer]) {
-      if (!it.shape.cut || it.x + it.shape.x1 < x0 || it.x + it.shape.x0 > x1) continue;
+      if (!it.shape.cut || it.x + it.shape.x1 * it.k < x0 || it.x + it.shape.x0 * it.k > x1) continue;
       g.save();
-      g.translate(it.x, it.y);
+      g.translate(it.x, it.y + it.base * (1 - it.k));
+      if (it.k !== 1) g.scale(it.k, it.k);
       for (const [cp, a, lw] of paths(it.shape).cuts) {
         g.globalAlpha = a;
         if (lw) {
@@ -186,7 +192,7 @@ export function createLandscape(canvas: HTMLCanvasElement) {
       w = vw;
       H = h;
       canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round((H + LIFT) * dpr);
+      canvas.height = Math.round((H + lift) * dpr);
       world = wd;
       for (const l of LAYERS) strips[l].x0 = Number.NaN;
     },
@@ -202,23 +208,26 @@ export function createLandscape(canvas: HTMLCanvasElement) {
       river = css(oklabToRgb(riverColor(l.horizon)));
       return true;
     },
-    /** Screen x of a world-unit point on a layer at this scroll (0 under reduced motion). */
-    toScreen(layer: LayerId, xU: number, scrollY: number) {
-      return xU * (world?.s ?? 1) - scrollY * PARALLAX[layer];
+    /** Screen x of a world-unit point on a layer at this walk (0 under reduced motion). */
+    toScreen(layer: LayerId, xU: number, walk: number) {
+      return xU * (world?.s ?? 1) - walk * PARALLAX[layer];
+    },
+    get lift() {
+      return lift;
     },
     /**
      * Draw the band. `between(g, layer, offset)` runs after each layer (night lights, fireflies, the rickshaw,
      * reflections) with the context in CSS px, origin at the band's top-left; a world-unit point x on that layer
      * is at screen x · s − offset.
      */
-    draw(scrollY: number, between: (g: CanvasRenderingContext2D, layer: LayerId | "river", offset: number) => void) {
+    draw(walk: number, between: (g: CanvasRenderingContext2D, layer: LayerId | "river", offset: number) => void) {
       if (!world) return;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (glowCss) {
         // Behind everything in the band: a soft lift from the hilltops down to the river.
-        const top = (LIFT + 14 * world.s) * dpr;
-        const bottom = (LIFT + 72 * world.s) * dpr;
+        const top = (lift + 14 * world.s) * dpr;
+        const bottom = (lift + 72 * world.s) * dpr;
         const g = ctx.createLinearGradient(0, top, 0, bottom);
         g.addColorStop(0, "rgba(0,0,0,0)");
         g.addColorStop(1, glowCss);
@@ -226,12 +235,12 @@ export function createLandscape(canvas: HTMLCanvasElement) {
         ctx.fillRect(0, top, canvas.width, bottom - top);
       }
       for (const layer of LAYERS) {
-        const o = scrollY * PARALLAX[layer];
+        const o = walk * PARALLAX[layer];
         const st = strips[layer];
         if (!(o >= st.x0 + 8 && o + w <= st.x0 + w + 2 * PAD - 8) || st.key !== lightKey) renderStrip(layer, o);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.drawImage(st.c, Math.round((st.x0 - o) * dpr), Math.round(LIFT * dpr));
-        ctx.setTransform(dpr, 0, 0, dpr, 0, LIFT * dpr);
+        ctx.drawImage(st.c, Math.round((st.x0 - o) * dpr), Math.round(lift * dpr));
+        ctx.setTransform(dpr, 0, 0, dpr, 0, lift * dpr);
         if (layer === "L2") {
           // The Surma: a band across the whole width, in front of the tea hills and behind the town's bank.
           ctx.fillStyle = river;
@@ -241,9 +250,22 @@ export function createLandscape(canvas: HTMLCanvasElement) {
           ctx.globalAlpha = 0.45;
           ctx.fillRect(0, RIVER[0] * world.s, w, 2.2 * world.s);
           ctx.globalAlpha = 1;
-          between(ctx, "river", scrollY * PARALLAX.L3);
+          between(ctx, "river", walk * PARALLAX.L3);
         }
         between(ctx, layer, o);
+      }
+      if (fadeBottom > 0) {
+        // The stage scene ends where the page goes on: its ground fades out instead of stopping on a hard line.
+        const y1 = canvas.height;
+        const y0 = y1 - fadeBottom * dpr;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        const fg = ctx.createLinearGradient(0, y0, 0, y1);
+        fg.addColorStop(0, "rgba(0,0,0,0)");
+        fg.addColorStop(1, "rgba(0,0,0,1)");
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.fillStyle = fg;
+        ctx.fillRect(0, y0, canvas.width, y1 - y0);
+        ctx.globalCompositeOperation = "source-over";
       }
     },
     /** Re-render every strip now (the light changed while scrubbing). */

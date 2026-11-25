@@ -4,6 +4,7 @@
  * (ResizeObserver on <body>); scrollY is stored by a passive listener and applied in rAF.
  */
 import { arcGeom, stageHeightFor, type ArcGeom } from "./arc";
+import { landMode } from "./landscape/anchors";
 
 /** Below this viewport width the 768px column (+ 20px padding each side) is the whole width. */
 export const COLUMN_BREAK = 808;
@@ -111,4 +112,5 @@ export const runtime: { cloudsIn: ((x0: number, y0: number, x1: number, y1: numb
 export const notifyGeometry = () => geometry.forEach((l) => l());
 
 /** The arc's geometry from the live layout (the stage at scroll 0; a stage-sized horizon on pages without one). */
-export const geomNow = (v: View = view): ArcGeom => arcGeom(v.vw, v.vh, v.stage || stageHeightFor(v.vw, v.vh), v.stage ? v.hero?.y : undefined);
+export const geomNow = (v: View = view): ArcGeom =>
+  arcGeom(v.vw, v.vh, v.stage || stageHeightFor(v.vw, v.vh), landMode(v.vw, !!v.stage) === "scene");

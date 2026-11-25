@@ -28,8 +28,8 @@ import { createLife, TAKEOFF_S, type Life, type LifeFrame } from "./life";
 import { createAmbient, type Ambient } from "./ambient";
 import { fireflyCount } from "@/lib/sky/landscape/lights";
 import { createParticles, mulberry32, type Particles, type ParticleState } from "./particles";
-import { PARALLAX, solveAnchors } from "@/lib/sky/landscape/anchors";
-import { buildWorld } from "@/lib/sky/landscape/world";
+import { closingWalk, landMode, PARALLAX, solveAnchors, stageWalk, type LandMode } from "@/lib/sky/landscape/anchors";
+import { buildClosingScene, buildStageScene, buildWorld } from "@/lib/sky/landscape/world";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
 
@@ -107,7 +107,7 @@ type Window2 = Window & {
     geom?: ArcGeom;
     takeoffs?: number;
     place?: string | null;
-    land?: { offsets: number[]; marks: { id: string; x: number }[] };
+    land?: { mode: LandMode; offsets: number[]; marks: { id: string; x: number }[]; closing?: { id: string; x: number }[] };
   };
 };
 
@@ -119,7 +119,7 @@ const smooth01 = (e0: number, e1: number, x: number) => {
 function start(
   atmCanvas: HTMLCanvasElement,
   ptsCanvas: HTMLCanvasElement,
-  landCanvas: HTMLCanvasElement,
+  fixedCanvas: HTMLCanvasElement,
   onNoWebGL: () => void,
 ): () => void {
   let dead = false;
@@ -135,14 +135,35 @@ function start(
 
   let atm: Atmosphere | null = null;
   let pts: Particles | null = null;
-  let land: Landscape | null = null;
+  /**
+   * Landscape bands: the fixed band (gutter and centre modes) and, in scene mode, the stage's horizon and the
+   * closing band above the footer (canvases created inside their [data-sky-scene] slots).
+   */
+  type Band = { id: "fixed" | "stage" | "closing"; canvas: HTMLCanvasElement; land: Landscape; frame: LifeFrame | null; slot: HTMLElement | null; docTop: number };
+  let bands: Band[] = [];
   let life: Life | null = null;
   let ambient: Ambient | null = null;
   let backing: BackingRunner | null = null;
-  let lifeFrame: LifeFrame | null = null;
   let lastLight = -Infinity;
   let takeoffUntil = -Infinity;
   const sunR = () => (view.vw < COLUMN_BREAK ? 13 : 16);
+  /** The bands drawn in this layout: the fixed band, or the two scenes. */
+  const activeBands = () => {
+    const scene = landMode(view.vw, !!view.stage) === "scene";
+    return bands.filter((b) => (b.id === "fixed") !== scene && b.land.world);
+  };
+  /** The walk (px) a band's parallax follows; 0 under reduced motion. */
+  const walkOf = (b: Band) => {
+    if (reduce) return 0;
+    if (b.id === "fixed") return view.y;
+    if (b.id === "stage") return stageWalk(view.y, view.stage - (view.sections.stage ?? 0), view.vw);
+    return closingWalk(b.docTop - view.y, b.land.height, view.vh, view.vw);
+  };
+  const visible = (b: Band) => {
+    if (b.id === "fixed") return true;
+    const top = b.docTop - view.y - b.land.lift;
+    return top < view.vh && top + b.land.height + b.land.lift > 0;
+  };
   const sunLayer = createSun(() => Math.min(window.devicePixelRatio || 1, 2));
   const clouds = createCloudField();
   const drift: [number, number] = [0, 0];
@@ -272,7 +293,9 @@ function start(
           ? { x: mx, y: my, r: moonR(), visible: moonVis, glow: m.moon.fraction * m.night * (1 - 0.7 * m.cloudCover) }
           : null,
       glows: [],
-      lands: land ? [{ top: landCanvas.getBoundingClientRect().top + LIFT, h: land.height }] : [],
+      lands: activeBands()
+        .filter(visible)
+        .map((b) => ({ top: b.canvas.getBoundingClientRect().top + b.land.lift, h: b.land.height })),
     };
   };
 
@@ -346,7 +369,7 @@ function start(
                 birds: n("sunAlt") > 0 && model.rainDensity === 0 && model.condition !== "fog",
                 night: n("uNight") > 0.5,
                 hero: hero ? { y0: hero.y - view.y, y1: hero.y + hero.h - view.y } : null,
-                ink: land?.colorOf("L3") ?? text,
+                ink: activeBands()[0]?.land.colorOf("L3") ?? text,
               });
             }
           },
@@ -361,89 +384,87 @@ function start(
         w2.__sky.geom = geom;
       }
     }
-    if (land) {
+    const active = activeBands();
+    if (active.length && life) {
       const scrubbing = skyStore.get().scrubbing;
       if (still || t - lastLight >= (scrubbing ? 1 / 30 : 2)) {
-        const hz = rgbToOklab(
-          v2("uHorizon").map((c) => toGamma(Math.min(1, Math.max(0, c)))) as [
-            number,
-            number,
-            number,
-          ],
-        );
-        land.setLighting({
+        const hz = rgbToOklab(v2("uHorizon").map((c) => toGamma(Math.min(1, Math.max(0, c)))) as [number, number, number]);
+        const lighting = {
           horizon: hz,
           rim: n("uGlow") * smooth01(-2, 1, n("sunAlt")),
           sunX: v2("sunPos")[0]! * view.vw,
           night: smooth01(-6, -14, n("sunAlt")),
-        });
+        };
+        for (const b of active) b.land.setLighting(lighting);
         lastLight = t;
       }
-      const world = land.world;
-      if (world && life) {
-        const at = skyTime();
-        const alt = n("sunAlt");
-        const ss = sunState();
-        const moonAlt = model.astro.moon.altitudeDeg;
-        const ps = particleState();
-        lifeFrame = {
+      const at = skyTime();
+      const alt = n("sunAlt");
+      const ss = sunState();
+      const moonAlt = model.astro.moon.altitudeDeg;
+      const ps = particleState();
+      const mins = dhakaParts(at).minutes;
+      const glints = [
+        {
+          x: ss.x,
+          k: ss.up && alt < 12 ? (1 - Math.max(0, alt) / 12) * (1 - ss.cloud) * smooth01(-0.9, 0.6, alt) : 0,
+          rgb: sunColor(alt),
+          r: ss.r,
+        },
+        {
+          x: ps.moon.x * view.vw,
+          k: ps.moon.up && moonAlt < 12 ? (1 - Math.max(0, moonAlt) / 12) * ps.moonVisible * (0.3 + 0.7 * ps.moon.fraction) : 0,
+          rgb: tx,
+          r: ps.moonR,
+        },
+      ];
+      for (const b of active) {
+        const world = b.land.world;
+        if (!world || !visible(b)) continue;
+        const f: LifeFrame = {
           t,
           moving: !still,
           w: view.vw,
           world,
-          minutes: dhakaParts(at).minutes,
+          minutes: mins,
           seed: dayOfYear(at),
           dark: smooth01(2, -5, alt),
           lamps: smooth01(0.5, -1.5, alt),
-          glints: [
-            {
-              x: ss.x,
-              k:
-                ss.up && alt < 12
-                  ? (1 - Math.max(0, alt) / 12) * (1 - ss.cloud) * smooth01(-0.9, 0.6, alt)
-                  : 0,
-              rgb: sunColor(alt),
-              r: ss.r,
-            },
-            {
-              x: ps.moon.x * view.vw,
-              k:
-                ps.moon.up && moonAlt < 12
-                  ? (1 - Math.max(0, moonAlt) / 12) *
-                    ps.moonVisible *
-                    (0.3 + 0.7 * ps.moon.fraction)
-                  : 0,
-              rgb: tx,
-              r: ps.moonR,
-            },
-          ],
-          l3: land.colorOf("L3"),
+          glints,
+          l3: b.land.colorOf("L3"),
         };
-        const f = lifeFrame;
-        // Reduced motion: the landscape is static (no parallax).
-        const walk = reduce ? 0 : view.y;
-        const at2 = skyTime();
-        const mins = dhakaParts(at2).minutes;
-        const ll = {
-          t,
-          w: view.vw,
-          s: world.s,
-          fireflies: n("uNight") > 0.5 ? fireflyCount(dhakaParts(at2).m, model.rainDensity > 0) : 0,
-          rickshaw: mins >= 6 * 60 && mins < 21 * 60 + 30 && model.rainDensity < 20,
-          l4: land.colorOf("L4"),
-        };
-        land.draw(walk, (g, layer, o) => {
+        b.frame = f;
+        const walk = walkOf(b);
+        // The slow life (fireflies, the rickshaw) lives on the first band only.
+        const ll =
+          b === active[0]
+            ? {
+                t,
+                w: view.vw,
+                s: world.s,
+                fireflies: n("uNight") > 0.5 ? fireflyCount(dhakaParts(at).m, model.rainDensity > 0) : 0,
+                rickshaw: mins >= 6 * 60 && mins < 21 * 60 + 30 && model.rainDensity < 20,
+                l4: b.land.colorOf("L4"),
+              }
+            : null;
+        b.land.draw(walk, (g, layer, o) => {
           life!.between(g, layer, o, f);
-          if (!still && ambient && (layer === "L2" || layer === "L4"))
-            ambient.land(g, layer, o, ll);
+          if (ll && !still && ambient && (layer === "L2" || layer === "L4")) ambient.land(g, layer, o, ll);
         });
-        if (TEST && w2.__sky)
+        if (!("ready" in b.canvas.dataset)) b.canvas.dataset.ready = "";
+      }
+      if (TEST && w2.__sky) {
+        const main = active[0]!;
+        const mw = main.land.world;
+        const walk = walkOf(main);
+        const marks = (b: Band | undefined) =>
+          b?.land.world ? b.land.world.marks.map((m) => ({ id: m.id, x: ((m.x0 + m.x1) / 2) * b.land.world!.s - walkOf(b) * PARALLAX.L3 })) : undefined;
+        if (mw)
           w2.__sky.land = {
+            mode: landMode(view.vw, !!view.stage),
             offsets: [PARALLAX.L1, PARALLAX.L2, PARALLAX.L3, PARALLAX.L4].map((k) => walk * k),
-            marks: world.marks.map((m) => ({
-              id: m.id,
-              x: ((m.x0 + m.x1) / 2) * world.s - walk * PARALLAX.L3,
-            })),
+            marks: marks(main)!,
+            closing: marks(active.find((b) => b.id === "closing")),
           };
       }
     }
@@ -461,7 +482,6 @@ function start(
     if (frames === 1) {
       atmCanvas.dataset.ready = "";
       ptsCanvas.dataset.ready = "";
-      landCanvas.dataset.ready = "";
     }
     return lightning > 0;
   };
@@ -556,19 +576,22 @@ function start(
   const onVV = () => {
     if (!vv) return;
     const gap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-    landCanvas.style.transform = gap > 0.5 ? `translateY(${-gap}px)` : "";
+    fixedCanvas.style.transform = gap > 0.5 ? `translateY(${-gap}px)` : "";
   };
   vv?.addEventListener("resize", onVV);
   vv?.addEventListener("scroll", onVV);
-  // "Book 30 min" hovered or focused with the airport on screen: the parked plane takes off.
+  // "Book 30 min" hovered, focused or tapped (pointerdown, before navigation; nothing waits for it) with the
+  // airport on screen: the parked plane takes off.
   const onIntent = (e: Event) => {
     if (reduce || !(e.target instanceof Element) || !e.target.closest("[data-sky-takeoff]")) return;
-    if (life?.takeoff(now(), lifeFrame, view.y)) {
+    const b = activeBands().find((x) => x.land.world?.plane && visible(x));
+    if (b && life?.takeoff(now(), b.frame, walkOf(b) * PARALLAX.L3)) {
       takeoffUntil = now() + TAKEOFF_S + 0.2;
       if (TEST && w2.__sky) w2.__sky.takeoffs = (w2.__sky.takeoffs ?? 0) + 1;
     }
   };
   document.addEventListener("pointerover", onIntent);
+  document.addEventListener("pointerdown", onIntent, { passive: true });
   document.addEventListener("focusin", onIntent);
   const unsubBus = onSky((e) => {
     if (e.type === "meteor" && !reduce) pts?.meteor(now(), rng);
@@ -596,20 +619,36 @@ function start(
   };
 
   let resizeTimer = 0;
+  /** Scene slots on this page get a canvas each; bands whose slot left the page (client navigation) are dropped. */
+  const ensureScenes = () => {
+    bands = bands.filter((b) => b.id === "fixed" || b.slot?.isConnected);
+    document.querySelectorAll<HTMLElement>("[data-sky-scene]").forEach((slot) => {
+      if (bands.some((b) => b.slot === slot)) return;
+      const c = document.createElement("canvas");
+      c.setAttribute("aria-hidden", "true");
+      c.className = "sky-scene-canvas";
+      slot.appendChild(c);
+      const stage = slot.dataset.skyScene !== "closing";
+      const l = createLandscape(c, LIFT, stage ? 24 : 0);
+      if (l) bands.push({ id: stage ? "stage" : "closing", canvas: c, land: l, frame: null, slot, docTop: 0 });
+    });
+  };
   const relayoutLand = () => {
-    if (!land) return;
-    const H = Math.max(1, landCanvas.clientHeight - LIFT);
-    land.resize(
-      view.vw,
-      H,
-      buildWorld(
-        solveAnchors(view.sections, view.vw, view.vh, Math.max(0, view.docH - view.vh)),
-        view.vw,
-        view.vh,
-        view.docH,
-        H,
-      ),
-    );
+    ensureScenes();
+    const mode = landMode(view.vw, !!view.stage);
+    for (const b of bands) {
+      if (b.id === "fixed") {
+        if (b.canvas.clientHeight < 10 + LIFT) continue; // hidden (scene mode)
+        const H = b.canvas.clientHeight - LIFT;
+        const anchors = solveAnchors(view.sections, view.vw, view.vh, Math.max(0, view.docH - view.vh), mode === "scene" ? "centre" : mode);
+        b.land.resize(view.vw, H, buildWorld(anchors, view.vw, view.vh, view.docH, H, mode === "scene" ? "centre" : mode));
+      } else {
+        const H = b.slot!.clientHeight;
+        if (H < 10) continue; // hidden (gutter mode)
+        b.docTop = b.slot!.getBoundingClientRect().top + window.scrollY;
+        b.land.resize(view.vw, H, b.id === "stage" ? buildStageScene(view.vw, H) : buildClosingScene(view.vw, H));
+      }
+    }
     lastLight = -Infinity;
   };
   const resize = () => {
@@ -629,7 +668,8 @@ function start(
     tx = readToken("--text");
     text = `rgb(${tx.map((c) => Math.round(c * 255)).join(",")})`;
     pts = createParticles(ptsCanvas, tx);
-    land = createLandscape(landCanvas);
+    const fixedLand = createLandscape(fixedCanvas);
+    if (fixedLand) bands.push({ id: "fixed", canvas: fixedCanvas, land: fixedLand, frame: null, slot: null, docTop: 0 });
     life = createLife(tx);
     ambient = createAmbient(rng, readToken("--signal"), tx, {
       force: SKY_DEBUG && q.get("life") === "1",
@@ -648,7 +688,7 @@ function start(
     resize();
     backing = startBacking(backingScene);
     ro.observe(ptsCanvas);
-    ro.observe(landCanvas);
+    ro.observe(fixedCanvas);
     motion.addEventListener("change", applyMotion);
     document.addEventListener("visibilitychange", onVisibility);
     atmCanvas.addEventListener("webglcontextlost", onLost);
@@ -672,6 +712,7 @@ function start(
     vv?.removeEventListener("resize", onVV);
     vv?.removeEventListener("scroll", onVV);
     document.removeEventListener("pointerover", onIntent);
+    document.removeEventListener("pointerdown", onIntent);
     document.removeEventListener("focusin", onIntent);
     unsubStore();
     unsubBus();
