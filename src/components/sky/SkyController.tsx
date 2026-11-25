@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { skyModel } from "@/lib/sky/model";
 import { effectiveWeather, parseOverrides, skyStore, skyTime } from "@/lib/sky/store";
-import { weatherSchema } from "@/lib/sky/weather";
+import { isWeather } from "@/lib/sky/weather";
 
 export const WEATHER_POLL_MS = 15 * 60_000;
 const ASTRO_TICK_MS = 60_000;
@@ -38,8 +38,8 @@ export function SkyController() {
       lastFetch = Date.now();
       try {
         const res = await fetch("/api/sylhet", { headers: { accept: "application/json" } });
-        const parsed = weatherSchema.safeParse(res.ok ? await res.json() : null);
-        if (!dead) skyStore.set({ weather: parsed.success ? parsed.data : skyStore.get().weather, loaded: true });
+        const body: unknown = res.ok ? await res.json() : null;
+        if (!dead) skyStore.set({ weather: isWeather(body) ? body : skyStore.get().weather, loaded: true });
       } catch {
         if (!dead) skyStore.set({ loaded: true });
       }

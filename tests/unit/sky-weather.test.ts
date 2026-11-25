@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fixture from "@/server/fixtures/open-meteo-sylhet.json";
-import { compass, conditionFor, hasWeather, normalise, upstreamUrl, weatherWord, type Condition } from "@/lib/sky/weather";
+import { compass, conditionFor, hasWeather, isWeather, upstreamUrl, weatherWord, type Condition } from "@/lib/sky/weather";
+import { normalise } from "@/lib/sky/weather-schema";
 import { _resetSylhetCache, getSylhetWeather } from "@/server/sylhet";
 
 describe("WMO code → condition", () => {
@@ -44,6 +45,11 @@ describe("normalise", () => {
     const w = normalise({ ...fixture, current })!;
     expect(w.visibilityM).toBeUndefined();
     expect(w.condition).toBe("fog");
+  });
+  it("accepts its own output on the client and rejects junk", () => {
+    expect(isWeather(normalise(fixture))).toBe(true);
+    expect(isWeather({ condition: "snow" })).toBe(false);
+    expect(isWeather(null)).toBe(false);
   });
   it("rejects a malformed body", () => {
     expect(normalise({ current: { time: "x" } })).toBeNull();

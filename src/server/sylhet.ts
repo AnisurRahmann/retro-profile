@@ -1,6 +1,7 @@
 import "server-only";
 import fixture from "./fixtures/open-meteo-sylhet.json";
-import { normalise, UNKNOWN_WEATHER, upstreamUrl, type SylhetWeather } from "@/lib/sky/weather";
+import { normalise } from "@/lib/sky/weather-schema";
+import { UNKNOWN_WEATHER, upstreamUrl, type SylhetWeather } from "@/lib/sky/weather";
 
 /** Open-Meteo "current" values are 15-minutely, so refetching more often buys nothing (~96 upstream calls/day max). */
 export const WEATHER_TTL_S = 900;

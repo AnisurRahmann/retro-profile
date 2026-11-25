@@ -1,9 +1,7 @@
 /**
  * Sylhet weather: Open-Meteo upstream schema, WMO code mapping and the normalised shape /api/sylhet returns.
- * Pure (no fetch, no server-only imports) so the client, the agent tool and the tests share it.
+ * Pure and zod-free (zod would land in the client bundle); server-side parsing is in weather-schema.ts.
  */
-import { z } from "zod";
-
 export const SYLHET = { lat: 24.8949, lon: 91.8687, tz: "Asia/Dhaka", utcOffsetMin: 360 } as const;
 
 export const CONDITIONS = ["clear", "partly", "overcast", "fog", "drizzle", "rain", "heavy-rain", "thunder"] as const;
@@ -52,26 +50,6 @@ export function upstreamUrl(): string {
   return `https://api.open-meteo.com/v1/forecast?${q.toString()}`;
 }
 
-const num = z.number().finite();
-export const upstreamSchema = z.object({
-  current: z.object({
-    time: z.string(),
-    temperature_2m: num,
-    relative_humidity_2m: num,
-    apparent_temperature: num,
-    is_day: num.optional(),
-    precipitation: num,
-    rain: num.optional(),
-    showers: num.optional(),
-    weather_code: z.number().int(),
-    cloud_cover: num,
-    wind_speed_10m: num,
-    wind_direction_10m: num,
-    visibility: num.nullable().optional(),
-  }),
-  daily: z.object({ sunrise: z.array(z.string()).min(1), sunset: z.array(z.string()).min(1) }),
-});
-
 export type SylhetWeather = {
   observedAt: string | null;
   code: number | null;
@@ -93,28 +71,6 @@ export type SylhetWeather = {
 /** Open-Meteo local times ("2026-11-25T08:15", Asia/Dhaka) → ISO with the +06:00 offset. */
 export function dhakaIso(local: string): string {
   return /[zZ]|[+-]\d\d:\d\d$/.test(local) ? local : `${local.length === 16 ? `${local}:00` : local}+06:00`;
-}
-
-export function normalise(raw: unknown): SylhetWeather | null {
-  const parsed = upstreamSchema.safeParse(raw);
-  if (!parsed.success) return null;
-  const { current: c, daily } = parsed.data;
-  return {
-    observedAt: dhakaIso(c.time),
-    code: c.weather_code,
-    tempC: Math.round(c.temperature_2m * 10) / 10,
-    feelsC: Math.round(c.apparent_temperature * 10) / 10,
-    humidity: c.relative_humidity_2m,
-    cloudCover: Math.min(1, Math.max(0, c.cloud_cover / 100)),
-    precipMm: c.precipitation,
-    condition: conditionFor(c.weather_code),
-    windKmh: c.wind_speed_10m,
-    windFromDeg: c.wind_direction_10m,
-    ...(typeof c.visibility === "number" ? { visibilityM: c.visibility } : {}),
-    sunrise: dhakaIso(daily.sunrise[0]!),
-    sunset: dhakaIso(daily.sunset[0]!),
-    stale: false,
-  };
 }
 
 /** No data at all: a clear sky, no weather in the label. */
@@ -179,20 +135,19 @@ export function compass(deg: number): (typeof COMPASS)[number] {
 /** Whether the label should show weather at all. */
 export const hasWeather = (w: SylhetWeather | null): w is SylhetWeather => !!w && !w.stale && w.tempC !== null;
 
-/** Shape check for the client (the route's JSON). */
-export const weatherSchema = z.object({
-  observedAt: z.string().nullable(),
-  code: z.number().nullable(),
-  tempC: z.number().nullable(),
-  feelsC: z.number().nullable(),
-  humidity: z.number().nullable(),
-  cloudCover: z.number(),
-  precipMm: z.number(),
-  condition: z.enum(CONDITIONS),
-  windKmh: z.number(),
-  windFromDeg: z.number(),
-  visibilityM: z.number().optional(),
-  sunrise: z.string().nullable(),
-  sunset: z.string().nullable(),
-  stale: z.boolean(),
-});
+/** Client-side shape check for the /api/sylhet JSON (zod-free to keep zod out of the client bundle). */
+export function isWeather(v: unknown): v is SylhetWeather {
+  if (!v || typeof v !== "object") return false;
+  const w = v as Record<string, unknown>;
+  const numOrNull = (k: string) => w[k] === null || typeof w[k] === "number";
+  return (
+    (CONDITIONS as readonly unknown[]).includes(w.condition) &&
+    typeof w.cloudCover === "number" &&
+    typeof w.precipMm === "number" &&
+    typeof w.windKmh === "number" &&
+    typeof w.windFromDeg === "number" &&
+    typeof w.stale === "boolean" &&
+    ["tempC", "feelsC", "humidity", "code"].every(numOrNull) &&
+    ["observedAt", "sunrise", "sunset"].every((k) => w[k] === null || typeof w[k] === "string")
+  );
+}
