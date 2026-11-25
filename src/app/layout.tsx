@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { Header } from "@/components/Header";
+import { SignalFieldMount } from "@/components/signal-field/SignalFieldMount";
 import { brand } from "@/lib/brand";
 import { links, profile, ui } from "@/site";
 import "./globals.css";
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="depth-vignette" />
           <div className="depth-grain" />
         </div>
+        <SignalFieldMount />
         <Header />
         {children}
       </body>

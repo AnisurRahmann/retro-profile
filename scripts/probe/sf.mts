@@ -1,0 +1,11 @@
+import { chromium } from "@playwright/test";
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
+p.on("console", (m) => console.log("console:", m.text()));
+await p.goto("http://localhost:3100/", { waitUntil: "networkidle" });
+await p.waitForTimeout(1500);
+console.log(await p.evaluate(() => ({ canvas: !!document.querySelector("canvas[data-signal-field]"), fb: !!document.querySelector("[data-signal-fallback]"), op: (document.querySelector("canvas") as HTMLCanvasElement | null)?.style.opacity, w: document.querySelector("canvas")?.width })));
+await p.mouse.move(150, 400);
+await p.waitForTimeout(500);
+await p.screenshot({ path: ".shots/sf-probe.png" });
+await b.close();

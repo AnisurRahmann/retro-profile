@@ -15,11 +15,14 @@
     "test:watch": "vitest",
     "knowledge": "tsx scripts/build-knowledge.ts",
     "shots": "tsx scripts/shots.ts",
-    "e2e": "playwright test",
+    "e2e": "pnpm build:e2e && playwright test",
     "eval:live": "tsx evals/run.ts --live",
     "eval:mock": "tsx evals/run.ts",
     "postbuild": "tsx scripts/check-build-output.ts",
-    "test:build": "pnpm build && vitest run tests/build"
+    "test:build": "pnpm build && vitest run tests/build",
+    "build:e2e": "tsx scripts/build-knowledge.ts && NEXT_PUBLIC_E2E=1 NEXT_DIST_DIR=.next-e2e next build",
+    "e2e:only": "playwright test",
+    "shots:signal": "tsx scripts/shots-signal.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.14.0",

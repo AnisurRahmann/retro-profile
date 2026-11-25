@@ -54,3 +54,20 @@ Format: decision · rejected alternative · why.
 36. **Hex mirror in `src/lib/brand.ts`** for `next/og`, the favicon and `theme-color` (they can't read CSS variables). A test asserts it matches `globals.css`.
 37. **Placeholder guard matches `[[` + letter … `]]`**, not bare `[[`: RSC payloads contain JSON `[[` arrays. It runs as `postbuild` (so no build can ship a placeholder) and as `pnpm test:build`.
 38. **OG images read Geist TTFs from `node_modules/geist`** at build time and fall back to the monogram until the portrait exists.
+
+## Signal Field
+
+39. **Final constants** (`SF` in `src/lib/signal-math.ts`; the GLSL is generated from the same object, so TS and shader can't drift):
+    pitch 22 · rBase **0.9** (brief 0.8) · rGain 1.1 · aa 0.75 · aMin **0.16** (brief 0.10) · aMax 0.62 · idle 0.06, λ 900 px, period 9 s, noise 0.0015 / 0.05 / warp 1.7 · cursor gain **0.45** (brief 0.35), σ 140, smoothing τ 0.08 s, leave fade 0.4 s · ripples v 420 px/s, w 18 px, τ 1.6 s, 8 emitters, inactive after 5τ · column mask **0.25** (brief 0.35), ramp 80 px into each gutter, flat below 808 px · amber ≤ 35% where masked ripple > 0.5.
+    - Column 0.35 → 0.25: the Playwright guard measured 4.13:1 for `--graphite` against the brightest dot pixel behind the hero paragraph at a ripple peak (needs 4.5). At 0.25 the column peak dot alpha is 0.155 and the guard passes. The brief's ≈0.25 estimate was for alpha; a dot-centre pixel at that alpha is too bright.
+    - aMin 0.10 → 0.16 and rBase 0.8 → 0.9: at 1920 the gutters still read as empty. Column idle alpha stays ≤ 0.047 (guard ≤ 0.06).
+    - Cursor 0.35 → 0.45: the glow didn't register in the gutter; over the column it's masked to 0.25 × and stays faint.
+40. **The column mask scales the whole dot alpha, floor included** (`alpha = mix(aMin, aMax, I_raw) × mask`), so the column stays within mask × [aMin, aMax] as the readability guard requires. Radius and colour use the masked I.
+41. **Ramp sits in the gutter** (smoothstep 0 → 80 px past the column edge), so text at the column edge never gets gutter-strength dots.
+42. **Instanced dot quads instead of one full-screen triangle.** · The brief's full-screen fragment shader. · Measured on Chrome/ANGLE Metal, Apple M2, 3840×2160 (1920×1080 at DPR 2), 8 active emitters: full-screen shader 4.4–6.6 ms; with an early exit for fragments outside any dot 2.0 ms; an empty full-screen pass alone ~1.0–1.2 ms. Instancing evaluates the intensity once per dot in the vertex shader (~4.4k instances) and rasterizes only dot pixels: 1.13–1.25 ms total, of which ~1.05 ms is the clear/present floor of a 3840×2160 surface (clear-only frame measured at 1.03–1.09 ms). 0.57 ms at 1920×1080 DPR 1. Same intensity function, same per-cell-centre semantics, same pixels.
+43. **Init split across tasks** (context, then shader compile polled through `KHR_parallel_shader_compile`, then wiring). The first version blocked the main thread on `LINK_STATUS` and added a ~99 ms long task under Lighthouse's 4× CPU throttle (TBT median 24 → 58 ms). After the split: median 24 ms, no Signal Field long task.
+44. **Test-only hooks (`window.__signalFrames`, `window.__emitSignal`) exist only in a separate test build** (`NEXT_PUBLIC_E2E=1`, `distDir .next-e2e`, `pnpm e2e`), so production bundles never contain them and the e2e build never overwrites `.next`.
+45. **Dots are anchored to the viewport** (fixed canvas), so content scrolls over a still grid: no parallax, nothing moves on scroll, and no emits on scroll.
+46. **Reduced motion:** one static frame (idle at t = 0, no cursor, no ripples). No loop and no bus subscription, re-checked on the media-query change event.
+47. **GPU timing is dev-only** (`EXT_disjoint_timer_query_webgl2`, `[signal-field]` console prefix). Headless Chrome's default SwiftShader doesn't expose the extension; measure with `--use-angle=metal --enable-gpu --ignore-gpu-blocklist` (`scripts/probe/gpu.mts`, needs `pnpm dev` on :3000).
+48. **Stop e2e dispatches the click.** The docked composer moves while tokens stream, so Playwright's stability wait could outlast the stream (flaked once at 30 s).

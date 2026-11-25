@@ -41,7 +41,8 @@ test("Stop aborts the stream and New chat resets", async ({ page }) => {
   await page.getByRole("button", { name: "What's he building right now?" }).click();
   const stop = page.getByRole("button", { name: "Stop" });
   await expect(stop).toBeVisible();
-  await stop.click();
+  // The docked composer moves while tokens stream, so "wait until stable" can outlast the stream.
+  await stop.dispatchEvent("click");
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
   await page.getByRole("button", { name: "New chat" }).click();
   await expect(page.getByRole("heading", { name: "What brings you here?" })).toBeVisible();
@@ -60,14 +61,14 @@ test("leave_intro renders a form the visitor submits", async ({ page }) => {
   await expect(page.getByText("Sent. He reads these himself.")).toBeVisible();
 });
 
-test("API rejects cross-origin posts and malformed bodies", async ({ request }) => {
+test("API rejects cross-origin posts and malformed bodies", async ({ request, baseURL }) => {
   const bad = await request.post("/api/chat", {
     headers: { origin: "https://evil.example" },
     data: { messages: [{ role: "user", content: "hi" }] },
   });
   expect(bad.status()).toBe(403);
   const malformed = await request.post("/api/chat", {
-    headers: { origin: "http://localhost:3100" },
+    headers: { origin: baseURL! },
     data: { messages: [{ role: "assistant", content: "hi" }] },
   });
   expect(malformed.status()).toBe(400);
