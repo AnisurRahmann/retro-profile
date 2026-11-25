@@ -319,6 +319,38 @@ main:has(> .sky-stage) {
 .sky-stage-open {
   flex: 1;
 }
+/* Drag the sky: the open sky is the handle; vertical swipes still scroll. */
+.sky-stage {
+  touch-action: pan-y;
+}
+.sky-stage,
+.sky-stage [data-sky-open] {
+  cursor: grab;
+}
+.sky-stage [data-sky-hero] {
+  cursor: auto;
+}
+.sky-stage[data-grabbing],
+.sky-stage[data-grabbing] * {
+  cursor: grabbing;
+  user-select: none;
+}
+/* The first-visit hint, bottom-right of the stage for 4 s. */
+.sky-hint {
+  position: absolute;
+  right: max(20px, calc(50vw - 384px));
+  bottom: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--on-sky);
+  opacity: 0;
+  transition: opacity 400ms ease;
+  pointer-events: none;
+}
+.sky-hint[data-show] {
+  opacity: 1;
+}
 /* Text scrims over the open stage: --ink behind the hero block and the header row, alpha solved by the contrast
    guard (--hero-a, --head-a). An ellipse: the box is the text block grown by --fx/--fy, the plateau (to 64% of
    the radius) covers the block's corners, and the rest is a smootherstep feather, so it reads as the sky
@@ -555,6 +587,32 @@ a.card:hover {
 }
 
 /* ── Sky label ──────────────────────────────────────────────── */
+/* The place name: every variant stacked in one cell, so the label's width never changes; 200ms cross-fade. */
+.sky-place {
+  display: inline-grid;
+}
+.sky-place > * {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.sky-place > [data-active] {
+  opacity: 1;
+}
+/* The sun-path strip: a slider; 44px tall touch target on mobile. */
+.sky-strip {
+  width: 200px;
+  color: var(--on-sky);
+  cursor: pointer;
+  touch-action: none;
+  border-radius: 4px;
+}
+@media (max-width: 807px) {
+  .sky-strip {
+    width: 100%;
+    padding-block: 4px;
+  }
+}
 .sky-range {
   accent-color: var(--text);
 }

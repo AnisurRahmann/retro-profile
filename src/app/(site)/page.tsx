@@ -26,7 +26,7 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd).replace(/</g, "\\u003c") }}
       />
-      <SkyStage>
+      <SkyStage copy={ui.sky}>
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
           <Portrait size={88} priority />
           <div className="min-w-0">

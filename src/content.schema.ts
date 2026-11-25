@@ -171,7 +171,6 @@ export const uiSchema = z.object({
   }),
   notFound: z.object({ heading: text, body: text, home: text }),
   sky: z.object({
-    label: text,
     weather: text,
     preview: text,
     sun: text,
@@ -181,8 +180,11 @@ export const uiSchema = z.object({
     attributionHref: url,
     dialog: text,
     scrub: text,
-    backToNow: text,
-    close: text,
+    stripValue: text,
+    phases: z.object({ night: text, astronomical: text, nautical: text, civil: text, golden: text, day: text }),
+    hint: text,
+    hintTouch: text,
+    places: z.object({ default: text, tea: text, bridge: text, city: text, airport: text }),
     words: z.object({
       clear: text,
       mostlyClear: text,

@@ -20,16 +20,23 @@ export type SkySnapshot = {
   wxOverride: Partial<SylhetWeather> | null;
   /** Scrubber position, minutes past Dhaka midnight; null = live. */
   preview: number | null;
-  /** True while the scrubber is open or animating back to now (the renderer runs at 60fps). */
+  /** True while a scrub, drag or time-lapse is running or easing back to now (the renderer runs at 60fps). */
   scrubbing: boolean;
+  /** The landmark nearest the viewport centre (the label's place name); null = "in Sylhet". */
+  place: PlaceId | null;
 };
 
-let snap: SkySnapshot = { weather: null, loaded: false, timeOverride: null, wxOverride: null, preview: null, scrubbing: false };
+export type PlaceId = "tea" | "bridge" | "city" | "airport";
+
+let snap: SkySnapshot = { weather: null, loaded: false, timeOverride: null, wxOverride: null, preview: null, scrubbing: false, place: null };
 const listeners = new Set<() => void>();
 
 export const skyStore = {
   get: (): SkySnapshot => snap,
   set(patch: Partial<SkySnapshot>): void {
+    let changed = false;
+    for (const k in patch) if (snap[k as keyof SkySnapshot] !== patch[k as keyof SkySnapshot]) changed = true;
+    if (!changed) return;
     snap = { ...snap, ...patch };
     listeners.forEach((l) => l());
   },
