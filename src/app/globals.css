@@ -408,6 +408,28 @@ a.card:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Sky label ──────────────────────────────────────────────── */
+.sky-range {
+  accent-color: var(--text);
+}
+/* Header monogram dot: amber at golden hour, a dim graphite dot at night, nothing otherwise. */
+.sky-dot {
+  display: none;
+  width: 6px;
+  height: 6px;
+  margin-left: 4px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+html[data-sky="golden"] .sky-dot {
+  display: inline-block;
+  background: var(--signal);
+}
+html:is([data-sky="night"], [data-sky="astronomical"], [data-sky="nautical"]) .sky-dot {
+  display: inline-block;
+  background: color-mix(in srgb, var(--graphite) 55%, transparent);
+}
+
 /* ── Chat ───────────────────────────────────────────────────── */
 .ring-spin {
   transform-origin: center;

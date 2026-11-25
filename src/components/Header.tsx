@@ -8,6 +8,7 @@ export function Header() {
     <header className="column flex h-16 items-center justify-between">
       <Link href="/" aria-label={ui.nav.home} className="font-mono text-[15px] text-text">
         as
+        <span aria-hidden="true" className="sky-dot" />
       </Link>
       <nav className="flex items-center gap-4 sm:gap-6">
         <Link href="/chat" className={navLink}>

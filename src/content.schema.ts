@@ -142,7 +142,7 @@ export const uiSchema = z.object({
   footer: z.object({ github: text, linkedin: text, privacy: text }),
   privacy: z.object({
     heading: text,
-    sections: z.array(z.object({ heading: text, body: text })),
+    sections: z.array(z.object({ heading: text, body: text, links: z.array(z.object({ label: text, href: url })).optional() })),
   }),
   chat: z.object({
     heading: text,
@@ -170,6 +170,32 @@ export const uiSchema = z.object({
     agent: text,
   }),
   notFound: z.object({ heading: text, body: text, home: text }),
+  sky: z.object({
+    label: text,
+    weather: text,
+    preview: text,
+    sun: text,
+    details: text,
+    updated: text,
+    attribution: text,
+    attributionHref: url,
+    dialog: text,
+    scrub: text,
+    backToNow: text,
+    close: text,
+    words: z.object({
+      clear: text,
+      mostlyClear: text,
+      partlyCloudy: text,
+      overcast: text,
+      foggy: text,
+      drizzle: text,
+      lightRain: text,
+      rain: text,
+      heavyRain: text,
+      thunderstorm: text,
+    }),
+  }),
 });
 
 export const contentSchema = z.object({

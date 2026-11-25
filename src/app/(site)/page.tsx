@@ -3,6 +3,7 @@ import { Closer } from "@/components/Closer";
 import { Portrait } from "@/components/Portrait";
 import { ReceiptCard } from "@/components/ReceiptCard";
 import { StatusLine } from "@/components/StatusLine";
+import { SkyLabel } from "@/components/sky/SkyLabel";
 import { Waveform } from "@/components/Waveform";
 import { building, links, profile, receipts, shipped, ui } from "@/site";
 
@@ -37,6 +38,7 @@ export default function Home() {
             <StatusLine lines={profile.statusLines} />
           </p>
           <p className="mt-1 text-sm text-graphite">{profile.oneLiner}</p>
+          <SkyLabel copy={ui.sky} />
         </div>
       </section>
 

@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createEventParser, type ErrorCode } from "@/agent/protocol";
 import type { ToolEventResult } from "@/agent/tools";
+import { emitSky } from "@/lib/signal-bus";
+import { isNightElevation, sun } from "@/lib/sky/astro";
+import { liveNow } from "@/lib/sky/store";
 import type { StatusLabels } from "@/lib/project";
 import { Markdown } from "./Markdown";
 import { BookCard, ToolCard } from "./ToolCards";
@@ -173,6 +176,8 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
           else if (event.type === "done") {
             finished = true;
             patchLast(() => ({ status: "done" }));
+            // A reply landed while it's night in Sylhet: one meteor across the sky.
+            if (isNightElevation(sun(liveNow()).elevationDeg)) emitSky({ type: "meteor" });
           } else if (event.type === "error") fail(event.code);
         });
         const reader = res.body.getReader();
