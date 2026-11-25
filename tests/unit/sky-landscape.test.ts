@@ -24,13 +24,23 @@ import {
   fireflyCount,
   LATE_SHARE,
   LIT_SHARE,
+  moonRimAlpha,
+  MOON_RIM_ALPHA,
   windowLit,
   windowSchedule,
 } from "@/lib/sky/landscape/lights";
 import { keaneBridge } from "@/lib/sky/landscape/shapes";
-import { layerColor, sunLight } from "@/lib/sky/landscape/colors";
+import {
+  HAZE,
+  layerColor,
+  layerColorLit,
+  sunLight,
+  teaRowColor,
+  teaRowNight,
+} from "@/lib/sky/landscape/colors";
+import { CITY_GLOW, LAND_TEA_ROWS, MOON_RIM } from "@/lib/sky/palette";
 import { cityGlowOver, gradientAt, type CityGlow } from "@/lib/sky/backing";
-import { luminance, oklabToRgb } from "@/lib/sky/color";
+import { hexToLab, luminance, mixLab, oklabToRgb } from "@/lib/sky/color";
 import { skyColors } from "@/lib/sky/gradient";
 import { CONDITIONS } from "@/lib/sky/weather";
 import { buildClosingScene, buildStageScene, buildWorld, ridgeL1 } from "@/lib/sky/landscape/world";
@@ -302,6 +312,45 @@ describe("the night landscape", () => {
     expect(cityGlowAlpha(23 * 60 + 30, 0, 1)).toBeLessThan(0.16);
     expect(cityGlowAlpha(23 * 60 + 30, 0, 1)).toBeGreaterThan(0.096);
     expect(cityGlowAlpha(12 * 60, 0, 0)).toBe(0); // by day
+  });
+
+  it("shows the tea rows as their own green by day and as the hill 3% lighter at night: texture, never glowing lines (T4)", () => {
+    const horizon = skyColors(10, "evening", "clear").horizon;
+    const light = (e: number) => ({ horizon, k: sunLight(e) });
+    const hill = (e: number) => layerColorLit(light(e), "L2");
+    const chroma = (c: [number, number, number]) => Math.hypot(c[1], c[2]);
+    // Night (at −6° and below): the hill's own chroma, exactly, and no more than 3% lighter.
+    expect(teaRowNight(light(-30))).toBe(1);
+    const night = teaRowColor(light(-30));
+    expect(night[0]).toBeCloseTo(hill(-30)[0] + 0.03, 9);
+    expect(night.slice(1)).toEqual(hill(-30).slice(1));
+    // By day: the tea green's own chroma, hazed like the hills, 6% lighter than the hill (as before T4).
+    expect(teaRowNight(light(30))).toBe(0);
+    const day = teaRowColor(light(30));
+    expect(day[0]).toBeCloseTo(hill(30)[0] + 0.06, 9);
+    const teaGreen = mixLab(hexToLab(LAND_TEA_ROWS), horizon, HAZE.L2);
+    expect(day.slice(1)).toEqual([teaGreen[1], teaGreen[2]]);
+    // Dusk is between the two.
+    const dusk = teaRowColor(light(-3));
+    expect(0 < teaRowNight(light(-3)) && teaRowNight(light(-3)) < 1).toBe(true);
+    expect(dusk[0]).toBeGreaterThan(hill(-3)[0] + 0.03);
+    expect(dusk[0]).toBeLessThan(hill(-3)[0] + 0.06);
+    expect(chroma(night)).toBeLessThan(chroma(day));
+  });
+
+  it("rims the top of the hills and the bridge with moonlight only while the moon is up: 0.3 × illumination in #C9D4E8 (T4)", () => {
+    expect(MOON_RIM).toBe("#C9D4E8");
+    expect(moonRimAlpha(true, 1, 1, 0)).toBeCloseTo(MOON_RIM_ALPHA, 9);
+    expect(moonRimAlpha(true, 0.5, 1, 0)).toBeCloseTo(0.15, 9);
+    expect(moonRimAlpha(false, 1, 1, 0)).toBe(0); // below the horizon
+    expect(moonRimAlpha(true, 1, 0, 0)).toBe(0); // daylight
+    expect(moonRimAlpha(true, 1, 1, 1)).toBe(0); // hidden by cloud
+  });
+
+  it("keeps the city glow at #E8A15A, 0.16 at the horizon, fading to 0 at 14% of the viewport height", () => {
+    expect(CITY_GLOW).toBe("#E8A15A");
+    expect(cityGlowAlpha(21 * 60, 0, 1)).toBeCloseTo(0.16, 9);
+    expect(CITY_GLOW_REACH).toBe(0.14);
   });
 
   it("keeps every silhouette darker than the sky behind it at night, city glow included", () => {

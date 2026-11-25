@@ -47,11 +47,25 @@ export function layerColor(horizon: Lab, layer: LayerId, k = 1, wash = 0): Lab {
 export const layerColorLit = (l: LandLight, layer: LayerId) =>
   layerColor(l.horizon, layer, l.k ?? 1, l.wash ?? 0);
 
-/** The tea bush rows on L2: their own green, hazed like the hills, then +0.06 OKLab L over the hill so they read. */
+/** How far toward night the light is: 0 by day (k ≥ 0.9: sunLight from 0° up), 1 at night (k ≤ 0.55: at −6° and below). */
+const nightOf = (k: number) => Math.min(1, Math.max(0, (0.9 - k) / (0.9 - 0.55)));
+
+/** How much of the night treatment the tea bush rows get, 0 by day … 1 at night (v5.1 T4). */
+export const teaRowNight = (l: LandLight) => nightOf(l.k ?? 1);
+
+/**
+ * The tea bush rows on L2. By day their own green, hazed like the hills, at +0.06 OKLab L over the hill so they
+ * read. At night the hill's own colour at +0.03 L and nothing else: barely visible texture, never lines that glow
+ * (v5.1 T4: they used to keep their green on a dark hill and read as neon).
+ */
 export function teaRowColor(l: LandLight): Lab {
+  const k = l.k ?? 1;
   const hill = layerColorLit(l, "L2");
-  const row = baseLab(LAND_TEA_ROWS, l.horizon, HAZE.L2, l.k ?? 1);
-  return [hill[0] + 0.06, row[1], row[2]];
+  const row = baseLab(LAND_TEA_ROWS, l.horizon, HAZE.L2, k);
+  const day: Lab = [hill[0] + 0.06, row[1], row[2]];
+  const night: Lab = [Math.min(1, hill[0] + 0.03), hill[1], hill[2]];
+  const t = nightOf(k);
+  return [0, 1, 2].map((i) => day[i]! + (night[i]! - day[i]!) * t) as Lab;
 }
 
 /** The near ground under L4's things: L4 a touch lighter (+0.03 OKLab L). */

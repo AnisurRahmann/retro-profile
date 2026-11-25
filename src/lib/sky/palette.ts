@@ -38,6 +38,8 @@ export const LAND_L2 = "#1E2E28";
 export const LAND_TEA_ROWS = "#24372F";
 export const LAND_L3 = "#171D2A";
 export const LAND_L4 = "#0C1018";
+/** Moonlight: the 1px rim along the top of the hills and the bridge while the moon is up (landscape.ts). */
+export const MOON_RIM = "#C9D4E8";
 /** Runway lights: the threshold (green) and the far end (red); the plane's red beacon uses the same red. */
 export const RWY_GREEN = "#62E08E";
 export const RWY_RED = "#FF5A4E";

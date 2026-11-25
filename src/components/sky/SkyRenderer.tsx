@@ -26,7 +26,12 @@ import { CLOUD_REFRESH_S, createCloudField } from "./cloud-field";
 import { createLandscape, GLOW_HORIZON, LIFT, type Landscape } from "./landscape";
 import { createLife, TAKEOFF_S, type Life, type LifeFrame } from "./life";
 import { createAmbient, type Ambient } from "./ambient";
-import { cityGlowAlpha, CITY_GLOW_REACH, fireflyCount } from "@/lib/sky/landscape/lights";
+import {
+  cityGlowAlpha,
+  CITY_GLOW_REACH,
+  fireflyCount,
+  moonRimAlpha,
+} from "@/lib/sky/landscape/lights";
 import { createParticles, mulberry32, type Particles, type ParticleState } from "./particles";
 import {
   closingWalk,
@@ -544,9 +549,7 @@ function start(
             smooth01(0.5, -1.5, alt0),
           ),
           glowReach: CITY_GLOW_REACH * view.vh,
-          moonRim: model.moon.up
-            ? 0.3 * n("uMoonIllum") * n("uNight") * Math.max(0, 1 - n("uCloudCover"))
-            : 0,
+          moonRim: moonRimAlpha(model.moon.up, n("uMoonIllum"), n("uNight"), n("uCloudCover")),
           moonX: v2("uMoonPos")[0]! * view.vw,
         };
         for (const b of active) b.land.setLighting(lighting);

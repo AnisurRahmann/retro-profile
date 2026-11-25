@@ -83,6 +83,17 @@ At 375×812, for 03:30 clear, 11:00 partly cloudy and 16:45 clear:
 - Shots: `.shots/v5.1/T3/t3-0330-clear-375x812-top.png`, `t3-1100-partly-375x812-top.png`, `t3-1645-clear-375x812-top.png`; sheets `sheet-pass1.png`, `crop-night-bottom.png`, `edges/sheet.png` (320, 375×667, 639, 640, 768, 1440).
 - How: the phone stage is `max(600px, 100svh − 40px)` with the text block first and the scene last (CSS, below 640px only); the scene is 200px; on phones `buildStageScene` places Keane Bridge alone, centred, at 1.6 × 150 / H; the arc's ends are at 8% and 92% of the width, 8px above the tallest far hill on screen, its apex 28px under the measured text block, recomputed on resize. DECISIONS #111.
 
+#### T4 · night landscape: no neon lines, readable silhouettes
+
+At 03:30 clear, 375×812 and 1440×900:
+
+- PASS: no green glowing lines. The tea rows are the hill's own colour 3% lighter at night (before: the tea green's chroma on a dark hill). Zoomed crops: `crop-phone-zoom-after.png`, `crop-desktop-right-after.png`.
+- PASS: the hill outline and the bridge outline are visible against the sky. The moonlight rim (0.3 × 0.98 illumination) now runs along the top of every layer, the far hills included: the skyline, the tea mounds' edge and the arches of the bridge each have a light 1px edge (crops above). The city glow adds warmth just above the skyline: on the phone the sky there measures (27, 34, 48) against (21, 30, 47) higher up.
+- PASS: the bridge lights still show (14 deck lights, mirrored in the river).
+- The city glow already existed with the brief's numbers (#E8A15A, 0.16, 14% of the viewport height, behind every layer) and is wired into the phone scenes too: one `draw()` serves the fixed band and both scenes. It was not rendering weakly for lack of wiring; it is subtle at 03:30 because the v3 schedule dims it to × 0.6 between 01:00 and 05:00 (about 0.10 at the horizon). Left as it is.
+- Shots: `.shots/v5.1/T4/t4-after-0330-375x812-top.png`, `t4-after-0330-1440x900-top.png`; before/after sheets `sheet-before.png` (before), `sheet-after.png`, `sheet-desktop-before-after.png`.
+- How: `teaRowColor` blends from the day colour to "hill + 0.03 L, hill chroma" with the light (`teaRowNight`); `moonRimAlpha` (0.3 × illumination while the moon is up, fading with daylight and cloud) and the rim colour `MOON_RIM` #C9D4E8 composited at that alpha over each layer; the far hills join the moon rim (they never take the golden-hour rim). DECISIONS #112.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.
