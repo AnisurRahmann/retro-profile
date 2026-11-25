@@ -23,10 +23,10 @@ import { startBacking, type BackingRunner } from "./backing-runner";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createSun, drawArc, type SunState } from "./bodies";
 import { CLOUD_REFRESH_S, createCloudField } from "./cloud-field";
-import { createLandscape, LIFT, type Landscape } from "./landscape";
+import { createLandscape, GLOW_HORIZON, LIFT, type Landscape } from "./landscape";
 import { createLife, TAKEOFF_S, type Life, type LifeFrame } from "./life";
 import { createAmbient, type Ambient } from "./ambient";
-import { fireflyCount } from "@/lib/sky/landscape/lights";
+import { cityGlowAlpha, CITY_GLOW_REACH, fireflyCount } from "@/lib/sky/landscape/lights";
 import { createParticles, mulberry32, type Particles, type ParticleState } from "./particles";
 import { closingWalk, landMode, PARALLAX, solveAnchors, stageWalk, type LandMode } from "@/lib/sky/landscape/anchors";
 import { buildClosingScene, buildStageScene, buildWorld } from "@/lib/sky/landscape/world";
@@ -292,7 +292,13 @@ function start(
         m.moon.up && moonVis > 0.01
           ? { x: mx, y: my, r: moonR(), visible: moonVis, glow: m.moon.fraction * m.night * (1 - 0.7 * m.cloudCover) }
           : null,
-      glows: [],
+      glows: activeBands()
+        .filter(visible)
+        .map((b) => ({
+          horizonY: b.canvas.getBoundingClientRect().top + b.land.lift + GLOW_HORIZON * (b.land.world?.s ?? 1),
+          reach: CITY_GLOW_REACH * view.vh,
+          alpha: cityGlowAlpha(dhakaParts(skyTime()).minutes, m.cloudCover, smooth01(0.5, -1.5, m.sun.alt)),
+        })),
       lands: activeBands()
         .filter(visible)
         .map((b) => ({ top: b.canvas.getBoundingClientRect().top + b.land.lift, h: b.land.height })),
@@ -389,11 +395,16 @@ function start(
       const scrubbing = skyStore.get().scrubbing;
       if (still || t - lastLight >= (scrubbing ? 1 / 30 : 2)) {
         const hz = rgbToOklab(v2("uHorizon").map((c) => toGamma(Math.min(1, Math.max(0, c)))) as [number, number, number]);
+        const alt0 = n("sunAlt");
         const lighting = {
           horizon: hz,
-          rim: n("uGlow") * smooth01(-2, 1, n("sunAlt")),
+          rim: n("uGlow") * smooth01(-2, 1, alt0),
           sunX: v2("sunPos")[0]! * view.vw,
-          night: smooth01(-6, -14, n("sunAlt")),
+          night: smooth01(-6, -14, alt0),
+          glow: cityGlowAlpha(dhakaParts(skyTime()).minutes, n("uCloudCover"), smooth01(0.5, -1.5, alt0)),
+          glowReach: CITY_GLOW_REACH * view.vh,
+          moonRim: model.moon.up ? 0.3 * n("uMoonIllum") * n("uNight") * Math.max(0, 1 - n("uCloudCover")) : 0,
+          moonX: v2("uMoonPos")[0]! * view.vw,
         };
         for (const b of active) b.land.setLighting(lighting);
         lastLight = t;

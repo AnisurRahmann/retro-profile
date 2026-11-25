@@ -62,8 +62,9 @@ export function keaneBridge(): Shape {
       const xn = x0 + ((x1 - x0) * (k < n / 2 ? k - 1 : k + 1)) / n;
       strokes.push(line([x, top(x)], [xn, deckTop]));
     }
-    for (let k = 0; k < 4; k++) lights.push({ at: [x0 + ((x1 - x0) * (k + 0.5)) / 4, deckTop - 0.5], kind: "deck" });
   }
+  // A string of 14 warm lights along the deck (mirrored in the river at night).
+  for (let k = 0; k < 14; k++) lights.push({ at: [(spans * W * (k + 0.5)) / 14, deckTop - 0.5], kind: "deck" });
   return { fill, stroke: [{ d: strokes.join(""), width: 0.75 }], lights, x0: -16, x1: spans * W + 16 };
 }
 

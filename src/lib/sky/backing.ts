@@ -237,11 +237,11 @@ export function moonOver(bg: RGB, m: MoonDisc, d: number): RGB {
   return out;
 }
 
-/** The night city glow (fix 3): CITY_GLOW at `alpha` at the horizon, fading to 0 at `reach` px above it. */
+/** The night city glow: CITY_GLOW at `alpha` at and below the horizon, fading to 0 at `reach` px above it. */
 export type CityGlow = { horizonY: number; reach: number; alpha: number };
 const GLOW_RGB = hexToRgb(CITY_GLOW);
 export function cityGlowOver(bg: RGB, g: CityGlow, y: number): RGB {
-  if (g.alpha <= 0 || y > g.horizonY + 2) return bg;
+  if (g.alpha <= 0) return bg;
   const t = 1 - Math.min(1, Math.max(0, (g.horizonY - y) / g.reach));
   return t > 0 ? over(bg, GLOW_RGB, g.alpha * t) : bg;
 }

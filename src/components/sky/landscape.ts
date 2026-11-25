@@ -10,16 +10,19 @@
  * the sun.
  */
 import { brand } from "@/lib/brand";
-import { hexToLab, mixLab, oklabToRgb, type Lab, type RGB } from "@/lib/sky/color";
+import { hexToLab, hexToRgb, mixLab, oklabToRgb, type Lab, type RGB } from "@/lib/sky/color";
 import { layerColor, riverColor } from "@/lib/sky/landscape/colors";
 import { PARALLAX, type LayerId } from "@/lib/sky/landscape/anchors";
-import { RIVER } from "@/lib/sky/landscape/shapes";
+import { BANK_Y, RIVER } from "@/lib/sky/landscape/shapes";
+import { CITY_GLOW } from "@/lib/sky/palette";
 import { ridgeL1, ridgeL2, ridgeL4, type Placed, type World } from "@/lib/sky/landscape/world";
 import type { Shape } from "@/lib/sky/landscape/shapes";
 
 const PAD = 256;
 /** Transparent headroom above the band, for the plane climbing out. */
 export const LIFT = 120;
+/** The city glow's horizon in band units: the foot of the far hills (L1's ridge averages 34). */
+export const GLOW_HORIZON = 50;
 const LAYERS: LayerId[] = ["L1", "L2", "L3", "L4"];
 export { DEPTH, layerColor, NEAR, riverColor } from "@/lib/sky/landscape/colors";
 
@@ -36,8 +39,14 @@ export type Lighting = {
   rim: number;
   /** Sun x on screen (px) for the rim's falloff. */
   sunX: number;
-  /** Night 0..1: the city's glow lifts the sky behind the skyline so the silhouettes read. */
+  /** Night 0..1. */
   night: number;
+  /** City glow (sodium) at the horizon, alpha (cityGlowAlpha), and its reach above the horizon in px. */
+  glow: number;
+  glowReach: number;
+  /** Moonlight rim strength (0.3 × illumination while the moon is up) and the moon's screen x. */
+  moonRim: number;
+  moonX: number;
 };
 
 /**
@@ -55,8 +64,9 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
   let w = 1,
     H = 1,
     dpr = 1;
-  let light: Lighting = { horizon: hexToLab(brand.ink), rim: 0, sunX: 0, night: 0 };
-  let glowCss = "";
+  let light: Lighting = { horizon: hexToLab(brand.ink), rim: 0, sunX: 0, night: 0, glow: 0, glowReach: 0, moonRim: 0, moonX: 0 };
+  const glowRgb = hexToRgb(CITY_GLOW);
+  const moonLab = hexToLab(brand.text);
   let lightKey = "";
   const colors = {} as Record<LayerId, string>;
   let river = "rgba(0,0,0,1)";
@@ -157,12 +167,16 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
     const x0 = x0Px / s;
     const x1 = (x0Px + sw) / s;
     const body = colors[layer];
-    if (light.rim > 0.02 && layer !== "L1") {
-      // Rim: the layer in the horizon colour (50%, falling off away from the sun), then the body 1 px lower.
+    // Rim: golden hour (the horizon colour at 50%, brightest toward the sun) or moonlight (the moon's colour at
+    // 0.3 × illumination, on the moon's side): the layer in the rim colour, then the body 1 px lower.
+    const moon = light.rim <= 0.02 && light.moonRim > 0.02;
+    if ((light.rim > 0.02 || moon) && layer !== "L1") {
       const base = layerColor(light.horizon, layer);
-      const hi = oklabToRgb(mixLab(base, light.horizon, 0.5 * light.rim));
-      const lo = oklabToRgb(mixLab(base, light.horizon, 0.15 * light.rim));
-      const sunU = (light.sunX + offsetPx) / s;
+      const tint = moon ? moonLab : light.horizon;
+      const k = moon ? light.moonRim : 0.5 * light.rim;
+      const hi = oklabToRgb(mixLab(base, tint, k));
+      const lo = oklabToRgb(mixLab(base, tint, moon ? 0 : 0.15 * light.rim));
+      const sunU = ((moon ? light.moonX : light.sunX) + offsetPx) / s;
       const span = w / s;
       const grad = g.createLinearGradient(sunU - span, 0, sunU + span, 0);
       grad.addColorStop(0, css(lo));
@@ -199,12 +213,10 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
     /** New light: recolours (re-renders) the strips when it has changed enough. */
     setLighting(l: Lighting) {
       light = l;
-      const key = `${l.horizon.map((v) => Math.round(v * 200)).join()}|${Math.round(l.rim * 20)}|${Math.round(l.sunX / 40)}|${Math.round(l.night * 20)}`;
+      const key = `${l.horizon.map((v) => Math.round(v * 200)).join()}|${Math.round(l.rim * 20)}|${Math.round(l.sunX / 40)}|${Math.round(l.night * 20)}|${Math.round(l.moonRim * 40)}|${Math.round(l.moonX / 40)}`;
       if (key === lightKey) return false;
       lightKey = key;
       for (const layer of LAYERS) colors[layer] = css(oklabToRgb(layerColor(l.horizon, layer)));
-      // Sky glow over the city: the horizon lifted toward warm grey.
-      glowCss = l.night > 0.02 ? css(oklabToRgb(mixLab(l.horizon, [0.62, 0.01, 0.03], 0.16)), 0.45 * l.night) : "";
       river = css(oklabToRgb(riverColor(l.horizon)));
       return true;
     },
@@ -224,15 +236,20 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fadeBott
       if (!world) return;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (glowCss) {
-        // Behind everything in the band: a soft lift from the hilltops down to the river.
-        const top = (lift + 14 * world.s) * dpr;
-        const bottom = (lift + 72 * world.s) * dpr;
-        const g = ctx.createLinearGradient(0, top, 0, bottom);
-        g.addColorStop(0, "rgba(0,0,0,0)");
-        g.addColorStop(1, glowCss);
+      if (light.glow > 0.003) {
+        // Light pollution behind the skyline: sodium at the horizon (where the land meets the sky, the foot of the
+        // far hills), fading to 0 glowReach px above, and level below it down to the bank. The silhouettes read
+        // as dark shapes against it.
+        const horizon = (lift + GLOW_HORIZON * world.s) * dpr;
+        const bank = (lift + BANK_Y * world.s) * dpr;
+        const top = Math.max(0, horizon - light.glowReach * dpr);
+        const g = ctx.createLinearGradient(0, top, 0, horizon);
+        g.addColorStop(0, css(glowRgb, 0));
+        g.addColorStop(1, css(glowRgb, light.glow));
         ctx.fillStyle = g;
-        ctx.fillRect(0, top, canvas.width, bottom - top);
+        ctx.fillRect(0, top, canvas.width, horizon - top);
+        ctx.fillStyle = css(glowRgb, light.glow);
+        ctx.fillRect(0, horizon, canvas.width, bank - horizon);
       }
       for (const layer of LAYERS) {
         const o = walk * PARALLAX[layer];

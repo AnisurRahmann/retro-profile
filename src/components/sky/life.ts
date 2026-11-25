@@ -1,7 +1,7 @@
 /**
  * Night life on the landscape band (drawn between its layers, src/components/sky/landscape.ts):
- * - lit windows (WINDOW_LIT, 1–2 px, 30% of windows, each off between 22:00 and 01:00 and back on between 05:00 and
- *   06:30, seeded by date: src/lib/sky/landscape/lights.ts),
+ * - lit windows (WINDOW_LIT, 1–2 px; 45% lit before 22:00, 10% by 01:00, back on between 05:00 and 06:30, a few
+ *   cool white TVs flickering at 0.3 Hz; seeded by date: src/lib/sky/landscape/lights.ts),
  * - lamp posts glowing from sunset to sunrise, the bridge's deck lights mirrored in the river with shimmer,
  * - runway lights in a sequenced chase every 2 s,
  * - the sun's or moon's shimmer column on the river when it's within 12° of the horizon (1 px dashes, lengths
@@ -12,10 +12,10 @@
  */
 import { hexToRgb, type RGB } from "@/lib/sky/color";
 import type { LayerId } from "@/lib/sky/landscape/anchors";
-import { windowLit } from "@/lib/sky/landscape/lights";
+import { TV_HZ, windowLit, windowSchedule } from "@/lib/sky/landscape/lights";
 import { planePath, RIVER } from "@/lib/sky/landscape/shapes";
 import type { World } from "@/lib/sky/landscape/world";
-import { WINDOW_LIT } from "@/lib/sky/palette";
+import { TV_LIT, WINDOW_LIT } from "@/lib/sky/palette";
 import { LIFT } from "./landscape";
 
 const rgba = (c: RGB, a: number) => `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
@@ -53,6 +53,7 @@ export function createLife(textRgb: RGB) {
   const warm = hexToRgb(WINDOW_LIT);
   const warmCss = rgba(warm, 1);
   const textCss = rgba(textRgb, 1);
+  const tvCss = rgba(hexToRgb(TV_LIT), 1);
   const plane = new Path2D(planePath());
   let takeoffAt = -Infinity;
   let lastTakeoff = -Infinity;
@@ -124,16 +125,23 @@ export function createLife(textRgb: RGB) {
         return;
       }
       if (layer === "L3") {
-        // Windows.
+        // Windows: warm, a few cool white TVs flickering gently.
         if (f.dark > 0.01) {
-          g.fillStyle = warmCss;
-          g.globalAlpha = 0.9 * f.dark;
           const sz = s < 1.4 ? 1 : 1.5;
           for (const l of f.world.lights.L3) {
             if (l.kind !== "window") continue;
             const x = l.x * s - o;
             if (x < -2 || x > f.w + 2) continue;
-            if (windowLit(l.i, f.minutes, f.seed)) g.fillRect(Math.round(x), Math.round(l.y * s), sz, sz);
+            if (!windowLit(l.i, f.minutes, f.seed)) continue;
+            if (windowSchedule(l.i, f.seed).tv) {
+              const flicker = f.moving ? 0.75 + 0.2 * Math.sin(2 * Math.PI * TV_HZ * f.t + l.i * 1.7) + 0.05 * Math.sin(11 * f.t + l.i) : 0.85;
+              g.fillStyle = tvCss;
+              g.globalAlpha = 0.9 * f.dark * flicker;
+            } else {
+              g.fillStyle = warmCss;
+              g.globalAlpha = 0.9 * f.dark;
+            }
+            g.fillRect(Math.round(x), Math.round(l.y * s), sz, sz);
           }
         }
         if (f.lamps > 0.01) {

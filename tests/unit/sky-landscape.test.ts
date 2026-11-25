@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ANCHOR_AT, closingWalk, gutterCentre, gutterWidth, landMode, nearestPlace, PARALLAX, scenePlace, screenX, solveAnchors, stageWalk } from "@/lib/sky/landscape/anchors";
-import { fireflyCount, LIT_SHARE, windowLit, windowSchedule } from "@/lib/sky/landscape/lights";
+import { cityGlowAlpha, CITY_GLOW_REACH, fireflyCount, LATE_SHARE, LIT_SHARE, windowLit, windowSchedule } from "@/lib/sky/landscape/lights";
+import { keaneBridge } from "@/lib/sky/landscape/shapes";
+import { layerColor } from "@/lib/sky/landscape/colors";
+import { cityGlowOver, gradientAt, type CityGlow } from "@/lib/sky/backing";
+import { luminance, oklabToRgb } from "@/lib/sky/color";
+import { skyColors } from "@/lib/sky/gradient";
+import { CONDITIONS } from "@/lib/sky/weather";
 import { buildClosingScene, buildStageScene, buildWorld } from "@/lib/sky/landscape/world";
 
 // Section tops (document px) for a 1440×900 home page.
@@ -156,23 +162,65 @@ describe("window lights", () => {
     expect(a).not.toEqual(c);
   });
 
-  it("light about 30% of windows, off between 22:00 and 01:00, back on between 05:00 and 06:30", () => {
-    const n = 4000;
+  it("light 45% of windows before 22:00, 10% by 01:00, and wake between 05:00 and 06:30", () => {
+    const n = 6000;
     const s = Array.from({ length: n }, (_, i) => windowSchedule(i, 120));
-    const lit = s.filter((w) => w.lit).length / n;
-    expect(lit).toBeGreaterThan(LIT_SHARE - 0.03);
-    expect(lit).toBeLessThan(LIT_SHARE + 0.03);
+    const share = (min: number) => Array.from({ length: n }, (_, i) => windowLit(i, min, 120)).filter(Boolean).length / n;
+    expect(Math.abs(share(20 * 60 + 30) - LIT_SHARE)).toBeLessThan(0.025);
+    expect(share(23 * 60 + 30)).toBeLessThan(share(20 * 60 + 30)); // the city goes to sleep
+    expect(Math.abs(share(60) - LATE_SHARE)).toBeLessThan(0.02);
+    expect(Math.abs(share(3 * 60) - LATE_SHARE)).toBeLessThan(0.02);
+    expect(Math.abs(share(7 * 60) - LIT_SHARE)).toBeLessThan(0.025); // and wakes by 06:30
     for (const w of s) {
-      expect(w.off).toBeGreaterThanOrEqual(22 * 60);
-      expect(w.off).toBeLessThanOrEqual(25 * 60);
       expect(w.on).toBeGreaterThanOrEqual(5 * 60);
       expect(w.on).toBeLessThanOrEqual(6.5 * 60);
     }
-    const count = (min: number) => Array.from({ length: n }, (_, i) => windowLit(i, min, 120)).filter(Boolean).length;
-    expect(count(20 * 60 + 30)).toBe(s.filter((w) => w.lit).length); // all lit windows on at 20:30
-    expect(count(23 * 60 + 30)).toBeLessThan(count(20 * 60 + 30)); // the city goes to sleep
-    expect(count(3 * 60)).toBe(0); // 03:00: everyone's asleep
-    expect(count(7 * 60)).toBe(s.filter((w) => w.lit).length); // and wakes by 06:30
+    // A few lit windows are TVs.
+    const tv = s.filter((w) => w.lit && w.tv).length / s.filter((w) => w.lit).length;
+    expect(tv).toBeGreaterThan(0.06);
+    expect(tv).toBeLessThan(0.2);
+  });
+});
+
+describe("the night landscape", () => {
+  it("lights Keane Bridge with 14 warm deck lights", () => {
+    expect(keaneBridge().lights!.filter((l) => l.kind === "deck")).toHaveLength(14);
+  });
+
+  it("glows over the city from sunset: 0.16, more under low cloud, dimmer after 01:00", () => {
+    expect(cityGlowAlpha(20 * 60, 0, 1)).toBeCloseTo(0.16, 9);
+    expect(cityGlowAlpha(20 * 60, 1, 1)).toBeCloseTo(0.16 * 1.8, 9);
+    expect(cityGlowAlpha(60, 0, 1)).toBeCloseTo(0.16 * 0.6, 9);
+    expect(cityGlowAlpha(3 * 60, 0, 1)).toBeCloseTo(0.16 * 0.6, 9);
+    expect(cityGlowAlpha(23 * 60 + 30, 0, 1)).toBeLessThan(0.16);
+    expect(cityGlowAlpha(23 * 60 + 30, 0, 1)).toBeGreaterThan(0.096);
+    expect(cityGlowAlpha(12 * 60, 0, 0)).toBe(0); // by day
+  });
+
+  it("keeps every silhouette darker than the sky behind it at night, city glow included", () => {
+    const fails: string[] = [];
+    // 1440×900: the band (162px) starts at 738; ridge tops of each layer (band units); the glow's horizon at 50.
+    const vh = 900;
+    const top = 738;
+    const s = 1.62;
+    const tops: Record<string, number> = { L1: 20, L2: 48, L3: 30, L4: 40 };
+    for (let e = -30; e <= -1; e++)
+      for (const c of CONDITIONS)
+        for (const phase of ["morning", "evening"] as const)
+          for (const cover of [0, 1])
+            for (const mins of [21 * 60, 2 * 60]) {
+              const colors = skyColors(e, phase, c);
+              const glow: CityGlow = { horizonY: top + 50 * s, reach: CITY_GLOW_REACH * vh, alpha: cityGlowAlpha(mins, cover, 1) };
+              for (const layer of ["L1", "L2", "L3", "L4"] as const) {
+                const sil = luminance(oklabToRgb(layerColor(colors.horizon, layer)));
+                for (let u = tops[layer]!; u <= 70; u += 5) {
+                  const y = top + u * s;
+                  const sky = cityGlowOver(oklabToRgb(gradientAt({ colors }, y / vh)), glow, y);
+                  if (sil >= luminance(sky)) fails.push(`${e}° ${c} ${phase} cover ${cover} ${layer} u=${u}: ${sil.toFixed(4)} ≥ ${luminance(sky).toFixed(4)}`);
+                }
+              }
+            }
+    expect(fails.slice(0, 10)).toEqual([]);
   });
 });
 
