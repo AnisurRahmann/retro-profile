@@ -2,6 +2,68 @@
 
 Branch `redesign/talk-to-my-agent` (off `main` @ 9fb4a5a). Nothing pushed, nothing deployed.
 
+## File map
+
+Which file does what (as found by grep, 2026-11-26). Paths are relative to the repo root.
+
+- Copy and data
+  - `src/content.ts`: all copy and data. `profile.statusLines` is the rotating status line; `ui.sky` is the sky label's copy.
+  - `src/content.schema.ts`: the zod schemas (`profileSchema.statusLines`). `src/site.ts`: the placeholder-stripped view components import.
+- Page and styles
+  - `src/app/(site)/page.tsx`: the home page: the sky stage with the hero (name, status line, one-liner, label), the sections, the closer, the closing scene slot `[data-sky-scene=closing]`.
+  - `src/app/layout.tsx`: the root layout: the inline first-paint script, `SkyBackdrop`, the header.
+  - `src/app/globals.css`: tokens and all sky CSS: `.sky-stage`, `.sky-scene*`, `--stage-h`, `--scene-h`, `--band-h`, `[data-on-sky]` (halo and chip), `.status-line`.
+- Hero
+  - `src/components/StatusLine.tsx`: the rotating status line.
+  - `src/components/sky/SkyStage.tsx`: the stage section (`[data-sky-stage]`), the stage scene slot, the hero wrapper `[data-sky-hero]`, drag-the-sky, the first-visit time-lapse.
+  - `src/components/sky/SkyLabel.tsx`, `SkyStrip.tsx`, `SylhetClock.tsx`, `SkyGlyph.tsx`: the time · weather · place label, the sun-path strip (on phones the 44px arc handle), the clock, the glyphs.
+- The sky background
+  - `src/components/sky/SkyBackdrop.tsx`, `SkyMount.tsx`: the fixed layer stack; the renderer is lazy-loaded after idle.
+  - `src/components/sky/SkyController.tsx`: fetches `/api/sylhet`, paints the CSS gradient, sets the label's place.
+  - `src/components/sky/SkyRenderer.tsx`: the canvas renderer: atmosphere, particles, the landscape bands (fixed band, stage scene, closing scene), their lighting, the take-off trigger, the `window.__sky` test hooks.
+  - `src/components/sky/landscape.ts`: draws one landscape band (layer strips, rims, tea rows, the city glow, the ground fade).
+  - `src/components/sky/life.ts`: what lives between the layers: windows, lamps, runway lights, the airport, the plane and its take-off.
+  - `src/components/sky/particles.ts`: stars, the moon, meteors, rain. `bodies.ts`: the sun sprites, the dotted arc, `drawHalo` (the 22° ring).
+  - `src/components/sky/atmosphere.ts`, `sky-shader.ts`, `cloud-field.ts`, `ambient.ts`, `hooks.ts`: the WebGL2 sky, its shader, the CPU cloud mirror, birds / planes / fireflies / rickshaw, shared hooks.
+- Text backing
+  - `src/lib/sky/backing.ts`: the model (`decide`, `HALO_CURVE`, the chip's alpha). `src/components/sky/backing-runner.ts`: writes `data-backing`, `--halo-a`, `--chip-a` on each `[data-on-sky]` element.
+- Sky maths (`src/lib/sky/`)
+  - `arc.ts`: the sun/moon arc, `stageHeightFor`, `SCENE_HORIZON`. `view.ts`: live page geometry. `horizon.ts`: where the horizon is on screen.
+  - `store.ts`: the sky store, the `?sky` / `?wx` overrides, `SKY_DEBUG`. `first-paint.ts`: the inline first-paint script.
+  - `model.ts`, `gradient.ts`, `palette.ts`, `astro.ts`, `time.ts`, `scrub.ts`, `weather.ts`, `color.ts`: the sky model, colours, the keyframe palette, astronomy, Dhaka time, time travel, the weather shape, colour maths.
+- Landscape (`src/lib/sky/landscape/`)
+  - `anchors.ts`: parallax, landmark anchors, `landMode`, `sceneBand`, the scene walks. `world.ts`: `buildWorld` (the fixed band), `buildStageScene`, `buildClosingScene`.
+  - `shapes.ts`: the silhouettes as SVG path data. `plane.ts`: the plane, its take-off path, `planePx`, `createArrival` (the arrival trigger).
+  - `colors.ts`: layer colours, `teaRowColor`, `sunLight`. `lights.ts`: window schedules, the city glow alpha.
+- Tests and tools
+  - `tests/unit/sky-*.test.ts`: arc, plane, landscape, horizon, contrast, render, gradient (incl. the first-paint script).
+  - `tests/e2e/sky.spec.ts`, `sky-backing.spec.ts` (the pixel gate), `sky-nowebgl.spec.ts`, `pixels.ts`.
+  - `scripts/check-bundle.ts` (the budgets), `scripts/shots-sky.ts`, `scripts/probe/` (review shots and probes).
+
+## v5.1 resume (2026-11-26)
+
+Branch `fix/sky-v5.1`, off `main` @ 3cb5d0d (pulled: already up to date with `origin/main`). Nothing pushed, nothing deployed.
+
+### Step 0: why the earlier work wasn't showing
+
+The v5 tasks were never done. `git log --all --grep='fix(sky)'` finds only `384bbd4 fix(sky): column scrim band (D2)` (an older fix); no commit on any branch, no stash (`git stash list` is empty), no other worktree mentions T1–T10. The three dangling commits `git fsck` reports are unrelated: an old weather-test fixup (25 Nov 08:27), the pre-amend copy of `73a0b81` (a landed commit) and a September stash. There is no `.shots/v5*` folder either, so the earlier run left no evidence. localhost:3000 showed the old behaviour because that is what `main` does.
+
+The dev server on :3000 (started 03:37, from this checkout) was stopped by port, `.next` was deleted and `pnpm dev` restarted, as instructed. Evidence shots come from a second `pnpm dev` on :3005 with `WEATHER_MOCK=1 CHAT_MOCK=1` (dist dir `.scratch/next-dev`, git-ignored), so no screenshot run calls Open-Meteo. Next adds that dist dir's types to `tsconfig.json` on start; that edit is kept out of every commit.
+
+Baseline before any change: typecheck and lint clean; vitest 232 passed, 2 skipped. Shots in `.shots/v5.1/baseline/` confirm each reported problem: at 375×812 the `h1` starts at y = 271.5, the stage scene is 150px, the status line is `white-space: normal`; at 1440×900 the footer (viewport y 815–900) sits on the 162px landscape band (y 738–900); on the phone the closer ends at y 415, the closing scene runs 463–663 and the footer starts at 727.
+
+### Task log
+
+One line per "Done when" item. PASS / FAIL are from the code and a fresh screenshot; nothing is carried over from an earlier run.
+
+#### T1 · status line never wraps on mobile
+
+- PASS: at 375×812 all 7 short lines are one line each. Waited through one full rotation and measured every line as it finished typing: 24px tall, `white-space: nowrap`, none truncated (widest "Reviewing every agent diff." 194.6px of about 305px available). `tests/e2e/site.spec.ts` now re-checks all 7 in the suite.
+- PASS: no gap over 12px between the status line and the one-liner: 4px on every line (the phone reserve above the one-liner went from 48px to 24px).
+- From 640px up the full lines stay, 28px, one line (`t1-1440x900-wide.png`).
+- Shots (11:00 partly cloudy): `.shots/v5.1/T1/t1-375x812-line1.png`, `t1-375x812-line4.png`, `t1-375x812-line6.png`, contact sheet `sheet.png`, `t1-1440x900-wide.png`.
+- How: `statusLinesShort` in `src/content.ts` (schema: one per line, same order); `StatusLine` renders both variants and CSS shows one, so there is nothing to choose after hydration; `.status-line` has a fixed one-line height and `.status-line-text` is nowrap / overflow hidden / ellipsis. DECISIONS #109.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.

@@ -628,9 +628,11 @@ a.card:hover {
 
 /* ── Status line ────────────────────────────────────────────── */
 .status-line {
-  /* Inline-block so its box (and its backing) hugs the text. */
+  /* Inline-block so its box (and its backing) hugs the text. Exactly one line: 24px, 28px from 640px. */
   display: inline-block;
-  min-height: 24px;
+  height: 24px;
+  /* A flex item that may shrink below its text, so a line that doesn't fit truncates instead of wrapping. */
+  min-width: 0;
   transition:
     --halo-a 600ms ease,
     opacity 180ms ease,
@@ -638,7 +640,28 @@ a.card:hover {
 }
 @media (min-width: 640px) {
   .status-line {
-    min-height: 28px;
+    height: 28px;
+  }
+}
+/* The text: never wrapped. A line too long for the column ends in an ellipsis (the short lines never do). */
+.status-line-text {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* With a short set in the content (src/content.ts statusLinesShort) both variants are rendered and CSS shows one:
+   below 640px the short line, from 640px up the full line. */
+.status-line--short {
+  display: none;
+}
+@media (max-width: 639px) {
+  .status-line--short {
+    display: inline-block;
+  }
+  .status-line--wide {
+    display: none;
   }
 }
 .status-line[data-leaving="true"] {

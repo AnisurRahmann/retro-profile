@@ -41,11 +41,12 @@ export default function Home() {
             {profile.name}
           </h1>
           <div className={`mt-3 min-w-0 sm:col-span-1 sm:col-start-2 sm:mt-0 sm:self-start${photo ? " col-span-2" : " max-sm:mt-2"}`}>
-            <p className="mt-0 flex min-h-12 items-start gap-2.5 text-base leading-6 text-on-sky sm:mt-2 sm:min-h-7 sm:text-lg sm:leading-7">
+            {/* One line of status (24px on phones: the short lines never wrap), then the one-liner 4px under it. */}
+            <p className="mt-0 flex min-h-6 items-start gap-2.5 text-base leading-6 text-on-sky sm:mt-2 sm:min-h-7 sm:text-lg sm:leading-7">
               <span className="flex h-6 items-center sm:h-7">
                 <Waveform />
               </span>
-              <StatusLine lines={profile.statusLines} />
+              <StatusLine lines={profile.statusLines} short={profile.statusLinesShort} />
             </p>
             <p className="mt-1 w-fit text-sm text-on-sky" data-on-sky="one-liner">
               {profile.oneLiner}

@@ -59,6 +59,75 @@ test.describe("status line", () => {
     expect(animation).toBe("none");
     await context.close();
   });
+
+  test("from 640px up it keeps the full lines, on one fixed line", async ({ page }) => {
+    await page.goto("/");
+    const wide = page.getByTestId("status-line");
+    await expect(wide).toBeVisible();
+    await expect(page.getByTestId("status-line-short")).toBeHidden();
+    const m = await wide.evaluate((el) => {
+      const t = el.querySelector(".status-line-text")!;
+      const cs = getComputedStyle(t);
+      return {
+        h: el.getBoundingClientRect().height,
+        css: [cs.whiteSpace, cs.overflow, cs.textOverflow],
+      };
+    });
+    expect(m.h).toBe(28);
+    expect(m.css).toEqual(["nowrap", "hidden", "ellipsis"]);
+  });
+
+  test("on a phone every line is the short one, on one line, with at most 12px before the one-liner", async ({
+    browser,
+  }) => {
+    test.setTimeout(60_000);
+    const context = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 2 });
+    const page = await context.newPage();
+    await page.goto("/?sky=2026-12-15T11:00&wx=clear");
+    const short = page.getByTestId("status-line-short");
+    await expect(short).toBeVisible();
+    await expect(page.getByTestId("status-line")).toBeHidden();
+    // Wait through the rotation: each line is measured once its typing has finished (no hidden remainder left).
+    const measured = new Map<string, { h: number; gap: number; clipped: boolean; css: string[] }>();
+    const until = Date.now() + 45_000;
+    while (Date.now() < until && measured.size < 7) {
+      const m = await page.evaluate(() => {
+        const el = document.querySelector('[data-testid="status-line-short"]')!;
+        const t = el.querySelector(".status-line-text")!;
+        const cs = getComputedStyle(t);
+        return {
+          text: t.firstChild?.textContent ?? "",
+          typed: !t.querySelector(".invisible"),
+          h: el.getBoundingClientRect().height,
+          gap:
+            document.querySelector('[data-on-sky="one-liner"]')!.getBoundingClientRect().top -
+            el.getBoundingClientRect().bottom,
+          clipped: t.scrollWidth > t.clientWidth,
+          css: [cs.whiteSpace, cs.overflow, cs.textOverflow],
+        };
+      });
+      if (m.typed && m.text && !measured.has(m.text))
+        measured.set(m.text, { h: m.h, gap: m.gap, clipped: m.clipped, css: m.css });
+      await page.waitForTimeout(100);
+    }
+    await context.close();
+    expect([...measured.keys()]).toEqual([
+      "Building voice agents.",
+      "Shipping Callback AI.",
+      "Logging sets by voice.",
+      "Reviewing every agent diff.",
+      "Routing to Tier 1 models.",
+      "Deterministic checks first.",
+      "Between sets.",
+    ]);
+    for (const [text, m] of measured) {
+      expect(m.h, text).toBe(24);
+      expect(m.gap, text).toBeGreaterThanOrEqual(0);
+      expect(m.gap, text).toBeLessThanOrEqual(12);
+      expect(m.clipped, text).toBe(false);
+      expect(m.css, text).toEqual(["nowrap", "hidden", "ellipsis"]);
+    }
+  });
 });
 
 test("case study links into the chat with a prefilled question", async ({ page }) => {

@@ -35,6 +35,16 @@ const raw = {
       "Writing deterministic checks before LLM judges.",
       "Between sets.",
     ],
+    // Phones (below 640px): the same lines, same order, short enough to fit on one line.
+    statusLinesShort: [
+      "Building voice agents.",
+      "Shipping Callback AI.",
+      "Logging sets by voice.",
+      "Reviewing every agent diff.",
+      "Routing to Tier 1 models.",
+      "Deterministic checks first.",
+      "Between sets.",
+    ],
   },
 
   links: {

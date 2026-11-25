@@ -8,17 +8,25 @@ const id = z.string().regex(/^[a-z0-9-]+$/, "ids are kebab-case");
 const text = z.string().min(1);
 const url = z.string().refine((v) => isPlaceholder(v) || /^https:\/\//.test(v), "https url or [[placeholder]]");
 
-export const profileSchema = z.object({
-  name: text,
-  legalName: text,
-  title: text,
-  oneLiner: text,
-  summary: text,
-  location: text,
-  credentials: text,
-  portrait: z.string().startsWith("/"),
-  statusLines: z.array(text).min(1),
-});
+export const profileSchema = z
+  .object({
+    name: text,
+    legalName: text,
+    title: text,
+    oneLiner: text,
+    summary: text,
+    location: text,
+    credentials: text,
+    portrait: z.string().startsWith("/"),
+    statusLines: z.array(text).min(1),
+    /** Below 640px the status line shows these instead: one per status line, in the same order, each short enough
+     * to fit on one line. */
+    statusLinesShort: z.array(text).min(1),
+  })
+  .refine((p) => p.statusLinesShort.length === p.statusLines.length, {
+    message: "statusLinesShort has one line per status line, in the same order",
+    path: ["statusLinesShort"],
+  });
 
 export const linksSchema = z.object({
   github: url,
