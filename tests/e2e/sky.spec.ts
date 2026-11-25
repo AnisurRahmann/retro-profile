@@ -458,6 +458,39 @@ for (const size of [
   });
 }
 
+for (const size of [
+  { width: 375, height: 812 },
+  { width: 1440, height: 900 },
+]) {
+  // v5.1 T5: the arrival at the bottom flies the plane at both sizes, and coming back flies it once more.
+  test(`T5 at ${size.width}: the bottom of the page flies the plane, and so does coming back to it`, async ({
+    browser,
+  }) => {
+    test.setTimeout(60_000);
+    const ctx = await browser.newContext({
+      viewport: size,
+      deviceScaleFactor: size.width < 640 ? 2 : 1,
+    });
+    const page = await ctx.newPage();
+    await page.goto("/?sky=2026-11-26T03:30&wx=clear");
+    await page.waitForFunction(
+      () => (window.__sky?.frames ?? 0) >= 1 && !!window.__sky?.plane,
+      null,
+      { timeout: 8000 },
+    );
+    expect((await sky(page))!.plane!.flights).toBe(0);
+    await bottom(page);
+    await page.waitForTimeout(5000);
+    const first = (await sky(page))!.plane!.flights;
+    expect(first).toBeGreaterThanOrEqual(1);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await bottom(page);
+    await page.waitForTimeout(5000);
+    expect((await sky(page))!.plane!.flights).toBe(first + 1);
+    await ctx.close();
+  });
+}
+
 test("Book 30 min (hover or tap) flies a parked plane once, only with the airport on screen", async ({
   page,
 }) => {

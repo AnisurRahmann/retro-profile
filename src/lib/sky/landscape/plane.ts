@@ -31,8 +31,8 @@ export const FADE_IN_S = 0.6;
 
 /** Nose (x = −20.2) to tail (x = 21.4), units. */
 export const PLANE_LEN = 41.6;
-/** Plane length on screen, px: 70 on phones, 90 above. */
-export const planePx = (vw: number) => (vw < 640 ? 70 : 90);
+/** Plane length on screen, px: 90 on phones, 100 above (v5.1 T5: it was 70 and 90). */
+export const planePx = (vw: number) => (vw < 640 ? 90 : 100);
 
 /** Fuselage, fin, stabiliser, wing root and engine nacelle: one silhouette. */
 export const PLANE_BODY =
@@ -50,6 +50,7 @@ export const PLANE_BODY =
 export const PLANE_GEAR =
   "M-0.3 -2.2h0.6v1.75h-0.6Z M0 -0.45m-0.45 0a0.45 0.45 0 1 0 0.9 0a0.45 0.45 0 1 0 -0.9 0Z M-16.2 -2.2h0.4v1.8h-0.4Z M-16 -0.4m-0.4 0a0.4 0.4 0 1 0 0.8 0a0.4 0.4 0 1 0 -0.8 0Z";
 /** Light positions (local units): the red beacon on top of the fuselage, a wingtip strobe, the landing light. */
+// (Documented in life.ts drawPlane: the beacon flashes at 1 Hz, the strobe twice every 1.2 s, from sunset to sunrise.)
 export const PLANE_LIGHTS = {
   beacon: [-1, -6.9],
   strobe: [3.5, -2.6],
@@ -166,10 +167,27 @@ export function gateAt(t: number, t0: number): { state: PlaneState; alpha: numbe
   return { state: "parked", alpha: clamp01(back / FADE_IN_S) };
 }
 
+/** The share of a landmark's width (screen x0 … x1) that is inside the viewport, 0 … 1. */
+export function visibleShare(x0: number, x1: number, vw: number): number {
+  return x1 <= x0 ? 0 : Math.min(1, Math.max(0, (Math.min(x1, vw) - Math.max(x0, 0)) / (x1 - x0)));
+}
+
+/** The fixed band's arrival fires this close to the bottom of the page or closer, px. */
+export const ARRIVAL_FROM_BOTTOM = 400;
+
+/**
+ * The arrival at the airport in the fixed band (≥ 1100px; v5.1 T5): near once at least half the airport's width is
+ * on screen and the page is scrolled within ARRIVAL_FROM_BOTTOM px of its bottom; away once under a tenth of it is
+ * visible. It replaced "the airport within 60px of its gutter target" (re-armed beyond 240px).
+ */
+export function bandArrival(share: number, fromBottom: number): { near: boolean; away: boolean } {
+  return { near: share >= 0.5 && fromBottom <= ARRIVAL_FROM_BOTTOM, away: share < 0.1 };
+}
+
 /**
  * Arrival trigger with hysteresis: fires once when `near` turns true (and the plane is ready), then only re-arms
- * after `away` has been true. Desktop: near = the airport within 60px of its gutter target, away = beyond 240px.
- * Scene mode: near = the closing scene ≥ 60% visible, away = < 15% visible.
+ * after `away` has been true. The fixed band: bandArrival. Scene mode: near = the closing scene ≥ 60% visible,
+ * away = < 15% visible.
  */
 export function createArrival() {
   let armed = true;

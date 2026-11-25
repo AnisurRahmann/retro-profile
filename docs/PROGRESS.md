@@ -94,6 +94,15 @@ At 03:30 clear, 375×812 and 1440×900:
 - Shots: `.shots/v5.1/T4/t4-after-0330-375x812-top.png`, `t4-after-0330-1440x900-top.png`; before/after sheets `sheet-before.png` (before), `sheet-after.png`, `sheet-desktop-before-after.png`.
 - How: `teaRowColor` blends from the day colour to "hill + 0.03 L, hill chroma" with the light (`teaRowNight`); `moonRimAlpha` (0.3 × illumination while the moon is up, fading with daylight and cloud) and the rim colour `MOON_RIM` #C9D4E8 composited at that alpha over each layer; the far hills join the moon rim (they never take the golden-hour rim). DECISIONS #112.
 
+#### T5 · the plane at night, and the desktop take-off
+
+- PASS: the e2e test passes at both sizes. New test `T5 at 375` and `T5 at 1440` (`tests/e2e/sky.spec.ts`): scroll to the bottom, wait 5 s, flights ≥ 1; back to the top and down again, wait 5 s, flights up by exactly 1. Result on the test build: **375×812: 1 then 2; 1440×900: 1 then 2.** The other plane tests pass with it (3 visits at each size, "Book 30 min", scene mode, reduced motion): 7 passed.
+- PASS: at 03:30 clear the plane's lights are clearly visible mid-climb, in one frame on both sizes: `.shots/v5.1/T5/night-0330-375x812-climb-both.png`, `night-0330-1440x900-climb-both.png` (sheet `sheet-climb-both.png`). A red beacon with a soft glow on the fuselage, a white strobe with a larger glow, and a warm rim along the top of the shape.
+- Mid-roll and mid-climb at night, both sizes: `night-0330-{375x812,1440x900}-{parked,roll,climb}-beacon.png` and `-strobe.png` (the beacon is on 0.15 s per second and the strobe 0.12 s per 1.2 s, so most frames show one of them; a burst of 30 frames found each). Sheets `sheet-phone.png`, `sheet-desktop.png`, `sheet-desktop-zoom.png`. The landing light lies on the runway ahead of the nose in the roll.
+- By day (11:00 partly cloudy) there are no lights: `day-1100-{375x812,1440x900}-{roll,climb}-strobe.png`, zero red and zero added bright pixels in a 170-frame burst at each size.
+- About "the desktop take-off doesn't fire": not reproduced. The old trigger's own e2e test passed at 1440×900 before this change. It is replaced as the brief asks: the plane now takes off once at least half the airport is on screen and the page is within 400px of its bottom, re-armed under a tenth visible. On 1440×900 that is about 300px of scroll earlier than before (at about y 924 of 1321), so the take-off happens while the airport is coming into view rather than only in the last 110px. The phone trigger is unchanged (closing scene 60% visible, re-armed under 15%) and re-fires after leaving and coming back (the 3-visit test and the new test).
+- How: the lights are drawn in every state from sunset to sunrise (`LifeFrame.lamps`, fading in over 0.5° to −1.5°), 3px dots with 10px and 14px glows in screen px whatever the plane's scale; the rim is the city glow at 0.5; `planePx` 90 / 100; `bandArrival` and `visibleShare` in `plane.ts` carry the new trigger. DECISIONS #113.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.

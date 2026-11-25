@@ -43,7 +43,14 @@ import {
 } from "@/lib/sky/landscape/anchors";
 import { buildClosingScene, buildStageScene, buildWorld } from "@/lib/sky/landscape/world";
 import { sunLight, WASH_MAX } from "@/lib/sky/landscape/colors";
-import { createArrival, FADE_IN_S, planePx, RESPAWN_S } from "@/lib/sky/landscape/plane";
+import {
+  bandArrival,
+  createArrival,
+  FADE_IN_S,
+  planePx,
+  RESPAWN_S,
+  visibleShare,
+} from "@/lib/sky/landscape/plane";
 import { SCENE_HORIZON } from "@/lib/sky/arc";
 import {
   awayY,
@@ -192,11 +199,10 @@ function start(
   let backing: BackingRunner | null = null;
   let lastLight = -Infinity;
   let takeoffUntil = -Infinity;
-  // The plane takes off on every arrival at the airport (src/lib/sky/landscape/plane.ts createArrival): desktop when
-  // the airport is within 60px of its gutter target (re-armed beyond 240px), scene mode when the closing scene is
-  // ≥ 60% visible (re-armed under 15%).
+  // The plane takes off on every arrival at the airport (src/lib/sky/landscape/plane.ts createArrival): in the
+  // fixed band once at least half the airport is on screen and the page is within 400px of its bottom (re-armed
+  // under a tenth of it visible; v5.1 T5), in scene mode when the closing scene is ≥ 60% visible (re-armed under 15%).
   const arrival = createArrival();
-  let airportTarget: number | null = null;
   let closingRatio = 0;
   const closingIO = new IntersectionObserver(
     (es) => {
@@ -624,11 +630,11 @@ function start(
           if (b.id === "closing") {
             near = closingRatio >= 0.6;
             away = closingRatio < 0.15;
-          } else if (airportTarget !== null) {
+          } else {
+            // The fixed band: how much of the airport's width is on screen, and how far the page is from its bottom.
             const m = world.marks.find((k) => k.id === "airport");
-            const d = m ? Math.abs(((m.x0 + m.x1) / 2) * world.s - o3 - airportTarget) : Infinity;
-            near = d <= 60;
-            away = d > 240;
+            const seen = m ? visibleShare(m.x0 * world.s - o3, m.x1 * world.s - o3, view.vw) : 0;
+            ({ near, away } = bandArrival(seen, view.docH - view.vh - view.y));
           }
           if (arrival.update(near, away, life.ready(t) && b.frame !== null)) startTakeoff(t, b, o3);
         }
@@ -854,7 +860,6 @@ function start(
           Math.max(0, view.docH - view.vh),
           mode === "scene" ? "centre" : mode,
         );
-        airportTarget = anchors.find((a) => a.id === "airport")?.target ?? null;
         b.land.resize(
           view.vw,
           H,
