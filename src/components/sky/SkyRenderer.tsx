@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { brand } from "@/lib/brand";
 import { onSky } from "@/lib/signal-bus";
-import { hexToRgb, oklabToRgb, toLinear, type Lab } from "@/lib/sky/color";
+import { hexToRgb, oklabToRgb, rgbToOklab, toGamma, toLinear, type Lab } from "@/lib/sky/color";
 import { dayness } from "@/lib/sky/gradient";
 import { skyModel, type SkyModel } from "@/lib/sky/model";
 import { effectiveWeather, SKY_DEBUG, skyStore, skyTime } from "@/lib/sky/store";
@@ -14,7 +14,10 @@ import { geomNow, notifyGeometry, onViewGeometry, onViewScroll, runtime, scrimTo
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createSun, drawArc, type SunState } from "./bodies";
 import { CLOUD_REFRESH_S, createCloudField } from "./cloud-field";
+import { createLandscape, type Landscape } from "./landscape";
 import { createParticles, mulberry32, type Particles, type ParticleState } from "./particles";
+import { solveAnchors } from "@/lib/sky/landscape/anchors";
+import { buildWorld } from "@/lib/sky/landscape/world";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
 
@@ -91,7 +94,7 @@ const smooth01 = (e0: number, e1: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
-function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoWebGL: () => void): () => void {
+function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, landCanvas: HTMLCanvasElement, onNoWebGL: () => void): () => void {
   let dead = false;
   const isDead = () => dead;
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
@@ -105,6 +108,8 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
 
   let atm: Atmosphere | null = null;
   let pts: Particles | null = null;
+  let land: Landscape | null = null;
+  let lastLight = -Infinity;
   const sunR = () => (view.vw < COLUMN_BREAK ? 13 : 16);
   const sunLayer = createSun(() => Math.min(window.devicePixelRatio || 1, 2));
   const clouds = createCloudField();
@@ -268,11 +273,22 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
         w2.__sky.geom = geom;
       }
     }
+    if (land) {
+      const scrubbing = skyStore.get().scrubbing;
+      if (still || t - lastLight >= (scrubbing ? 1 / 30 : 2)) {
+        const hz = rgbToOklab(v2("uHorizon").map((c) => toGamma(Math.min(1, Math.max(0, c)))) as [number, number, number]);
+        land.setLighting({ horizon: hz, rim: n("uGlow") * smooth01(-2, 1, n("sunAlt")), sunX: v2("sunPos")[0]! * view.vw });
+        lastLight = t;
+      }
+      // Reduced motion: the landscape is static (no parallax).
+      land.draw(reduce ? 0 : view.y, () => {});
+    }
     frames++;
     if (TEST && w2.__sky) w2.__sky.frames = frames;
     if (frames === 1) {
       atmCanvas.dataset.ready = "";
       ptsCanvas.dataset.ready = "";
+      landCanvas.dataset.ready = "";
     }
     return lightning > 0;
   };
@@ -285,7 +301,7 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
     const raining = model.rainDensity > 0;
     const scrolling = t - lastScroll < 0.25;
     const busy = raining || (pts?.meteorActive(t) ?? false) || (strikeAt >= 0 && t - strikeAt < 0.3) || forceBolt || s.scrubbing || scrolling;
-    const cap = coarse ? (raining ? 30 : 20) : busy ? 60 : 24;
+    const cap = coarse ? (raining || scrolling || s.scrubbing ? 30 : 20) : busy ? 60 : 24;
     if (TEST && w2.__sky) w2.__sky.cap = cap;
     if (cap < 60 && dt < 1 / cap - 0.004) return;
     approach(cur, target, 1 - Math.exp(-dt / (s.scrubbing || s.preview !== null ? 0.12 : 1)));
@@ -344,6 +360,7 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
   let stillTimer = 0;
   const unsubGeom = onViewGeometry(() => {
     recompute();
+    relayoutLand();
     if (reduce) still();
   });
   const unsubScroll = onViewScroll(() => {
@@ -379,9 +396,16 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
   };
 
   let resizeTimer = 0;
+  const relayoutLand = () => {
+    if (!land) return;
+    const H = landCanvas.clientHeight || 1;
+    land.resize(view.vw, H, buildWorld(solveAnchors(view.sections, view.vw, view.vh), view.vw, view.vh, view.docH, H));
+    lastLight = -Infinity;
+  };
   const resize = () => {
     atm?.resize();
     pts?.resize(dayOfYear(skyTime()));
+    relayoutLand();
   };
   const ro = new ResizeObserver(() => {
     window.clearTimeout(resizeTimer);
@@ -395,12 +419,14 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
     const tx = readToken("--text");
     text = `rgb(${tx.map((c) => Math.round(c * 255)).join(",")})`;
     pts = createParticles(ptsCanvas, tx);
+    land = createLandscape(landCanvas);
     atm = await createAtmosphere(atmCanvas, SKY_DEBUG, isDead);
     if (dead) return;
     if (!atm) onNoWebGL();
     if (TEST) w2.__sky = { state: model.astro.state, elevation: model.astro.elevation, scrimA: w2.__sky?.scrimA ?? 0, fps: 0, condition: model.condition, webgl: !!atm };
     resize();
     ro.observe(ptsCanvas);
+    ro.observe(landCanvas);
     motion.addEventListener("change", applyMotion);
     document.addEventListener("visibilitychange", onVisibility);
     atmCanvas.addEventListener("webglcontextlost", onLost);
@@ -434,17 +460,20 @@ function start(atmCanvas: HTMLCanvasElement, ptsCanvas: HTMLCanvasElement, onNoW
 export default function SkyRenderer() {
   const atm = useRef<HTMLCanvasElement>(null);
   const pts = useRef<HTMLCanvasElement>(null);
+  const land = useRef<HTMLCanvasElement>(null);
   const [webgl, setWebgl] = useState(true);
 
   useEffect(() => {
     if (!atm.current || !pts.current) return;
-    return start(atm.current, pts.current, () => setWebgl(false));
+    if (!land.current) return;
+    return start(atm.current, pts.current, land.current, () => setWebgl(false));
   }, []);
 
   return (
     <>
       {webgl ? <canvas ref={atm} aria-hidden="true" className="sky-layer sky-atmosphere" data-sky-atmosphere="" /> : null}
       <canvas ref={pts} aria-hidden="true" className="sky-layer sky-particles" data-sky-particles="" />
+      <canvas ref={land} aria-hidden="true" className="sky-landscape" data-sky-landscape="" />
     </>
   );
 }

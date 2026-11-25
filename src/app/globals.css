@@ -153,8 +153,28 @@ html[data-sky-scrub] .sky-gradient {
   transition: opacity 600ms ease;
 }
 .sky-atmosphere[data-ready],
-.sky-particles[data-ready] {
+.sky-particles[data-ready],
+.sky-landscape[data-ready] {
   opacity: 1;
+}
+/* The landscape band: fixed to the bottom, 18vh desktop / 14svh mobile, 110–200px (src/components/sky/landscape.ts
+   mirrors it). Above the particles, below the scrim. */
+.sky-landscape {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  z-index: -2;
+  width: 100%;
+  height: clamp(110px, 14vh, 200px);
+  height: clamp(110px, 14svh, 200px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+@media (min-width: 808px) {
+  .sky-landscape {
+    height: clamp(110px, 18vh, 200px);
+  }
 }
 
 /* Column scrim: --ink behind the 768px column, its alpha solved per height (stops at 0/25/50/75/100% of the
