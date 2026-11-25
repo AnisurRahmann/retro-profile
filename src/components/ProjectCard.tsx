@@ -1,9 +1,8 @@
 import Link from "next/link";
-import type { BenchItem, Project } from "@/content.schema";
-import { projectHref, ui } from "@/site";
+import { projectHref, type CardProject, type StatusLabels } from "@/lib/project";
 import { Tile } from "./Tile";
 
-function StatusChip({ status }: { status: BenchItem["status"] }) {
+function StatusChip({ status, labels }: { status: NonNullable<CardProject["status"]>; labels: StatusLabels }) {
   const live = status === "in-build";
   return (
     <span className="ml-auto flex flex-none items-center gap-1.5 self-center font-mono text-xs whitespace-nowrap text-graphite">
@@ -12,12 +11,13 @@ function StatusChip({ status }: { status: BenchItem["status"] }) {
         className="inline-block size-1.5 rounded-full"
         style={{ background: live ? "var(--signal)" : "var(--graphite)" }}
       />
-      {live ? ui.home.statusInBuild : ui.home.statusBuilt}
+      {live ? labels.inBuild : labels.built}
     </span>
   );
 }
 
-export function ProjectCard({ project }: { project: Project | BenchItem }) {
+/** Pure card: usable from server pages and the client chat. */
+export function ProjectCard({ project, labels }: { project: CardProject; labels: StatusLabels }) {
   const target = projectHref(project);
   const body = (
     <>
@@ -26,7 +26,7 @@ export function ProjectCard({ project }: { project: Project | BenchItem }) {
         <span className="block text-sm leading-5 font-medium text-text">{project.title}</span>
         <span className="block text-sm leading-5 text-graphite">{project.subtitle}</span>
       </span>
-      {"status" in project ? <StatusChip status={project.status} /> : null}
+      {project.status ? <StatusChip status={project.status} labels={labels} /> : null}
     </>
   );
 

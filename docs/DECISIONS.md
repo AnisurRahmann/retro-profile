@@ -36,3 +36,7 @@ Format: decision · rejected alternative · why.
 24. **`server-only` package added** so server modules (keys, Supabase) fail the build if imported into client code. Aliased to an empty module in vitest.
 25. **Intro honeypot answers 200** so bots get no signal; rejected silently.
 26. **Retention via pg_cron** (`purge_chat_logs()` daily at 03:17 UTC): messages and sessions after 90 days, rate windows after 2 days. Intros are kept (they are leads), as the privacy page says.
+27. **`ProjectCard` is pure (labels passed in, no `site.ts` import)** so `/chat` reuses the exact home-page card without bundling the content file into client JS. The chat page passes `ui.chat` copy and the link allowlist as props.
+28. **Chat history sent to the API is rebuilt from UI state:** failed turns are dropped with their question so roles always alternate; a tool-only reply is sent as `[showed book call]` so the model knows what it did.
+29. **`?q=` is read on the client after hydration** (the page must stay static). It only prefills; it never sends.
+30. **Focus ring on the chat textarea is the global amber `:focus-visible` ring** rather than a softer border change: accessibility wins over the calmer look (logged per the brief's rule).

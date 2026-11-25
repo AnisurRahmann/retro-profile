@@ -66,11 +66,7 @@ export const liftHref: string | undefined = shipped.find((p) => p.id === "lift")
 /** Every project-like card, keyed by id (used by the agent's show_project tool). */
 export const allProjects: (Project | BenchItem)[] = [...shipped, ...building];
 
-export function projectHref(p: Project): { href: string; external: boolean } | null {
-  if (p.caseStudy) return { href: `/work/${p.caseStudy}`, external: false };
-  if (p.href) return { href: p.href, external: true };
-  return null;
-}
+export { projectHref } from "./lib/project";
 
 /** Fill {name} slots in a ui template. */
 export function fill(template: string, values: Record<string, string | number>): string {

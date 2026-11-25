@@ -4,6 +4,7 @@ import { ProjectCard } from "./ProjectCard";
 import { ShowMore } from "./ShowMore";
 
 const VISIBLE = 4;
+const labels = { inBuild: ui.home.statusInBuild, built: ui.home.statusBuilt };
 
 export function CardSection({
   id,
@@ -24,7 +25,7 @@ export function CardSection({
       </h2>
       <div className="grid gap-2.5 sm:grid-cols-2">
         {visible.map((p) => (
-          <ProjectCard key={p.id} project={p} />
+          <ProjectCard key={p.id} project={p} labels={labels} />
         ))}
       </div>
       {rest.length > 0 ? (
@@ -33,7 +34,7 @@ export function CardSection({
           moreLabel={fill(ui.home.showMore, { n: rest.length })}
           lessLabel={ui.home.showLess}
           hidden={rest.map((p) => (
-            <ProjectCard key={p.id} project={p} />
+            <ProjectCard key={p.id} project={p} labels={labels} />
           ))}
         />
       ) : null}
