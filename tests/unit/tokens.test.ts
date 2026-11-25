@@ -32,6 +32,12 @@ describe("design tokens (WCAG)", () => {
     expect(contrast(token("text"), tile)).toBeGreaterThanOrEqual(4.5);
     expect(lum(tile)).toBeLessThan(lum(token("graphite")));
   });
+  it("keeps the hex mirror in src/lib/brand.ts in sync with the CSS tokens", async () => {
+    const { brand } = await import("@/lib/brand");
+    const map: Record<string, string> = { ink: "ink", surface: "surface", surface2: "surface-2", hairline: "hairline", text: "text", graphite: "graphite", signal: "signal" };
+    for (const [k, v] of Object.entries(brand)) expect(v.toLowerCase(), k).toBe(token(map[k]!).toLowerCase());
+    expect(fs.readFileSync("src/app/icon.svg", "utf8")).toContain(token("ink"));
+  });
   it("has no hardcoded hex colours outside globals.css", () => {
     const offenders: string[] = [];
     const walk = (dir: string) => {
@@ -40,7 +46,7 @@ describe("design tokens (WCAG)", () => {
         if (e.isDirectory()) walk(p);
         else if (/\.(tsx?|css)$/.test(e.name) && !p.endsWith("globals.css") && !p.includes("/og/") && !p.includes("opengraph") && !p.endsWith("brand.ts")) {
           const src = fs.readFileSync(p, "utf8");
-          if (/#[0-9a-fA-F]{6}\b/.test(src.replace(/themeColor:\s*"#0B1220"/, ""))) offenders.push(p);
+          if (/#[0-9a-fA-F]{6}\b/.test(src)) offenders.push(p);
         }
       }
     };

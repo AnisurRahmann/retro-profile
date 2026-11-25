@@ -14,3 +14,5 @@ Each item has the default currently shipped. Values shaped like `[[...]]` in `sr
 | 8 | Nowash Jawad excerpt + post URL | `receipts` id `r-nowash` | Excluded until both are filled. |
 | 9 | `/hire`, `/gym`, blog posts and `fb-*` pages from the old CRA site | — | `/gym` → 301 to `/lifts`. Old blogs, `/hire` and `fb-*` pages are not carried over (not in the brief). Decide before deploy whether any need redirects or a home. |
 | 10 | `resume.pdf` from the old site | — | Not carried over. Recover with `git show main:public/resume.pdf > public/resume.pdf` if wanted. |
+| 11 | First-load JS target (100 kB gzip) | — | Missed: ~141 kB, of which ~131 kB is the Next/React runtime. Accept, or decide whether the brief's budget should be revised to "framework + ≤ 15 kB site code". |
+| 12 | Live evals | `pnpm eval:live` | Not run (no real API calls from the build session). Run follow-up prompt 2 with a key in `.env.local`. |

@@ -4,11 +4,26 @@ import { Portrait } from "@/components/Portrait";
 import { ReceiptCard } from "@/components/ReceiptCard";
 import { StatusLine } from "@/components/StatusLine";
 import { Waveform } from "@/components/Waveform";
-import { building, profile, receipts, shipped, ui } from "@/site";
+import { building, links, profile, receipts, shipped, ui } from "@/site";
+
+const personJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: profile.name,
+  alternateName: profile.legalName,
+  jobTitle: profile.title,
+  description: profile.oneLiner,
+  url: links.site,
+  sameAs: [links.github, links.linkedin],
+};
 
 export default function Home() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd).replace(/</g, "\\u003c") }}
+      />
       <section className="section flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
         <Portrait size={88} priority />
         <div className="min-w-0">

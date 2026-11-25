@@ -19,7 +19,7 @@ const shots: Shot[] = [
     name: "home-expanded",
     path: "/",
     prepare: async (page) => {
-      for (const b of await page.getByRole("button", { name: /^Show \d+ more$/ }).all()) await b.click();
+      for (const b of await page.locator("button[aria-controls]").all()) await b.click();
       await page.waitForTimeout(300);
     },
   },

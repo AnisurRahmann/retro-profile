@@ -17,7 +17,9 @@
     "shots": "tsx scripts/shots.ts",
     "e2e": "playwright test",
     "eval:live": "tsx evals/run.ts --live",
-    "eval:mock": "tsx evals/run.ts"
+    "eval:mock": "tsx evals/run.ts",
+    "postbuild": "tsx scripts/check-build-output.ts",
+    "test:build": "pnpm build && vitest run tests/build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.14.0",
