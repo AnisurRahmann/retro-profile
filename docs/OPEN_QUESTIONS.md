@@ -16,3 +16,4 @@ Each item has the default currently shipped. Values shaped like `[[...]]` in `sr
 | 10 | `resume.pdf` from the old site | — | Not carried over. Recover with `git show main:public/resume.pdf > public/resume.pdf` if wanted. |
 | 11 | First-load JS target (100 kB gzip) | — | Missed: ~141 kB, of which ~131 kB is the Next/React runtime. Accept, or decide whether the brief's budget should be revised to "framework + ≤ 15 kB site code". |
 | 12 | Live evals | `pnpm eval:live` | Not run (no real API calls from the build session). Run follow-up prompt 2 with a key in `.env.local`. |
+| 13 | Open-Meteo commercial status | `src/server/sylhet.ts` | Free tier is non-commercial only. No ads or subscriptions here, but the site promotes paid services ("promotional activities" counts as commercial in their terms). Ask Open-Meteo, or take a commercial plan before launch (DECISIONS #63). |
