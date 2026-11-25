@@ -33,8 +33,9 @@ function paint() {
   // hero and header with a 200px margin for a minute of drift.
   const cloudsIn = runtime.cloudsIn;
   const half = vw < 808 ? vw / 2 : MOON_COLUMN_PX / 2 + SCRIM_FALLOFF_PX;
-  const colClouds = cloudsIn ? Math.max(0, cloudsIn(vw / 2 - half, 0, vw / 2 + half, vh)) : undefined;
-  const profile = scrimProfile({ ...m, clouds: colClouds }, moon, m.moon.y, sunInColumn);
+  // Per height, over the column ± 300px (a minute of drift at the minimum speed is 300px sideways).
+  const cloudsAt = cloudsIn ? (y0: number, y1: number) => Math.max(0, cloudsIn(vw / 2 - half - 300, y0 * vh, vw / 2 + half + 300, y1 * vh)) : undefined;
+  const profile = scrimProfile(m, moon, m.moon.y, sunInColumn, cloudsAt);
   profile.forEach((a, i) => html.style.setProperty(`--scrim-${i}`, String(a)));
   const scrim = Math.max(...profile);
   // Text scrims over the open stage, solved at scroll 0 (document px = viewport px there).

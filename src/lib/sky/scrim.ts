@@ -174,12 +174,20 @@ export const SCRIM_STOPS = [0, 0.25, 0.5, 0.75, 1];
  * of the height up to the neighbouring stops), so linear interpolation between stops never undershoots.
  * The moon only counts near its own height.
  */
-export function scrimProfile(m: ScrimInput, moonInColumn = 0, moonY = 0.5, sun?: Disc | null): number[] {
+export function scrimProfile(
+  m: ScrimInput,
+  moonInColumn = 0,
+  moonY = 0.5,
+  sun?: Disc | null,
+  /** Measured cloud presence between two heights (viewport fractions), when the renderer's field is running. */
+  cloudsAt?: (y0: number, y1: number) => number,
+): number[] {
   const N = 32;
   const need: number[] = [];
   for (let i = 0; i <= N; i++) {
     const y = i / N;
-    need.push(solveScrim(oklabToRgb(brightestSky(m, Math.abs(y - moonY) < 0.08 ? moonInColumn : 0, y, COLUMN_DAMP, sun))));
+    const mi = cloudsAt ? { ...m, clouds: cloudsAt(y - 1.5 / N, y + 1.5 / N) } : m;
+    need.push(solveScrim(oklabToRgb(brightestSky(mi, Math.abs(y - moonY) < 0.08 ? moonInColumn : 0, y, COLUMN_DAMP, sun))));
   }
   return SCRIM_STOPS.map((y, k) => {
     const lo = Math.round((SCRIM_STOPS[k - 1] ?? y) * N);
