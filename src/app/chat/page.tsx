@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getChatAvailability } from "@/agent/availability";
 import { Chat } from "@/components/chat/Chat";
 import { Portrait } from "@/components/Portrait";
 import { allowedLinkHosts, links, ui } from "@/site";
@@ -11,10 +12,14 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: ui.meta.chatTitle, description: ui.meta.chatDescription },
 };
 
-/** Static page. The kill switch is read at build time (redeploy to flip); /api/chat also checks it per request. */
-const enabled = process.env.CHAT_ENABLED !== "false";
+/**
+ * Rendered per request so the page and /api/chat always agree: both call getChatAvailability().
+ * Not enabled → the kill-switch state (book-a-call card + email, no input).
+ */
+export const dynamic = "force-dynamic";
 
 export default function ChatPage() {
+  const { enabled } = getChatAvailability();
   return (
     <main id="main" className="column flex-1">
       <Chat

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { after } from "next/server";
+import { getChatAvailability } from "@/agent/availability";
 import { mockAdapter } from "@/agent/mock";
 import { anthropicAdapter, type ModelAdapter } from "@/agent/model";
 import { encodeEvent, type ChatEvent, type ErrorCode } from "@/agent/protocol";
@@ -17,7 +18,6 @@ export const maxDuration = 60;
 const STATUS: Record<ErrorCode, number> = {
   rate_limited: 429,
   budget: 429,
-  disabled: 503,
   bad_request: 400,
   forbidden: 403,
   unavailable: 503,
@@ -32,15 +32,11 @@ function errorResponse(code: ErrorCode) {
 }
 
 let adapter: ModelAdapter | null = null;
-function getAdapter(): ModelAdapter | null {
-  if (adapter) return adapter;
-  if (env.mock) return (adapter = mockAdapter());
-  if (!env.anthropicKey) return null;
-  return (adapter = anthropicAdapter());
-}
+const getAdapter = (): ModelAdapter => (adapter ??= env.mock ? mockAdapter() : anthropicAdapter());
 
 export async function POST(req: Request) {
-  if (!env.chatEnabled) return errorResponse("disabled");
+  // The ONLY source of "unavailable": the same check the /chat page renders from.
+  if (!getChatAvailability().enabled) return errorResponse("unavailable");
   if (!sameOrigin(req)) return errorResponse("forbidden");
 
   let body: unknown;
@@ -53,7 +49,6 @@ export async function POST(req: Request) {
   if (!parsed.success) return errorResponse("bad_request");
 
   const model = getAdapter();
-  if (!model) return errorResponse("unavailable");
 
   const hash = ipHash(req);
   const limit = await consume(hash, "chat");
@@ -98,9 +93,8 @@ export async function POST(req: Request) {
         emit(stats.stopReason === "refusal" && !stats.text ? { type: "error", code: "upstream" } : { type: "done" });
       } catch (err) {
         if (!upstream.signal.aborted) {
-          const code: ErrorCode = err instanceof Anthropic.RateLimitError ? "unavailable" : "upstream";
-          console.error("chat turn failed", err instanceof Error ? err.name : "unknown");
-          emit({ type: "error", code });
+          console.error("chat turn failed", err instanceof Anthropic.APIError ? `${err.name} ${err.status}` : "unknown");
+          emit({ type: "error", code: "upstream" });
         }
       } finally {
         open = false;

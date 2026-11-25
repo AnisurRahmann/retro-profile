@@ -43,8 +43,7 @@ export async function POST(req: Request) {
   const intro = parsed.data;
 
   const limit = await consume(ipHash(req), "intro");
-  if (limit === "rate_limited") return json(429, { ok: false, code: "rate_limited" });
-  if (limit !== "ok") return json(503, { ok: false, code: "unavailable" });
+  if (limit !== "ok") return json(429, { ok: false, code: "rate_limited" });
 
   const client = db();
   const mail = env.resend;

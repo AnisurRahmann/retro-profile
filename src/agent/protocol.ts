@@ -3,7 +3,8 @@
  */
 import type { ToolEventResult } from "./tools";
 
-export type ErrorCode = "rate_limited" | "budget" | "disabled" | "bad_request" | "forbidden" | "unavailable" | "upstream";
+/** "unavailable" means getChatAvailability() is not enabled; nothing else returns it. */
+export type ErrorCode = "rate_limited" | "budget" | "bad_request" | "forbidden" | "unavailable" | "upstream";
 
 export type ChatEvent =
   | { type: "text"; delta: string }

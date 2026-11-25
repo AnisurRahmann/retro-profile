@@ -71,6 +71,22 @@ function Emitting({ children }: { children: ReactNode }) {
 
 const STREAM_EMIT_MS = 120;
 
+/** Maps an error code to what the visitor sees. Every branch leaves a next action. */
+function ErrorReply({ code, copy, email, calendar }: { code?: ErrorCode; copy: ChatCopy; email: string; calendar: string }) {
+  const text =
+    code === "rate_limited" || code === "budget"
+      ? copy.rateLimited
+      : code === "unavailable"
+        ? copy.disabled.replace("{email}", email)
+        : copy.broken.replace("{email}", email);
+  return (
+    <div className="space-y-3" data-error={code ?? "upstream"}>
+      <p className="text-graphite">{text}</p>
+      <BookCard url={calendar} copy={copy} />
+    </div>
+  );
+}
+
 function SendIcon() {
   return (
     <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -187,7 +203,7 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
           parser.push(decoder.decode(value, { stream: true }));
         }
         parser.end();
-        if (!finished) fail(res.ok ? "upstream" : res.status === 429 ? "rate_limited" : "upstream");
+        if (!finished) fail(res.status === 429 ? "rate_limited" : res.status === 503 ? "unavailable" : "upstream");
       } catch {
         if (controller.signal.aborted) patchLast(() => ({ status: "done" }));
         else fail("upstream");
@@ -343,16 +359,7 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
                     <ToolCard result={t} copy={copy} labels={labels} sessionId={sessionId} context={history} email={email} />
                   </Emitting>
                 ))}
-                {m.status === "error" ? (
-                  m.error === "rate_limited" || m.error === "budget" ? (
-                    <div className="space-y-3">
-                      <p className="text-graphite">{copy.rateLimited}</p>
-                      <BookCard url={calendar} copy={copy} />
-                    </div>
-                  ) : (
-                    <p className="text-graphite">{copy.broken.replace("{email}", email)}</p>
-                  )
-                ) : null}
+                {m.status === "error" ? <ErrorReply code={m.error} copy={copy} email={email} calendar={calendar} /> : null}
               </div>
             </li>
           ),

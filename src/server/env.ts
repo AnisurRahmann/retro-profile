@@ -7,9 +7,6 @@ export const env = {
   get mock() {
     return process.env.CHAT_MOCK === "1";
   },
-  get chatEnabled() {
-    return process.env.CHAT_ENABLED !== "false";
-  },
   get dailyBudget() {
     const n = Number(process.env.CHAT_DAILY_TOKEN_BUDGET ?? 2_000_000);
     return Number.isFinite(n) && n > 0 ? n : 2_000_000;

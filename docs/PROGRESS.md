@@ -137,3 +137,10 @@ SignalField chunk: 3.6 kB gzip (budget 6 kB). It loads via `next/dynamic` after 
 - Pass 1: the contrast guard failed at the ripple peak (4.13:1 for `--graphite`). Column mask 0.35 → 0.25; the guard now passes.
 - Pass 2: no moiré at DPR 1 (integer 22 px pitch). Amber appears only on ripple crests in the gutters (the column mask keeps column ripples under the amber threshold). The click ripple reads as a single quiet ring that fades before the column. Mid-stream chat emits are visible as faint pulses at the avatar. The column stays calm while reading.
 - Full-page shots (`pnpm shots`) show a seam at the first viewport height: Chromium paints fixed layers once in full-page captures. Not a page bug; use the viewport-sized shots for the background.
+
+## Review fixes (2026-11-25, localhost:3000 review)
+
+### 1. `/api/chat` 503 `unavailable`: root cause
+There is no `.env.local` in the repo, so the dev server had no `ANTHROPIC_API_KEY` and no `CHAT_MOCK`. In `src/app/api/chat/route.ts`, `getAdapter()` returned null and the route returned 503 `unavailable` on line 56, before rate limiting. Adding only the key would have hit the second wall: `consume()` in `src/server/limits.ts` returned `unavailable` because Supabase wasn't configured outside mock mode. The page only checked `CHAT_ENABLED` (unset → enabled), so it rendered a working input.
+Fixed with `getChatAvailability()`, shared by the page and the route (DECISIONS #49–53). With the current env, `/chat` now renders the kill-switch state, and `pnpm dev` logs at startup: `[chat] unavailable (missing_env): ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RATE_SALT`.
+To run the real agent locally, `.env.local` needs `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `RATE_SALT` (≥ 16 chars), with the migrations applied to that Supabase project. Optional: `CHAT_MODEL`, `CHAT_DAILY_TOKEN_BUDGET`, plus `RESEND_API_KEY`, `INTRO_NOTIFY_EMAIL`, `INTRO_FROM_EMAIL` for intros. To try the UI without any services: `CHAT_MOCK=1 pnpm dev`.

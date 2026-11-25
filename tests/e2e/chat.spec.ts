@@ -73,3 +73,24 @@ test("API rejects cross-origin posts and malformed bodies", async ({ request, ba
   });
   expect(malformed.status()).toBe(400);
 });
+
+test("an unavailable reply shows the kill-switch state in place, with a next action", async ({ page }) => {
+  await page.route("**/api/chat", (route) =>
+    route.fulfill({ status: 503, contentType: "application/x-ndjson", body: '{"type":"error","code":"unavailable"}\n' }),
+  );
+  await page.goto("/chat");
+  await page.getByRole("button", { name: "Let's book a call" }).click();
+  const reply = page.locator('[data-error="unavailable"]');
+  await expect(reply).toContainText("resting right now");
+  await expect(reply.getByRole("link", { name: "Book 30 min" })).toBeVisible();
+  await expect(page.getByText("Something broke")).toHaveCount(0);
+});
+
+test("a rate-limited reply offers the call instead", async ({ page }) => {
+  await page.route("**/api/chat", (route) =>
+    route.fulfill({ status: 429, contentType: "application/x-ndjson", body: '{"type":"error","code":"rate_limited"}\n' }),
+  );
+  await page.goto("/chat");
+  await page.getByRole("button", { name: "Let's book a call" }).click();
+  await expect(page.locator('[data-error="rate_limited"]')).toContainText("That's a lot of questions");
+});
