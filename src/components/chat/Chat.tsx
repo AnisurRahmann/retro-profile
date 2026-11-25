@@ -233,7 +233,7 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
         e.preventDefault();
         void send(draft);
       }}
-      className="relative rounded-xl border border-hairline bg-surface focus-within:border-graphite"
+      className="composer relative bg-surface"
     >
       <label htmlFor="chat-input" className="sr-only">
         {copy.inputLabel}
@@ -252,7 +252,7 @@ export function Chat({ copy, labels, email, calendar, allowedHosts, enabled, por
         }}
         placeholder={copy.placeholder}
         rows={3}
-        className="block max-h-[240px] min-h-24 w-full resize-none bg-transparent px-4 pt-3.5 pb-12 text-base leading-6 text-text placeholder:text-graphite focus:outline-none"
+        className="block max-h-[240px] min-h-24 w-full resize-none bg-transparent px-4 pt-3.5 pb-12 text-base leading-6 text-text placeholder:text-graphite"
       />
       {streaming ? (
         <button

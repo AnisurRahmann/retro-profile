@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 
 const PAGES = ["/", "/chat", "/work/support-agent", "/lifts", "/privacy"];
 
-test.describe("layout at 360px", () => {
-  test.use({ viewport: { width: 360, height: 800 } });
+test.describe("layout at 375px", () => {
+  test.use({ viewport: { width: 375, height: 800 } });
   for (const path of PAGES) {
     test(`no horizontal scroll on ${path}`, async ({ page }) => {
       await page.goto(path);

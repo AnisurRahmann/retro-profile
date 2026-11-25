@@ -5,15 +5,23 @@ import { expect, test } from "@playwright/test";
 test("suggestion chip sends, streams tokens and shows a tool card", async ({ page }) => {
   await page.goto("/chat");
   await expect(page.getByRole("heading", { level: 1, name: "What brings you here?" })).toBeVisible();
+  // Record every length the agent reply passes through, so streaming is proven regardless of timing.
+  await page.evaluate(() => {
+    const w = window as unknown as { __lens: number[] };
+    w.__lens = [];
+    new MutationObserver(() => {
+      const reply = document.querySelectorAll("ol li")[1];
+      const n = reply?.textContent?.length ?? 0;
+      if (n && n !== w.__lens.at(-1)) w.__lens.push(n);
+    }).observe(document.body, { subtree: true, childList: true, characterData: true });
+  });
   await page.getByRole("button", { name: "I'm hiring an AI engineer" }).click();
 
-  // User bubble, then streamed agent text growing over time.
   await expect(page.getByText("I'm hiring an AI engineer", { exact: true })).toBeVisible();
-  const agent = page.locator("ol li").nth(1);
-  await expect(agent).toContainText("Good fit");
-  const partial = (await agent.textContent())?.length ?? 0;
   await expect(page.getByTestId("agent-done")).toHaveCount(1, { timeout: 10_000 });
-  expect((await agent.textContent())?.length ?? 0).toBeGreaterThan(partial);
+  await expect(page.locator("ol li").nth(1)).toContainText("Good fit");
+  const lens = await page.evaluate(() => (window as unknown as { __lens: number[] }).__lens);
+  expect(lens.length).toBeGreaterThan(5); // rendered incrementally, token by token
 
   await expect(page.getByRole("link", { name: "Book 30 min" })).toHaveAttribute("href", /cal\.com/);
 });

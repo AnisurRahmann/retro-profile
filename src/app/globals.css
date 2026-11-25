@@ -72,6 +72,33 @@ body {
   border-radius: 4px;
 }
 
+/* Amber rings are for keyboard focus only. Chrome and Safari match :focus-visible on text fields even on a
+   mouse click, so text fields get the ring only when the last input was the keyboard (data-input is set by
+   the inline script in the root layout; it defaults to "keyboard" so no-JS keyboard users keep the ring). */
+html[data-input="pointer"] :is(input, textarea, select):focus-visible {
+  outline: none;
+}
+:is(input, textarea, select):focus {
+  border-color: color-mix(in srgb, var(--graphite) 45%, var(--hairline));
+}
+
+/* Chat composer: the box is the field. Mouse focus = quieter border; keyboard focus = amber ring on the box. */
+.composer {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  transition: border-color 150ms ease;
+}
+.composer:focus-within {
+  border-color: color-mix(in srgb, var(--graphite) 45%, var(--hairline));
+}
+.composer textarea:focus-visible {
+  outline: none;
+}
+html:not([data-input="pointer"]) .composer:has(textarea:focus-visible) {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
 /* ── Depth layer ────────────────────────────────────────────
    Static, fixed, below everything. Top light, vignette, grain.
    No background-attachment: fixed (janky on iOS). */

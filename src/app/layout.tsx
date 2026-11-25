@@ -25,6 +25,8 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: ui.meta.title, description },
 };
 
+const INPUT_MODALITY = `(()=>{const d=document.documentElement,o={capture:true,passive:true};addEventListener("pointerdown",()=>{d.dataset.input="pointer"},o);addEventListener("keydown",e=>{if(e.key==="Tab")d.dataset.input="keyboard"},o)})()`;
+
 export const viewport: Viewport = {
   themeColor: brand.ink,
   colorScheme: "dark",
@@ -32,7 +34,16 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    <html
+      lang="en"
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      data-input="keyboard"
+      suppressHydrationWarning
+    >
+      <head>
+        {/* Input modality for focus rings: Tab → keyboard, pointer → pointer. See globals.css. */}
+        <script dangerouslySetInnerHTML={{ __html: INPUT_MODALITY }} />
+      </head>
       <body className="flex min-h-dvh flex-col text-text">
         <div aria-hidden="true" className="depth">
           <div className="depth-light" />
