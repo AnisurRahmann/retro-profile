@@ -19,6 +19,7 @@ import type { LayerId } from "@/lib/sky/landscape/anchors";
 import { TV_HZ, windowLit, windowSchedule } from "@/lib/sky/landscape/lights";
 import { RIVER } from "@/lib/sky/landscape/shapes";
 import {
+  FADE_IN_S,
   gateAt,
   PLANE_BODY,
   PLANE_GEAR,
@@ -84,6 +85,8 @@ export function createLife(textRgb: RGB) {
   /** The take-off in progress (or the last one): its start and its path. */
   let t0 = -Infinity;
   let path: TakeoffParams | null = null;
+  /** How visible the plane was (0..1) when that take-off started: one that begins during the gate's fade-in finishes fading in as it goes. */
+  let startAlpha = 1;
   let flights = 0;
   /** Test builds: hold the take-off at this many seconds in (the review's roll / rotation / climb frames). */
   let pinned: number | null = null;
@@ -201,7 +204,8 @@ export function createLife(textRgb: RGB) {
     const pf = p0 ? planeAt(since, { ...p0, bounds: { x0: o, x1: o + f.w, y0: -LIFT } }) : null;
     const x = (pf ? pf.x : ap.gate[0] * s) - o;
     const y = pf ? pf.y : ap.gate[1] * s;
-    const alpha = pf ? pf.alpha : f.moving ? gate.alpha : 1;
+    // A take-off that began during the gate's fade-in finishes it at the gate's own pace as it taxis.
+    const alpha = pf ? pf.alpha * Math.min(1, startAlpha + since / FADE_IN_S) : f.moving ? gate.alpha : 1;
     if (alpha <= 0.01 || x < -f.planePx || x > f.w + f.planePx) return;
     const k = (f.planePx / PLANE_LEN) * (pf ? pf.scale : 1);
     // Night: 0 by day … 1 from sunset to sunrise (LifeFrame.lamps). The strength of the lights.
@@ -268,12 +272,17 @@ export function createLife(textRgb: RGB) {
   };
 
   return {
-    /** Start a take-off now if a plane is parked at the gate (and none is flying). o3: the L3 offset. */
+    /**
+     * Start a take-off now if a plane is at the gate (and none is flying). o3: the L3 offset. "Book 30 min" may be
+     * hovered while the plane is still fading in after the last one (v5.1 T5): it goes, and finishes fading in as it
+     * taxis. Arrivals wait for the plane to be fully there (`ready`).
+     */
     takeoff(t: number, f: LifeFrame | null, o3: number): boolean {
       const ap = f?.world.airport;
       if (!f || !ap) return false;
       const gate = gateAt(t, t0);
-      if (gate.state !== "parked" || gate.alpha < 1) return false;
+      if (gate.state !== "parked") return false;
+      startAlpha = gate.alpha;
       path = pathFor(ap, f, o3);
       t0 = t;
       flights++;
