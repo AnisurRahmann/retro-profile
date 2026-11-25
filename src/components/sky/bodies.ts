@@ -205,28 +205,6 @@ export function createSun(dpr: () => number) {
 
 export type Sun = ReturnType<typeof createSun>;
 
-/** Moon halo (22°, only when humidity > 85%): a faint ring at 4%. */
-export function drawHalo(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  radius: number,
-  alpha: number,
-  text: string,
-) {
-  if (alpha <= 0.001) return;
-  ctx.globalAlpha = 0.04 * alpha;
-  ctx.strokeStyle = text;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.globalAlpha = 0.02 * alpha;
-  ctx.lineWidth = 9;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-}
-
 /** The arc: 1px dots (2 on, 7 off) in --text at 9% between the horizon points; the night dip dashed, while scrubbing. */
 export function drawArc(
   ctx: CanvasRenderingContext2D,

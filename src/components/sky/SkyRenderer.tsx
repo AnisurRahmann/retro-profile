@@ -9,7 +9,7 @@ import { driftVector, MIN_DRIFT, skyModel, type SkyModel } from "@/lib/sky/model
 import { effectiveWeather, SKY_DEBUG, skyStore, skyTime } from "@/lib/sky/store";
 import { dayOfYear, dhakaParts } from "@/lib/sky/time";
 import { sunColor } from "@/lib/sky/gradient";
-import { ALT_REF, nightPoint, sunPath, type ArcGeom } from "@/lib/sky/arc";
+import { nightPoint, sunPath, type ArcGeom } from "@/lib/sky/arc";
 import {
   COLUMN_BREAK,
   geomNow,
@@ -356,7 +356,6 @@ function start(
       (1 - 0.6 * n("uFog")),
     moonR: moonR(),
     moonDim: 1,
-    halo: { r: (22 / ALT_REF) * (geom.horizonY - geom.apexY), a: model.humidity > 85 ? 1 : 0 },
   });
 
   const sunState = (): SunState => {

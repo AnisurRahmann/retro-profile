@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { lightningEnvelope } from "@/components/sky/SkyRenderer";
-import { mulberry32, skyRotation } from "@/components/sky/particles";
+import * as bodies from "@/components/sky/bodies";
+import { createParticles, mulberry32, skyRotation } from "@/components/sky/particles";
 import { bearingToX, fogAmount, skyModel, windVector } from "@/lib/sky/model";
 import { dhakaDate } from "@/lib/sky/time";
 import { UNKNOWN_WEATHER } from "@/lib/sky/weather";
@@ -72,5 +73,49 @@ describe("stars", () => {
     const b = mulberry32(349);
     expect([a(), a(), a()]).toEqual([b(), b(), b()]);
     expect(mulberry32(350)()).not.toBe(mulberry32(349)());
+  });
+});
+
+describe("the moon", () => {
+  it("is a disc with its soft glow only: no ring is stroked around it, and no halo function exists", () => {
+    // A recording 2D context: every call is kept, every property write is accepted.
+    const calls: string[] = [];
+    const ctx = new Proxy<Record<string, unknown>>({}, {
+      get: (_, k: string) => () => {
+        calls.push(k);
+      },
+      set: () => true,
+    });
+    const canvas = { getContext: () => ctx, clientWidth: 375, clientHeight: 812, width: 0, height: 0 };
+    vi.stubGlobal("window", { devicePixelRatio: 2 });
+    try {
+      const pts = createParticles(canvas as unknown as HTMLCanvasElement, [0.9, 0.92, 0.95])!;
+      pts.resize(330);
+      // A clear night with a full moon high in the sky, no rain, no meteors: stars and the moon are filled.
+      pts.draw(
+        1,
+        Date.UTC(2026, 10, 25, 21, 30),
+        {
+          night: 1,
+          cloudCover: 0.04,
+          fog: 0,
+          rainDensity: 0,
+          rainSlant: 0,
+          moon: { x: 0.76, y: 0.31, up: true, fraction: 1, waxing: true },
+          moonVisible: 1,
+          moonR: 12,
+          moonDim: 1,
+        },
+        true,
+        {},
+        null,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(calls).toContain("fill");
+    // A 22° halo was two stroked circles around the disc. Nothing strokes here.
+    expect(calls).not.toContain("stroke");
+    expect("drawHalo" in bodies).toBe(false);
   });
 });

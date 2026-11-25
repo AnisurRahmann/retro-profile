@@ -64,6 +64,12 @@ One line per "Done when" item. PASS / FAIL are from the code and a fresh screens
 - Shots (11:00 partly cloudy): `.shots/v5.1/T1/t1-375x812-line1.png`, `t1-375x812-line4.png`, `t1-375x812-line6.png`, contact sheet `sheet.png`, `t1-1440x900-wide.png`.
 - How: `statusLinesShort` in `src/content.ts` (schema: one per line, same order); `StatusLine` renders both variants and CSS shows one, so there is nothing to choose after hydration; `.status-line` has a fixed one-line height and `.status-line-text` is nowrap / overflow hidden / ellipsis. DECISIONS #109.
 
+#### T2 · no ring around the moon
+
+- PASS: at 03:30 clear (`?sky=2026-11-26T03:30&wx=clear`) there is no ring around the moon at 375×812 or 1440×900, only the soft glow. Shots: `.shots/v5.1/T2/t2-after-0330-clear-375x812-top.png`, `t2-after-0330-clear-1440x900-top.png` (crops `c1.png`, `c2.png`, sheet `sheet-after.png`).
+- It was **not** fixed before this run, so T2's original "Do" was done after all. The "Verified fixed" check passed only because `wx=clear` pins humidity to 60%. The 22° ring was still in the code and drawn whenever real humidity was above 85% (the production review's condition). Proof from before the change, at 92% humidity (`?sky=2026-11-26T03:30&wx=drizzle&cloud=5`): `.shots/v5.1/T2/sheet-moon-humid-before.png` shows the large crisp ring on both sizes, crossing "Shakil" on the phone. The same URL after the change: `t2-after-humid-375x812-top.png`, `t2-after-humid-1440x900-top.png` (`c3.png`, `c4.png`), no ring.
+- How: `drawHalo` deleted from `bodies.ts`; the `halo` state and the `humidity > 85` condition deleted from `particles.ts` and `SkyRenderer.tsx`. The moon's soft radial glow is the shader's and stays. No test asserted the ring; `tests/unit/sky-render.test.ts` now draws the moon through a recording canvas context and asserts nothing strokes a circle and no `drawHalo` exists. DECISIONS #110.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.
