@@ -16,6 +16,10 @@
   --signal: #f5a524;
   --highlight: rgba(255, 255, 255, 0.04);
 
+  /* Depth layer (the one decorative gradient exception) */
+  --depth-light: rgba(122, 162, 247, 0.07);
+  --depth-vignette: rgba(4, 8, 16, 0.55);
+
   /* Glyph tiles: muted mid-tones, all ≥ 4.5:1 against --text */
   --tile-slate: #3e4c63;
   --tile-teal: #2c5958;
@@ -46,6 +50,9 @@ html {
 }
 
 body {
+  /* Transparent so the fixed depth layer and Signal Field (negative z-index) show through;
+     --ink is painted by <html>. */
+  background: transparent;
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 24px;
@@ -63,6 +70,35 @@ body {
   outline: 2px solid var(--signal);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* ── Depth layer ────────────────────────────────────────────
+   Static, fixed, below everything. Top light, vignette, grain.
+   No background-attachment: fixed (janky on iOS). */
+.depth {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  overflow: hidden;
+  /* Solid ink inside the layer so the grain's overlay blend has a backdrop to work on. */
+  background: var(--ink);
+}
+.depth > div {
+  position: absolute;
+  inset: 0;
+}
+.depth-light {
+  background: radial-gradient(1200px 640px at 50% -12%, var(--depth-light), transparent 70%);
+}
+.depth-vignette {
+  background: radial-gradient(ellipse at 50% 40%, transparent 55%, var(--depth-vignette) 100%);
+}
+.depth-grain {
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-size: 160px 160px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* ── Layout ─────────────────────────────────────────────────── */

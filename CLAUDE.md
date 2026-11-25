@@ -30,7 +30,9 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
   Card title 14/500, subtitle 14 graphite, mono meta 12 graphite.
 - One 768px column; 20px side padding below 808px. Header 64px, not sticky. Section gap 64 desktop / 48 mobile.
 - Cards: surface, radius 8, 14×16 padding, hover → hairline border + surface-2 (150ms). Whole card is the link.
-- No gradients (except the chat dock fade), glows, glass, bento, illustrations, parallax or scroll fade-ups.
+- No gradients, glows, glass, bento, illustrations, parallax or scroll fade-ups. **One exception:** the static
+  background depth layer (`.depth` in the root layout: top light, vignette, grain). Nothing else gets a decorative
+  gradient. (The chat dock fade is functional, from the original brief, and stays.)
 - Motion: waveform, status line, show-more, chat ring/dots. Every one has a reduced-motion path. Nothing else moves.
 - Accessibility beats design when they conflict; log it.
 

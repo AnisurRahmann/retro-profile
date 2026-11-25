@@ -32,7 +32,12 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body className="flex min-h-dvh flex-col bg-ink text-text">
+      <body className="flex min-h-dvh flex-col text-text">
+        <div aria-hidden="true" className="depth">
+          <div className="depth-light" />
+          <div className="depth-vignette" />
+          <div className="depth-grain" />
+        </div>
         <Header />
         {children}
       </body>
