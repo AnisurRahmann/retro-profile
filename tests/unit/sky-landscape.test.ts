@@ -10,6 +10,9 @@ import {
   MIN_GAP_VH,
   nearestPlace,
   PARALLAX,
+  PHONE_HILL_TOP,
+  POSTCARD_MARK,
+  sceneBand,
   scenePlace,
   screenX,
   solveAnchors,
@@ -30,7 +33,7 @@ import { cityGlowOver, gradientAt, type CityGlow } from "@/lib/sky/backing";
 import { luminance, oklabToRgb } from "@/lib/sky/color";
 import { skyColors } from "@/lib/sky/gradient";
 import { CONDITIONS } from "@/lib/sky/weather";
-import { buildClosingScene, buildStageScene, buildWorld } from "@/lib/sky/landscape/world";
+import { buildClosingScene, buildStageScene, buildWorld, ridgeL1 } from "@/lib/sky/landscape/world";
 
 // Section tops (document px) for a 1440×900 home page.
 const SECTIONS = {
@@ -201,23 +204,53 @@ describe("scene mode (< 1100px with a stage)", () => {
     expect(closingWalk(-200, 200, 812, 375)).toBeCloseTo(0.15 * 375, 9);
   });
 
-  it("puts the tea gardens and Keane Bridge on the stage's horizon, the airport in the closing band", () => {
-    const stage = buildStageScene(375, 114);
+  it("on a tablet puts the tea gardens, Keane Bridge and the clock tower on the stage's horizon, the airport in the closing band", () => {
+    const stage = buildStageScene(768, 140);
     expect(stage.marks.map((m) => m.id).sort()).toEqual(["bridge", "clock"]);
     const bridge = stage.marks.find((m) => m.id === "bridge")!;
     // On screen at the top of the page.
     expect(bridge.x0 * stage.s).toBeGreaterThan(0);
-    expect(bridge.x1 * stage.s).toBeLessThan(375 + 40);
+    expect(bridge.x1 * stage.s).toBeLessThan(768 + 40);
     expect(stage.layers.L2.length).toBeGreaterThan(3); // shade trees over the tea mounds
-    const closing = buildClosingScene(375, 200);
+    // The near foreground keeps its palms (the only things standing on the bank line itself, y = 0).
+    expect(stage.layers.L4.some((it) => it.y === 0)).toBe(true);
+    const closing = buildClosingScene(768, 200);
     expect(closing.marks.map((m) => m.id)).toEqual(["airport"]);
     for (const m of closing.marks) {
       expect(m.x0 * closing.s).toBeGreaterThanOrEqual(-1);
-      expect(m.x1 * closing.s).toBeLessThanOrEqual(376);
+      expect(m.x1 * closing.s).toBeLessThanOrEqual(769);
     }
     expect(closing.plane).not.toBeNull();
     expect(closing.plane![0] * closing.s).toBeGreaterThan(0);
-    expect(closing.plane![0] * closing.s).toBeLessThan(375);
+    expect(closing.plane![0] * closing.s).toBeLessThan(768);
+  });
+
+  it("on a phone (the postcard stage) shows only the tea gardens and Keane Bridge: centred, 1.6× its old size, nothing else", () => {
+    const H = sceneBand(375, 812);
+    expect(H).toBe(200);
+    const stage = buildStageScene(375, H);
+    expect(stage.marks.map((m) => m.id)).toEqual(["bridge"]);
+    const [b] = stage.marks;
+    expect(((b!.x0 + b!.x1) / 2) * stage.s).toBeCloseTo(375 / 2, 6);
+    // The old 150px band drew its 192 units (five spans and both approach ramps) at 1.5 px/unit = 288px wide.
+    expect((b!.x1 - b!.x0) * stage.s).toBeCloseTo(POSTCARD_MARK * 192 * 1.5, 6);
+    expect(stage.layers.L2.length).toBeGreaterThan(3); // shade trees over the tea mounds
+    // No clock tower on L3; no palms (y = 0) and no rickshaw (y ≈ 90) on the near layer.
+    expect(stage.layers.L3.some((it) => it.shape.x1 - it.shape.x0 === 14)).toBe(false);
+    expect(stage.layers.L4.filter((it) => it.y === 0)).toHaveLength(0);
+    expect(stage.layers.L4.filter((it) => it.y > 80)).toHaveLength(0);
+    // A short phone keeps the proportions (the scale follows the band height).
+    expect(buildStageScene(320, H).marks[0]!.x1 - buildStageScene(320, H).marks[0]!.x0).toBeCloseTo(
+      b!.x1 - b!.x0,
+      9,
+    );
+  });
+
+  it("PHONE_HILL_TOP is the far hills' highest point over a phone's width in the 200px scene", () => {
+    const s = 200 / 100;
+    let top = Infinity;
+    for (let x = 0; x <= 375 / s; x += 0.05) top = Math.min(top, ridgeL1(x));
+    expect(Math.abs(PHONE_HILL_TOP - top)).toBeLessThan(0.1);
   });
 
   it("names the stage scene's landmark nearest the centre", () => {

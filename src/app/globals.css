@@ -224,10 +224,10 @@ html[data-sky-scrub] .sky-gradient {
 }
 html {
   /* The landscape band's height (src/lib/sky/landscape/anchors.ts bandHeight), and the stage scene's (sceneBand:
-     150px on phones). */
+     200px on phones, STAGE_SCENE_PX). */
   --band-h: clamp(110px, 14vh, 200px);
   --band-h: clamp(110px, 14svh, 200px);
-  --scene-h: 150px;
+  --scene-h: 200px;
 }
 @media (min-width: 640px) {
   html {
@@ -277,23 +277,31 @@ html {
     padding-bottom: calc(0.8 * var(--band-h));
   }
 }
-/* Phones: the hero starts at 44% of the stage, so the open sky above and the text balance; the 150px stage scene
-   sits under it. */
+/* Phones: the postcard stage (v5.1 T3). Top to bottom: the header (64px, it overlays the stage), the text block
+   24px under it, open sky (the drag handle, and where the sun and moon arc: src/lib/sky/arc.ts), then the 200px
+   stage scene at the bottom. The stage is the first screen less 40px, so "Shipped" peeks in. */
 @media (max-width: 639px) {
   html .sky-stage {
+    /* 64px header + 24px. */
+    padding-top: 88px;
     padding-bottom: 0;
   }
+  .sky-stage > .column {
+    order: -1;
+  }
   .sky-stage > .sky-stage-open {
-    flex: none;
-    height: calc(0.44 * var(--stage-h));
+    flex: 1;
+  }
+  /* "Shipped" starts 32px after the stage scene's bottom edge (the section gap is 48px elsewhere). */
+  main > .sky-stage + .section {
+    margin-top: 32px;
   }
 }
 
 html {
-  /* Stage height, mirrored by .sky-stage (src/lib/sky/arc.ts stageHeightFor). Phones get a tall stage: the sky
-     arc needs room above the hero. */
-  --stage-h: max(540px, 76vh);
-  --stage-h: max(540px, 76svh);
+  /* Stage height, mirrored by .sky-stage (src/lib/sky/arc.ts stageHeightFor). Phones: the first screen less 40px,
+     at least 600px. */
+  --stage-h: max(600px, calc(100svh - 40px));
 }
 @media (min-width: 640px) {
   html {

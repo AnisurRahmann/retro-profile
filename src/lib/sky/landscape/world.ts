@@ -13,7 +13,9 @@ import {
   CLOSING_SCENE,
   gutterWidth,
   PARALLAX,
+  POSTCARD_VW,
   STAGE_SCENE,
+  stageMarkK,
   type Anchor,
   type LandMode,
   type LayerId,
@@ -36,6 +38,7 @@ import {
   rickshaw,
   shadeTree,
   type LightKind,
+  type NearKind,
   type Pt,
   type Shape,
 } from "./shapes";
@@ -128,7 +131,8 @@ function builder(s: number, start: number, length: Record<LayerId, number>) {
   };
   /** L4 ranges (units) kept clear of foreground, so nothing stands in front of the airport when it's reached. */
   const clearL4: [number, number][] = [];
-  const fill = () => {
+  /** The generic fillers. `omit` leaves kinds of near foreground out (the same random numbers are drawn, so what stays keeps its place). */
+  const fill = (omit: Partial<Record<NearKind, true>> = {}) => {
     // L3: riverside trees and low houses wherever the landmarks aren't.
     {
       const r = mulberry32(303);
@@ -159,7 +163,7 @@ function builder(s: number, start: number, length: Record<LayerId, number>) {
         const seed = (x * 11.3) | 0;
         if (k < 0.32) x += 40 + r() * 50;
         else if (k < 0.52) {
-          put("L4", palm(seed), x);
+          if (!omit.palm) put("L4", palm(seed), x);
           x += 50 + r() * 40;
         } else if (k < 0.66) {
           put("L4", bamboo(seed), x, ground(x));
@@ -172,7 +176,7 @@ function builder(s: number, start: number, length: Record<LayerId, number>) {
           put("L4", lowWall(w), x, Math.min(ground(x), ground(x + w)));
           x += w + 16 + r() * 20;
         } else {
-          put("L4", rickshaw(0.4), x, 100 + ground(x));
+          if (!omit.rickshaw) put("L4", rickshaw(0.4), x, 100 + ground(x));
           x += 46 + r() * 30;
         }
       }
@@ -298,13 +302,26 @@ export function buildWorld(
   };
 }
 
-/** Scene mode: the stage's horizon. Tea gardens with the hills behind, the Surma and Keane Bridge in front. */
+/**
+ * Scene mode: the stage's horizon. Tea gardens with the hills behind, the Surma and Keane Bridge in front.
+ * Phones (below POSTCARD_VW, the postcard stage of v5.1 T3): Keane Bridge alone, centred and 1.6× its old on-screen
+ * size (anchors.ts POSTCARD_MARK). No clock tower, palms or rickshaw: they stay in the fixed band and on tablets.
+ */
 export function buildStageScene(vw: number, H: number): World {
   const s = H / 100;
   const length = lengths(vw, vw, s);
   const b = builder(s, 0, length);
-  bridgeAndTower(b, (STAGE_SCENE.bridge * vw) / s, "tower-left");
-  b.fill();
+  if (vw < POSTCARD_VW) {
+    const bridge = keaneBridge();
+    const k = stageMarkK(H);
+    const x = vw / 2 / s - ((bridge.x0 + bridge.x1) / 2) * k;
+    b.put("L3", bridge, x, 0, "bridge", k);
+    b.taken.push([x + bridge.x0 * k, x + bridge.x1 * k]);
+    b.fill({ palm: true, rickshaw: true });
+  } else {
+    bridgeAndTower(b, (STAGE_SCENE.bridge * vw) / s, "tower-left");
+    b.fill();
+  }
   return {
     s,
     layers: b.layers,

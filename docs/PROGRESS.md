@@ -70,6 +70,19 @@ One line per "Done when" item. PASS / FAIL are from the code and a fresh screens
 - It was **not** fixed before this run, so T2's original "Do" was done after all. The "Verified fixed" check passed only because `wx=clear` pins humidity to 60%. The 22° ring was still in the code and drawn whenever real humidity was above 85% (the production review's condition). Proof from before the change, at 92% humidity (`?sky=2026-11-26T03:30&wx=drizzle&cloud=5`): `.shots/v5.1/T2/sheet-moon-humid-before.png` shows the large crisp ring on both sizes, crossing "Shakil" on the phone. The same URL after the change: `t2-after-humid-375x812-top.png`, `t2-after-humid-1440x900-top.png` (`c3.png`, `c4.png`), no ring.
 - How: `drawHalo` deleted from `bodies.ts`; the `halo` state and the `humidity > 85` condition deleted from `particles.ts` and `SkyRenderer.tsx`. The moon's soft radial glow is the shader's and stays. No test asserted the ring; `tests/unit/sky-render.test.ts` now draws the moon through a recording canvas context and asserts nothing strokes a circle and no `drawHalo` exists. DECISIONS #110.
 
+#### T3 · mobile hero becomes a "postcard" layout
+
+At 375×812, for 03:30 clear, 11:00 partly cloudy and 16:45 clear:
+
+- PASS: the text block is at the top, the sky band in the middle, the hills and bridge at the bottom. Measured in all three: header 0–64, text block 88–254 (24px under the header), open sky 254–572, stage scene 572–772 (200px).
+- PASS: the sun or moon sits in the sky band and touches no text. Moon at (276, 410) at 03:30; sun at (151, 393) at 11:00 and at (343, 604) at 16:45, above the hills (their top is at about y 630). The arc's apex is 28px under the text block, so no point of it comes nearer than 15px (the unit test sweeps the whole arc).
+- PASS: the bridge is clearly recognisable: five bowstring truss spans with deck lights and piers, centred, 1.6× its old on-screen size (460.8px including its approach ramps on a 375px screen, so the ramps run off both edges).
+- PASS: the top 8px of "Shipped" is on the first screen: it starts at y = 804, 32px after the scene's bottom (772), in a screen of 812. That is the bottom of the 8–40px range, which is what the brief's own numbers give (40 − 32). **Note:** of those 8px only the top 2–3px of the letter shapes show (16px text in a 24px line), so the hint is faint. Not changed, the numbers were explicit; `100svh − 24px` would show about 24px.
+- PASS: no empty band over 40px: header to text 24px, scene to "Shipped" 32px. The open sky band (318px) is by design and has the sun or moon in it.
+- Desktop and tablets are unchanged: at 1440×900, 768×1024 and 640×900 the stage, hero and "Shipped" measure exactly as in the baseline. Short phones (320×568, 375×667) and 639px get the postcard too.
+- Shots: `.shots/v5.1/T3/t3-0330-clear-375x812-top.png`, `t3-1100-partly-375x812-top.png`, `t3-1645-clear-375x812-top.png`; sheets `sheet-pass1.png`, `crop-night-bottom.png`, `edges/sheet.png` (320, 375×667, 639, 640, 768, 1440).
+- How: the phone stage is `max(600px, 100svh − 40px)` with the text block first and the scene last (CSS, below 640px only); the scene is 200px; on phones `buildStageScene` places Keane Bridge alone, centred, at 1.6 × 150 / H; the arc's ends are at 8% and 92% of the width, 8px above the tallest far hill on screen, its apex 28px under the measured text block, recomputed on resize. DECISIONS #111.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.

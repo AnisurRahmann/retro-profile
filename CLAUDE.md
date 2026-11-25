@@ -40,8 +40,10 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
   Card title 14/500, subtitle 14 graphite, mono meta 12 graphite.
 - One 768px column; 20px side padding below 808px. Header 64px, not sticky, transparent over the sky stage.
   Section gap 64 desktop / 48 mobile. Home starts with the sky stage: full-bleed, min(62svh, 640px) desktop / 70svh
-  (≥ 460px) 640–807px / 80svh (≥ 560px) below 640px, hero anchored to its bottom in the column, open sky above.
-  Below 640px without a photo the initials avatar is hidden and the name comes first.
+  (≥ 460px) from 640px, hero anchored to its bottom in the column, open sky above. Below 640px it's a postcard (v5.1):
+  max(600px, 100svh − 40px), the text block 24px under the header, open sky with the sun and moon arc (8% to 92% of the
+  width, apex 28px under the text), then a 200px scene with only the tea hills and Keane Bridge; "Shipped" follows 32px
+  later. Below 640px without a photo the initials avatar is hidden and the name comes first.
 - Cards: surface, radius 8, 14×16 padding, hover → hairline border + surface-2 (150ms). Whole card is the link.
 - No gradients, glows, glass, bento, illustrations, parallax or scroll fade-ups. **One exception:** the Sylhet Sky
   background (`src/components/sky`, `src/lib/sky`). Gradients and glows are allowed only inside the sky renderer.

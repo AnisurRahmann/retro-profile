@@ -113,4 +113,11 @@ export const notifyGeometry = () => geometry.forEach((l) => l());
 
 /** The arc's geometry from the live layout (the stage at scroll 0; a stage-sized horizon on pages without one). */
 export const geomNow = (v: View = view): ArcGeom =>
-  arcGeom(v.vw, v.vh, v.stage || stageHeightFor(v.vw, v.vh), landMode(v.vw, !!v.stage) === "scene");
+  arcGeom(
+    v.vw,
+    v.vh,
+    v.stage || stageHeightFor(v.vw, v.vh),
+    landMode(v.vw, !!v.stage) === "scene",
+    // Phones (the postcard stage): the arc's apex hangs under the text block.
+    v.hero ? v.hero.y + v.hero.h : undefined,
+  );

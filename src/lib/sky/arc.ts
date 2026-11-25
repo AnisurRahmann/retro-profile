@@ -7,12 +7,15 @@
  * climbs quickly after rising like the real sun. Height comes from real altitude: alt / (the pass's maximum
  * altitude), scaled by how high that maximum is in the year (sin max / sin ALT_REF), so December's arc is lower
  * than June's. The disc's x is clamped to [8%, 92%] so it's never clipped.
+ * Phones (below POSTCARD_VW, the postcard stage of v5.1 T3): the arc lives in the open sky band between the text block
+ * and the hills. Its ends are at 8% and 92% of the width, 8px above the top of the hills; its apex is 28px under the
+ * text block, so the sun and moon never touch the text. It follows the text block (and the viewport) on resize.
  * The celestial layer doesn't scroll (parallax 0): the arc is laid out against the stage at scroll 0.
  */
 import SunCalc from "suncalc";
 import { sun, sunTimes } from "./astro";
 import { SYLHET } from "./weather";
-import { sceneBand } from "./landscape/anchors";
+import { PHONE_HILL_TOP, POSTCARD_VW, sceneBand } from "./landscape/anchors";
 
 const DEG = 180 / Math.PI;
 const RAD = Math.PI / 180;
@@ -31,9 +34,24 @@ export const ARC = {
   apexGap: 28,
   sceneApexGap: 16,
   header: 64,
+  /** Phones (the postcard stage): the arc's ends, 8% and 92% of the width; how far they sit above the top of the
+   * hills; how far the apex sits under the text block; the text block's top gap under the header and its height
+   * when it hasn't been measured. */
+  postcardEast: 0.08,
+  postcardLift: 8,
+  postcardGap: 28,
+  postcardTextTop: 24,
+  postcardTextH: 164,
 };
 
-export type ArcGeom = { w: number; h: number; horizonY: number; apexY: number };
+export type ArcGeom = {
+  w: number;
+  h: number;
+  horizonY: number;
+  apexY: number;
+  /** Half the arc's width as a fraction of the viewport width. Default 0.5 − ARC.east; narrower on phones. */
+  span?: number;
+};
 
 /**
  * Arc geometry for a viewport and the stage's bottom edge (document px at scroll 0, = viewport px there).
@@ -41,7 +59,21 @@ export type ArcGeom = { w: number; h: number; horizonY: number; apexY: number };
  * stage, so the horizon is in its hills (SCENE_HORIZON of the band down from its top) and the apex is header + 16:
  * the sun sets behind the hero text and into the tea hills.
  */
-export function arcGeom(vw: number, vh: number, stageBottom: number, scene = false): ArcGeom {
+export function arcGeom(
+  vw: number,
+  vh: number,
+  stageBottom: number,
+  scene = false,
+  heroBottom?: number,
+): ArcGeom {
+  if (postcard(vw, scene)) {
+    // v5.1 T3: ends 8px above the top of the hills (the stage scene's tallest far hill), apex 28px under the text.
+    const band = sceneBand(vw, vh);
+    const horizon = stageBottom - band + PHONE_HILL_TOP * (band / 100) - ARC.postcardLift;
+    const textBottom = heroBottom ?? ARC.header + ARC.postcardTextTop + ARC.postcardTextH;
+    const apexY = textBottom + ARC.postcardGap;
+    return { w: vw, h: vh, horizonY: Math.max(apexY + 80, horizon), apexY, span: 0.5 - ARC.postcardEast };
+  }
   const apexY = ARC.header + (scene ? ARC.sceneApexGap : ARC.apexGap);
   const horizon = scene
     ? stageBottom - (1 - SCENE_HORIZON) * sceneBand(vw, vh)
@@ -51,14 +83,17 @@ export function arcGeom(vw: number, vh: number, stageBottom: number, scene = fal
 
 /** Where the horizon sits in the stage scene: this fraction of the band down from its top (the far hills). */
 export const SCENE_HORIZON = 0.4;
+/** True on a phone's home page: the postcard stage, with its own arc (v5.1 T3). */
+export const postcard = (vw: number, scene: boolean) => scene && vw < POSTCARD_VW;
 
-/** Stage height as CSS computes it (for pages without a stage, the sun still needs a horizon). */
+/** Stage height as CSS computes it (for pages without a stage, the sun still needs a horizon): on phones the first
+ * screen less 40px, so "Shipped" peeks at the bottom (at least 600px). */
 export const stageHeightFor = (vw: number, vh: number) =>
   vw >= 808
     ? Math.max(460, Math.min(0.62 * vh, 640))
-    : vw >= 640
+    : vw >= POSTCARD_VW
       ? Math.max(460, 0.7 * vh)
-      : Math.max(540, 0.76 * vh);
+      : Math.max(600, vh - 40);
 
 /** Geometry for pure contexts (tests, the guard's defaults): a 1440×900 desktop. */
 export const DEFAULT_GEOM: ArcGeom = arcGeom(1440, 900, stageHeightFor(1440, 900));
@@ -73,8 +108,10 @@ export type Pass = { u: number; alt: number; maxAlt: number; up: boolean };
 export type ArcPoint = { x: number; y: number; /** x clamped for the disc */ cx: number };
 
 /** Point on the arc for progress u ∈ [0, 1] and altitude (degrees) on a pass that peaks at maxAlt. */
+const halfSpan = (g: ArcGeom) => g.span ?? 0.5 - ARC.east;
+
 export function arcPoint(u: number, alt: number, maxAlt: number, g: ArcGeom): ArcPoint {
-  const x = g.w * (0.5 - (0.5 - ARC.east) * Math.cos(Math.PI * Math.min(1, Math.max(0, u))));
+  const x = g.w * (0.5 - halfSpan(g) * Math.cos(Math.PI * Math.min(1, Math.max(0, u))));
   const k = maxAlt > 0 ? Math.min(1, Math.max(0, alt / maxAlt)) : 0;
   const y = g.horizonY - (g.horizonY - g.apexY) * seasonScale(maxAlt) * k;
   return { x, y, cx: Math.min(g.w * ARC.clamp[1], Math.max(g.w * ARC.clamp[0], x)) };
@@ -83,7 +120,7 @@ export function arcPoint(u: number, alt: number, maxAlt: number, g: ArcGeom): Ar
 /** The dashed night continuation under the horizon (west back to east), depth px at its lowest. */
 export function nightPoint(v: number, g: ArcGeom, depth: number): { x: number; y: number } {
   return {
-    x: g.w * (0.5 + (0.5 - ARC.east) * Math.cos(Math.PI * v)),
+    x: g.w * (0.5 + halfSpan(g) * Math.cos(Math.PI * v)),
     y: g.horizonY + depth * Math.sin(Math.PI * v),
   };
 }
