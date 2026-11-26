@@ -542,6 +542,39 @@ branches are 2–4 at random points, not per-level branching with a decaying pro
 bundle budget is 35 kB in `check-bundle.ts` and 26 kB in CLAUDE.md (#133 ff., open for veto), and T10's phone-hero
 test is red by decision (#162).
 
+## Flat clouds (2026-11-27)
+
+Branch `feat/weather-v6` (PR #8). The procedural noise clouds of W1/W2 are replaced by flat, paper-cut clouds that
+match the landscape; everything else from v6 stays (lightning, the rain's slant and depths, splashes, fog, the storm
+base, the sun's occlusion, the dusk palette). Nothing pushed, nothing deployed. Evidence comes from `pnpm dev` on :3000
+and the test build on :3101, both with `WEATHER_MOCK=1`; shots in `.shots/flat-clouds/`.
+
+### Map: the cloud code before the change
+
+| File | What it held | Fate |
+| --- | --- | --- |
+| `src/components/sky/sky-shader.ts` | GLSL: the HIGH, MID, LOW and SCUD sheets in log-depth perspective (fbm on a twice-warped domain, Worley billow, Lambert + Henyey–Greenstein lighting, golden-hour and twilight colours, the town's glow under the LOW sheet, the storm base on the LOW sheet's colours), then fog, moon glow, horizon glow, rain curtains (`fbm2`, alpha up to 0.3 from drizzle on), the rain darkening and the lightning lifts | Sheets removed; the rest kept. The storm base now darkens the sky itself; curtains use a hashed value noise, heavy rain and thunder only, alpha ≤ 0.12 |
+| `src/components/sky/atmosphere.ts` | Uploads the two 256² textures (value-noise lattices, Worley cells) and the uniforms | Textures removed |
+| `src/components/sky/cloud-field.ts` | The CPU mirror of the sheets: optical depth τ at a point (sun and moon occlusion, crepuscular-ray gaps), the coverage quantile solver, the 64×36 grid the backing model read through `runtime.cloudsIn` | Deleted |
+| `src/lib/sky/clouds.ts` | Sheet constants, `cloudPlan`, `planePoint`, `planeWind`, `gust`, the evolution clock and both texture generators | Deleted; `gust` moved to `flat-clouds.ts` |
+| `src/lib/sky/palette.ts` | `CLOUD_LIT`, `CLOUD_SHADOW`, `CLOUD_UNDER_GOLD`, `CLOUD_TOP_GOLD`, `MOONLIGHT`, `NIGHT_SHADOW`, `CLOUD_LIT_RAIN`, `CLOUD_SHADOW_RAIN`, `CITY_ON_CLOUD` | Replaced by `FLAT_CLOUD_*` |
+| `src/lib/sky/backing.ts` | `skyAt` with `cloudOver` / `cloudLit` / `cloudLight` (the sheets' lit colour at a presence), `backgroundFor` reading the grid ±300 px | Reads the flat model (spans, tones, clearing) |
+| `src/components/sky/particles.ts` | Stars dimmed by cover and the stratus flag; the moon by the mirror's occlusion | Stars cut out by the cloud silhouettes; the moon by the exact geometry |
+| `src/components/sky/SkyRenderer.tsx` | Sheet offsets integrated per frame, thresholds, `uHi/uMi/uLo/uSc/uTh/uStyle/uWindv/uLight`, the mirror refreshed every 500 ms, `tau` for the sun and moon | Layer drift, the plan, the tones, the zones |
+| `tests/unit/sky-clouds.test.ts` | Sheets, wind on the planes, gusts, evolution, the mirror, the textures | Replaced by `tests/unit/sky-flat-clouds.test.ts` |
+
+### Map: the flat clouds
+
+- `src/lib/sky/flat-clouds.ts` (pure): the layers (FAR 0.45 / mix 55% / speed 0.3 / 8–30% of the sky height above the
+  horizon; MID 0.7 / 25% / 0.55 / 25–55%; NEAR 1 / 0 / 1 / 45–85%), the puff cluster (5–14 circles on a hump, flat
+  base), the deck (4–6 bands of 28–70px strips, a ragged underside in rain), the cumulonimbus, the coverage bands and
+  their solver, the wind (`nearSpeed`, `gust`), the breath, `sdCloud` / `inside` / `coverage`, and the tones.
+- `src/components/sky/flat-cloud-layer.ts`: the Canvas 2D layer (z −3, after the atmosphere), sprites, lightning,
+  the per-cloud text clearing, `coverAt` for the sun, the moon and the rays.
+- `src/lib/sky/backing.ts`: `CloudSpan`, `clearingFor`, `cloudsReach`; `backgroundFor(s, box, f)`.
+- `src/components/sky/backing-runner.ts`: solves each loose text's clearing factor and hands the zones to the layer.
+- `scripts/flat-clouds-shots.ts`: the review matrix, the drift measurement and the contact sheets.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.
