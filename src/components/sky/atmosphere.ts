@@ -14,15 +14,21 @@ export type Atmosphere = {
 /** Atmosphere backing scale, × DPR. */
 export const ATMOSPHERE_SCALE = 0.4;
 
+/**
+ * The sky's debug flag (store.ts SKY_DEBUG), written out again here on purpose: a constant of the module that uses
+ * it is folded away in a release build, an imported one or a parameter is not, and then the code it guards ships.
+ */
+const DEBUG = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_SKY_DEBUG === "1" || process.env.NEXT_PUBLIC_E2E === "1";
+
 const nextTask = (ms = 0) => new Promise<void>((r) => window.setTimeout(r, ms));
 
-export async function createAtmosphere(canvas: HTMLCanvasElement, debug: boolean, isDead: () => boolean): Promise<Atmosphere | null> {
+export async function createAtmosphere(canvas: HTMLCanvasElement, isDead: () => boolean): Promise<Atmosphere | null> {
   const gl = canvas.getContext("webgl2", { premultipliedAlpha: true, antialias: false, depth: false, stencil: false, powerPreference: "low-power" });
   if (!gl) return null;
   const parallel = gl.getExtension("KHR_parallel_shader_compile");
-  // Dev/test only: GPU timing via EXT_disjoint_timer_query_webgl2, and ?skyscale= to compare backing scales.
-  const timer = debug ? gl.getExtension("EXT_disjoint_timer_query_webgl2") : null;
-  const qScale = debug ? Number(new URLSearchParams(location.search).get("skyscale")) : 0;
+  // Debug builds only: GPU timing via EXT_disjoint_timer_query_webgl2, and ?skyscale= to compare backing scales.
+  const timer = DEBUG ? gl.getExtension("EXT_disjoint_timer_query_webgl2") : null;
+  const qScale = DEBUG ? Number(new URLSearchParams(location.search).get("skyscale")) : 0;
   let prog: WebGLProgram;
   const loc = new Map<string, WebGLUniformLocation | null>();
   let scale = 1;
@@ -45,7 +51,7 @@ export async function createAtmosphere(canvas: HTMLCanvasElement, debug: boolean
     if (parallel) while (!gl.getProgramParameter(prog, parallel.COMPLETION_STATUS_KHR)) await nextTask(32);
     else await nextTask();
     if (isDead() || !gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-      if (debug && !isDead()) console.warn("[sky] shader:", gl.getProgramInfoLog(prog));
+      if (DEBUG && !isDead()) console.warn("[sky] shader:", gl.getProgramInfoLog(prog));
       return false;
     }
     gl.useProgram(prog);

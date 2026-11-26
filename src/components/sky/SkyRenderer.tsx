@@ -6,7 +6,7 @@ import { onSky } from "@/lib/signal-bus";
 import { hexToRgb, oklabToRgb, rgbToOklab, toGamma, toLinear, type Lab } from "@/lib/sky/color";
 import { dayness } from "@/lib/sky/gradient";
 import { driftVector, MIN_DRIFT, skyModel, type SkyModel } from "@/lib/sky/model";
-import { effectiveWeather, SKY_DEBUG, skyStore, skyTime } from "@/lib/sky/store";
+import { effectiveWeather, skyStore, skyTime } from "@/lib/sky/store";
 import { dayOfYear, dhakaParts } from "@/lib/sky/time";
 import { sunColor } from "@/lib/sky/gradient";
 import { nightPoint, sunPath, type ArcGeom } from "@/lib/sky/arc";
@@ -64,6 +64,8 @@ import {
 } from "@/lib/sky/horizon";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
+/** The sky's debug flag (store.ts SKY_DEBUG), written out here so a release build folds what it guards away (as atmosphere.ts does). */
+const DEBUG = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_SKY_DEBUG === "1" || process.env.NEXT_PUBLIC_E2E === "1";
 /** The clear-sky cirrus floor on phones (an aesthetic choice, DECISIONS). */
 const CIRRUS_FLOOR = 0.06;
 
@@ -174,7 +176,7 @@ function start(
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
   const coarse = matchMedia("(pointer: coarse)").matches;
   const q = new URLSearchParams(window.location.search);
-  const forceBolt = SKY_DEBUG && q.get("bolt") === "1";
+  const forceBolt = DEBUG && q.get("bolt") === "1";
   const origin = performance.now();
   const now = () => (performance.now() - origin) / 1000;
   const rng = mulberry32(Date.now() & 0xffffffff);
@@ -472,7 +474,7 @@ function start(
   // Dev/test builds: main-thread ms per frame, logged every 60 frames next to the GPU timer.
   const cpu: number[] = [];
   const draw = (t: number, dt: number, still: boolean) => {
-    const c0 = SKY_DEBUG ? performance.now() : 0;
+    const c0 = DEBUG ? performance.now() : 0;
     let lightning = 0;
     if (!still && model.thunder) {
       if (forceBolt) lightning = 1;
@@ -683,7 +685,7 @@ function start(
           };
       }
     }
-    if (SKY_DEBUG && !still) {
+    if (DEBUG && !still) {
       cpu.push(performance.now() - c0);
       if (cpu.length >= 60) {
         const avg = cpu.reduce((a, b) => a + b, 0) / cpu.length;
@@ -958,9 +960,9 @@ function start(
       });
     life = createLife(tx);
     ambient = createAmbient(rng, readToken("--signal"), tx, {
-      force: SKY_DEBUG && q.get("life") === "1",
+      force: DEBUG && q.get("life") === "1",
     });
-    atm = await createAtmosphere(atmCanvas, SKY_DEBUG, isDead);
+    atm = await createAtmosphere(atmCanvas, isDead);
     if (dead) return;
     if (!atm) onNoWebGL();
     if (TEST)

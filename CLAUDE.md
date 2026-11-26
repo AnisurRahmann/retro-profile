@@ -89,7 +89,9 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
   scroll. Budgets (gzip, excluding suncalc, enforced by `pnpm check:bundle`): up-front sky JS ≤ 13 kB, idle-loaded
   renderer ≤ 26 kB (DECISIONS #101); inline first-paint script < 1.5 kB; atmosphere GPU ≤ 2 ms at 1920×1080 DPR 2 (`scripts/probe/gpu-sky.mts`);
   no long task > 50 ms while scrolling (`scripts/probe/scroll-trace.mts`). Tests and e2e run with `WEATHER_MOCK=1`;
-  never hit Open-Meteo from a test.
+  never hit Open-Meteo from a test. A release bundle holds no e2e hooks and no debug-only code: `next.config.ts` `env`
+  gives `NEXT_PUBLIC_E2E` and `NEXT_PUBLIC_SKY_DEBUG` a value to fold, and code behind them uses a constant of its own
+  module (`TEST`, `DEBUG`), never an import or a parameter (DECISIONS #120; `check:bundle` fails on `window.__sky`).
 - Accessibility beats design when they conflict; log it.
 
 ## Docs

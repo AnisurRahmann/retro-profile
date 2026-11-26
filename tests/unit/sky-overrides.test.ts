@@ -152,3 +152,24 @@ describe("the badge", () => {
     expect(ui.sky.preview).toBe(PREVIEW);
   });
 });
+
+describe("the sky's debug flag in a release build", () => {
+  // A constant of the module that uses it is folded away in a release build; an imported one, or a parameter, is not,
+  // and the code it guards ships (v5.1: it put the renderer over its budget). So the renderer and the atmosphere
+  // repeat the store's definition, and next.config.ts gives the two variables a value to fold. They must not drift.
+  const flag =
+    /process\.env\.NODE_ENV\s*!==\s*"production"\s*\|\|\s*process\.env\.NEXT_PUBLIC_SKY_DEBUG\s*===\s*"1"\s*\|\|\s*process\.env\.NEXT_PUBLIC_E2E\s*===\s*"1"/;
+
+  it.each(["src/lib/sky/store.ts", "src/components/sky/SkyRenderer.tsx", "src/components/sky/atmosphere.ts"])(
+    "means the same in %s",
+    (f) => {
+      expect(readFileSync(join(process.cwd(), f), "utf8"), f).toMatch(flag);
+    },
+  );
+
+  it("has a value to fold: next.config.ts defines both variables for the bundle", () => {
+    const config = readFileSync(join(process.cwd(), "next.config.ts"), "utf8");
+    expect(config).toMatch(/NEXT_PUBLIC_E2E: process\.env\.NEXT_PUBLIC_E2E \?\? ""/);
+    expect(config).toMatch(/NEXT_PUBLIC_SKY_DEBUG: process\.env\.NEXT_PUBLIC_SKY_DEBUG \?\? ""/);
+  });
+});

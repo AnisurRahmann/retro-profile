@@ -15,7 +15,11 @@ const E2E = process.env.NEXT_PUBLIC_E2E === "1";
  * production build made with NEXT_PUBLIC_SKY_DEBUG=1. Any other production build honours them only on a URL that also
  * has preview=1 (`overridesAllowed`), so day and dusk can be reviewed in production (v5.1 T9).
  */
-export const SKY_DEBUG = !SKY_PRODUCTION || process.env.NEXT_PUBLIC_SKY_DEBUG === "1" || E2E;
+/** Written out in full: src/components/sky/SkyRenderer.tsx and atmosphere.ts repeat it, where a release build must fold it. */
+export const SKY_DEBUG =
+  process.env.NODE_ENV !== "production" ||
+  process.env.NEXT_PUBLIC_SKY_DEBUG === "1" ||
+  process.env.NEXT_PUBLIC_E2E === "1";
 
 /**
  * A production build marks a honoured override with the fixed "preview 16:45" badge (`html[data-sky-preview]`,
