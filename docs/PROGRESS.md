@@ -503,6 +503,45 @@ What the merge did:
 | thunder 18:30 | 1.29 / 1.80 / 1.89 | 0.61 / 0.96 / 1.17 |
 
 **The one test that fails is a decision, not a bug to fix.** `main`'s T10 made the hero's four text elements on a phone text over the sky, never stacked boxes: a halo up to 0.9, and no chip unless even that cannot be read. Its test holds that in three states, the first being partly cloudy at 11:00. On `main` the clouds there are v5.1's dim grey, so a halo is enough. With v6 a sunlit cumulus sits right behind the hero, and the backing model is right to give the status line, the one-liner and the label a chip: light text on a cloud top cannot be read without one, and the pixel gate passes with them. So on top of `main`, a phone's hero wears chips again under bright cloud by day (`w7/hero-phone-chips-merged.png`; in the matrix, `matrix/partly-{0630,1100,1645}-375x812.png`). The test is left as it is, red, rather than weakened, and nothing is dimmed behind the text to make it pass. The ways out: accept a chip under bright cloud and change T10's test to say so; give the hero a softer backing than a box (the backing's CSS, and the model to predict it); or keep the clouds dim on phones, which gives up v6's realism there. DECISIONS #162.
+
+### Review of PR #8 (2026-11-26)
+
+An independent review of W1–W7 against the brief, the code read line by line where it matters (lightning, rain,
+fog), checked on a dev build (probes in `.scratch/wx-review.mts`, `.scratch/wx-bolt.mts`, shots in
+`.shots/v6/review/`). DECISIONS #163.
+
+**Bugs found and fixed**
+
+| # | Bug | Fix |
+| --- | --- | --- |
+| 1 | Heavy rain fired one cloud-to-ground bolt on load: entering the storm loop set the next CG to "now" outside thunder too. The brief: heavy rain, no bolts. | The next CG is "never" outside thunder; no CG is ever fired unless the condition is thunder (a storm that eases to heavy rain kept its CG due time). Measured: 0 CG over 8 s of heavy rain. |
+| 2 | Heavy rain's sheet flashes were gated on the eased `uRainDark >= 1`, which after a change of weather stalls a float step under 1: they never began. | Gated on the condition. |
+| 3 | The dark gaps between re-strokes weren't dark. `boltAlpha`'s afterglow ran before the last stroke had ended (a negative "time since", so 0.28–0.5 between strokes), and the re-stroke gap was measured from the previous stroke's middle (gaps of −15 to 60 ms, strokes could merge). | Each re-stroke follows a 50–90 ms gap after the stroke before ends; dark in between; the afterglow only after the last. Pulses still end within 450 ms; the 3-a-second test still passes. |
+| 4 | The rain slant missed W3's "done when": 13.4° for 30 km/h from 200° (brief: about 35°), and vertical rain in any north or south wind (a W7 fail: "rain is vertical with wind > 10 km/h"). The east–west wind scaled the angle instead of signing it. | θ at full size, signed by the east–west wind; a north or south wind leans right. Now 35° left for 30 km/h from 200°. |
+| 5 | At a 35° slant the upwind lower corner had no rain: streaks spawned across the width only and never wrapped, and drift sideways up to 0.7 of the height as they fall (wider than a phone). | Streaks wrap at 40 px past either side. |
+| 6 | The ground fog barely moved in calm air: the renderer folded the raw km/h ÷ 15 into the drift clock and passed `groundFogX` a wind factor of 1, so its 2 px/s floor never applied. Real fog is near calm. | The drift clock takes the clamped factor (1–2). |
+| 7 | After a change of size or fog colour only the first ground-fog strip was rebuilt (one key shared by three canvases): the other two stayed stale, stretched to the new width. | A key per strip. |
+
+**Brief items that were missing, now in**
+
+- Gusts swing the rain's slant ±4° (W3), from the W2 gust signal.
+- A drizzle draws only the far and mid streaks, 0.6 as long and 0.6 as fast (W3).
+- The near streaks are motion-blurred: head at full alpha, tail at 0.4 (two strokes per pass, not a gradient per streak).
+- The stepped leader is drawn down from the cloud over its 70–110 ms, branches with it, at a steady 0.35 (it flickered at 38 Hz before: not a counted pulse, and nothing the brief asked for).
+- A CG lights the cloud around its top (the sheet-flash disc, 24% of the width, at 0.8 of the bolt's brightness), as the brief's scene response asks.
+
+**Measured after the fixes (dev build, 1440×900):** thunder at 18:30: a CG within 3 s of load; 60 s at 21:00: 7 CG and
+15 sheet flashes (brief: 4–10 and 8–16). Forced bolt captured from the particle canvas at 59 ms (leader halfway down,
+dim) and 147 ms (full bolt and branches): `.shots/v6/review/bolt-35.png`, `bolt-130.png`. Heavy rain 15:00, 30 km/h
+from 200°, 375×812: slanted 35° left, rain to both edges: `heavy-1500-375.png`. typecheck, lint, 318 unit tests,
+build and `check:bundle` (up-front 10.6 kB, renderer 34.2 kB of 35) pass.
+
+**Left as they are, flagged:** splashes are rings on the river (#139), not on the ground line and scene tops; the bolt's
+branches are 2–4 at random points, not per-level branching with a decaying probability; rain curtains reach 0.3 alpha
+(brief 0.08–0.14) and darken drizzle and rain too, not heavy rain alone; strikes don't prefer the gutters. The idle
+bundle budget is 35 kB in `check-bundle.ts` and 26 kB in CLAUDE.md (#133 ff., open for veto), and T10's phone-hero
+test is red by decision (#162).
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.
