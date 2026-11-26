@@ -32,7 +32,8 @@ export function firstPaintTable(): string {
 /**
  * @param debug honour ?sky=YYYY-MM-DDTHH:mm (Asia/Dhaka) on every URL, as the client overrides do in development and
  *   test builds.
- * @param production a production build without `debug`: ?sky= is honoured only on a URL that also has preview=1.
+ * @param production a production build without `debug`: ?sky= is honoured only on a URL that also has preview=1 (the
+ *   first `preview` value, as URLSearchParams reads it in store.ts `overridesAllowed`).
  * @param badge where given (a production build), an honoured ?sky= also marks the page for the badge in globals.css:
  *   `html[data-sky-preview]` = this text with {time} replaced ("preview 16:45"). SkyController.tsx keeps it after
  *   hydration.
@@ -42,7 +43,7 @@ export function firstPaintScript(debug: boolean, production = false, badge = "")
   const dbg =
     !debug && !production
       ? ""
-      : `var m=${debug ? "" : "/[?&]preview=1(&|$)/.test(location.search)&&"}location.search.match(/sky=(\\d+)-(\\d+)-(\\d+)T(\\d+):(\\d+)/);` +
+      : `var m=${debug ? "" : "(location.search.match(/[?&]preview=([^&]*)/)||[,0])[1]===\"1\"&&"}location.search.match(/sky=(\\d+)-(\\d+)-(\\d+)T(\\d+):(\\d+)/);` +
         `if(m){t=Date.UTC(+m[1],m[2]-1,+m[3],+m[4],+m[5])-216e5;` +
         (badge
           ? `D.dataset.skyPreview=${JSON.stringify(badge.replace("{time}", ""))}+("0"+m[4]).slice(-2)+":"+("0"+m[5]).slice(-2);`

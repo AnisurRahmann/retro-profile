@@ -62,7 +62,13 @@ describe("the sky overrides in a production build without the flag", () => {
 
   it("takes preview=1 only as that exact value", async () => {
     const s = await built(PRODUCTION);
-    for (const q of ["?preview=0&sky=2026-11-26T16:45", "?preview=true&sky=2026-11-26T16:45", "?previews=1&sky=2026-11-26T16:45"])
+    for (const q of [
+      "?preview=0&sky=2026-11-26T16:45",
+      "?preview=true&sky=2026-11-26T16:45",
+      "?previews=1&sky=2026-11-26T16:45",
+      // The first value is the one, as URLSearchParams reads it (and the first-paint script, below).
+      "?preview=0&preview=1&sky=2026-11-26T16:45",
+    ])
       expect(s.parseOverrides(q), q).toEqual(NONE);
     expect(s.parseOverrides("/?sky=2026-11-26T16:45#preview=1")).toEqual(NONE);
   });
@@ -114,6 +120,9 @@ describe("the first-paint script", () => {
     // The same paint as a build that needs no key.
     expect(preview.props).toEqual(run(flagged, "?sky=2026-12-15T02:00", noon).props);
     expect(run(production, "?sky=2026-12-15T02:00&preview=0", noon).dataset.sky).toBe("day");
+    // The first preview value is the one, as the client reads it.
+    expect(run(production, "?preview=0&preview=1&sky=2026-12-15T02:00", noon).dataset.sky).toBe("day");
+    expect(run(production, "?preview=1&preview=0&sky=2026-12-15T02:00", noon).dataset.skyPreview).toBe("preview 02:00");
     expect(run(production, "?preview=1", noon).dataset.skyPreview).toBeUndefined();
     // Without ?sky= the gradient is the only thing it sets, as before.
     expect(Object.keys(run(production, "", noon).props).sort()).toEqual(["--sky-horizon", "--sky-mid", "--sky-zenith"]);
