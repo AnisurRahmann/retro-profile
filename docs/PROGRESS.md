@@ -404,7 +404,9 @@ The matrix (DECISIONS #161): `npx tsx scripts/weather-v6-shots.ts matrix` on the
 
 ### Final report: Weather v6
 
-Branch `feat/weather-v6`, off `fix/sky-v5.1` @ cd5feaf: seven commits, W1–W7, in its own worktree. Nothing pushed, nothing deployed.
+Branch `feat/weather-v6`: seven task commits, W1–W7, off `fix/sky-v5.1` @ cd5feaf (T6), in its own worktree; then `main` (Sylhet Sky v5.1 T6 follow-up to T10, PR #7) is merged into it before its pull request. Nothing deployed.
+
+**Read first.** Everything in this report up to "Not green" was measured on the T6 base, before that merge. On top of `main` some of it moved: the pixel-contrast gate is green, one of main's tests fails, and the numbers were taken again. That is in **"On top of `main`"** at the end.
 
 **W1–W7.** Every task's items are in its table above; shots are under `.shots/v6/`.
 
@@ -416,7 +418,7 @@ Branch `feat/weather-v6`, off `fix/sky-v5.1` @ cd5feaf: seven commits, W1–W7, 
 | W4 lightning | **PASS** | `w4/bolt-2100-{1440x900,375x812}.png`, `bolt-1530-…`, `sheet-flash-2100-…`, `thunder-60s-1440x900.png`, `thunder-reduced-1440x900.png` |
 | W5 storm atmosphere | **PASS** | `w5/thunder-1500-{1440x900,375x812}.png`, `thunder-1830-…`, `thunder-1500-calm-1440x900.png` |
 | W6 fog with depth | **PASS**; the ground fog is subtle (#156) | `w6/fog-0700-{1440x900,375x812}.png`, `fog-2200-…`, `fog-bands-1440x900.png`, `fog-drift-1440x900-{0,1}.png` |
-| W7 matrix and gates | **PASS** after three fixes; the pixel-contrast gate is **not green** (6 rows, #134) | `matrix/sheet-matrix-desk.png`, `matrix/sheet-matrix-phone.png` |
+| W7 matrix and gates | **PASS** after three fixes; the pixel-contrast gate was **not green** (6 rows, #134) on the T6 base. On top of `main` it is green, and one of main's tests fails | `matrix/sheet-matrix-desk.png`, `matrix/sheet-matrix-phone.png` |
 
 **W2, cloud travel.** 100 px in 10 s at 1440×900: a LOW cloud in the upper third (band y 60–300) at 15 km/h from 270°, two frames 10 s apart correlated against 240 shifts (0.87). The brief asks 60–120. At 375×812 the same wind moves a feature 16 px (the band is 70 px wide, so fewer shifts fit). `w2/cal-wind15-1440x900-{0,1}.png`, `w2/cal-wind15-375x812-{0,1}.png`.
 
@@ -455,12 +457,52 @@ Scrolling at 1440×900, final test build: partly cloudy and fog 60.0 fps, no fra
 
 **Open for a decision** (each in docs/DECISIONS.md):
 
-- **Bundle.** The idle renderer's budget went 26 → 31 → 32 → 34 → 35 kB gzip; it measures 34.7. The base branch was already over its 26 kB (26.1). The up-front sky JS is unchanged at 10.7 of 13.0 kB, so first paint is untouched (#133, #143, #152, #157).
-- **Pixel-contrast gate**, 6 rows of several hundred: the desktop `footer-linkedin` icon in four states (fails on the base commit too), and the phone's `receipts-note` in two partly-cloudy states, where a bright cumulus top meets its chip's edge (#134).
+- **Bundle.** The idle renderer's budget went 26 → 31 → 32 → 34 → 35 kB gzip; it measures 34.7 (34.0 on the merged tree). The base branch was already over its 26 kB (26.1). The up-front sky JS is unchanged at 10.7 of 13.0 kB, so first paint is untouched (#133, #143, #152, #157).
+- **Pixel-contrast gate**, 6 rows of several hundred: the desktop `footer-linkedin` icon in four states (fails on the base commit too), and the phone's `receipts-note` in two partly-cloudy states, where a bright cumulus top meets its chip's edge (#134). On top of `main` this gate is green.
 - **A north wind makes the clouds recede**, the opposite of the brief's W2 wording; the viewer faces south (#135).
 - **W5's "again within 1.5 s of the stage returning"** is in the code and never forced on screen.
 - **One 50 ms frame in half the thunder scroll runs** (59.6 fps against 60.0), with lightning on or off and no long task behind it. Not reproduced at rest and not found.
 - The GPU gate's first measurement was under load; the quiet one above is the final code.
+
+#### On top of `main`, measured again before the pull request
+
+While W1–W7 were being done, `fix/sky-v5.1` grew from T6 to T10 and was merged as PR #7. So before the PR, `main` (d9f7a70) is merged into the branch (`34902cd`) and everything is measured again on that tree.
+
+What the merge did:
+
+- **The decisions are renumbered.** `main` took #115–#120, so Weather v6's are **#121–#161** from here on (`3a8474f`); every reference in the two logs and in the code moved with them. The baseline note pointed at a decision that was never written: it now points at the budget's (#133).
+- **Three conflicts.** The two logs (v5.1's notes first, then Weather v6's) and `SkyRenderer.tsx`, where `main`'s build-time `DEBUG` constant (DECISIONS #120) replaces the imported `SKY_DEBUG` next to the v6 lines. The `window.__sky` hooks the v6 evidence reads in dev (`?sheet=`, `?lightning=off`, `strike`, `lightningLog`) sit behind `DEBUG` too: they are in dev and test builds, and folded out of a release build.
+- The atmosphere pass is untouched by the merge: `atmosphere.ts` differs only in the flag's name, and the shader in one comment.
+
+| Check, on the merged tree | Result |
+| --- | --- |
+| typecheck, lint, vitest | clean; 317 tests in 24 files (`main` brought 35) |
+| `pnpm build`, `pnpm check:bundle` | green: up-front 10.6 kB of 13.0; renderer **34.0 kB of 35.0** (the fold took 0.7 kB out); no `__sky` in any release chunk |
+| Full Playwright suite (`pnpm e2e`) | **65 passed, 1 failed.** `T5 at 375` failed once in the full run and passes alone at both sizes (1 then 2): a timing flake under load. The one that fails every time is `main`'s `tests/e2e/sky-hero-backing.spec.ts` (T10), below. Log: `w7/e2e-full-merged.log` |
+| Pixel-contrast gate (`tests/e2e/sky-backing.spec.ts`) | **green at both sizes.** `main`'s T6 follow-up (the icon's chip) and T10 resolved the six rows above |
+| Lighthouse mobile, release build | 93 (cold, TBT 300 ms) · 97 · 96 · 97 · 97 · 97; CLS 0.0000 on all six; LCP 0.91–0.93 s; TBT 197–218 ms; the machine at load 8–12. Reports: `w7/lh-merged-{1..6}.json` |
+| Scrolling at 1440×900, test build | partly 59.8 fps, thunder 59.6, fog 59.8: no frame gap over 33.3 ms and no main-thread task over 50 ms (longest 25.8 ms), at load 4–10 |
+| The matrix | recaptured on the merged tree: 72 shots, no console error. The contact sheets above are from it. With T10 the hero's text wears a halo, not a chip, on desktop and on a clear phone |
+
+**GPU on the merged tree**, three runs, all while the in-app browser was drawing this same page in two tabs (load 5–12):
+
+1. The full gate (load about 7): every state under 2.0 ms on its median except thunder at dusk, 2.54 (max 3.00), in a burst of contention. Log: `w7/gpu-merged-run1.log`.
+2. The pre-merge and the merged code alternately, twice, three states: the merged code is never the slower. Thunder at dusk 1.49 and 1.39 against 1.67 and 1.57; partly cloudy 1.64 and 1.54 against 1.71 and 1.84; clear 1.01 and 1.14 against 1.04 and 1.00. Log: `w7/gpu-merged-ab.log`.
+3. The full gate again (load 5–10): every median under 2.0 ms, two single samples just over (2.12, 2.01). The quiet-machine table above is the better statement of the pass's own cost: it is the same pass.
+
+| Condition | 1920×1080, DPR 2: min / median / max | 375×812, DPR 3: min / median / max |
+| --- | --- | --- |
+| clear 11:00 | 1.11 / 1.26 / 1.30 | 0.52 / 0.65 / 0.71 |
+| partly 11:00 | 1.84 / 1.95 / 2.12 | 0.84 / 0.88 / 1.03 |
+| overcast 13:00 | 1.48 / 1.85 / 2.01 | 0.66 / 0.76 / 1.02 |
+| fog 07:00 | 0.97 / 1.32 / 1.62 | 0.47 / 0.53 / 0.54 |
+| drizzle 15:00 | 0.63 / 0.78 / 1.06 | 0.61 / 0.88 / 0.94 |
+| rain 15:00 | 0.76 / 1.11 / 1.14 | 0.59 / 0.67 / 0.75 |
+| heavy-rain 15:00 | 0.63 / 0.99 / 1.18 | 0.67 / 0.80 / 0.99 |
+| thunder 15:00 | 1.02 / 1.35 / 1.48 | 0.75 / 0.80 / 0.89 |
+| thunder 18:30 | 1.29 / 1.80 / 1.89 | 0.61 / 0.96 / 1.17 |
+
+**The one test that fails is a decision, not a bug to fix.** `main`'s T10 made the hero's four text elements on a phone text over the sky, never stacked boxes: a halo up to 0.9, and no chip unless even that cannot be read. Its test holds that in three states, the first being partly cloudy at 11:00. On `main` the clouds there are v5.1's dim grey, so a halo is enough. With v6 a sunlit cumulus sits right behind the hero, and the backing model is right to give the status line, the one-liner and the label a chip: light text on a cloud top cannot be read without one, and the pixel gate passes with them. So on top of `main`, a phone's hero wears chips again under bright cloud by day (`w7/hero-phone-chips-merged.png`; in the matrix, `matrix/partly-{0630,1100,1645}-375x812.png`). The test is left as it is, red, rather than weakened, and nothing is dimmed behind the text to make it pass. The ways out: accept a chip under bright cloud and change T10's test to say so; give the hero a softer backing than a box (the backing's CSS, and the model to predict it); or keep the clouds dim on phones, which gives up v6's realism there. DECISIONS #162.
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.
