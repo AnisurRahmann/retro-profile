@@ -575,6 +575,62 @@ and the test build on :3101, both with `WEATHER_MOCK=1`; shots in `.shots/flat-c
 - `src/components/sky/backing-runner.ts`: solves each loose text's clearing factor and hands the zones to the layer.
 - `scripts/flat-clouds-shots.ts`: the review matrix, the drift measurement and the contact sheets.
 
+### Baseline (the noise clouds, test build of 6fbc8aa)
+
+Every header and hero element wore a chip in all four target states at both sizes, except the name (halo or none):
+`.shots/flat-clouds/backing-before.json`. GPU (1920×1080 DPR 2, timer medians): partly 11:00 1.66 ms, overcast 13:00
+1.81, heavy rain 15:00 1.02. Idle renderer 34.2 kB gzip.
+
+### Log
+
+| Step | Result | Evidence |
+| --- | --- | --- |
+| 1 Model | Puffs (5–14 circles on a hump, flat base, ±18%), three layers, decks, cumulonimbus, coverage solved per condition, wind 0.8 px/s per km/h east–west (4–40), breath ±4% over 20–40 s, deterministic by day and layer, constant count | `tests/unit/sky-flat-clouds.test.ts` (26 tests: coverage for 10 seeds per condition at 160×90, determinism, respawn count, north/south fallback, gusts, breath, tones, clearing) |
+| 2 Rendering | Sheets and textures out of the shader; sprites, three tones + rim, lightning lift, exact occlusion, stars behind clouds | shots below |
+| 3 Text clearing | Per-cloud fade by a solved factor (DECISIONS #168), backing reads the flat model (#169), nav links `--on-sky` (#170) | `backing-after.json`, `manifest.json` |
+| 4 Clean-ups | Curtains heavy rain and thunder only, ≤ 0.12, no texture; dead sheet code, textures, the mirror and their tests removed | DECISIONS #177 |
+| 5 Verify | typecheck, lint, 324 unit tests, build, `check:bundle` (up-front 10.6 kB, renderer 34.8 kB of 35); e2e 67/67 on the final test build, the phone-hero test (#162) and the pixel gate unchanged and green (worst 4.61:1 at 375, 4.78:1 at 1440; the first full run had one chat "Stop" flake that passed 10/10 on re-run) | `/tmp/e2e.log` summary here |
+
+**Coverage measured on the page** (`manifest.json`, top of the page, 1440 / 375): clear 0.7 / 0.8%, partly 23.3 / 23.8%,
+cloud 70 at 14:00 44.9 / 47.4%, overcast 83.9 / 83.0%, drizzle 86.5 / 82.8%, rain and heavy rain 93.4 / 90.9%, thunder
+93.5 / 91.3%, fog 0. **Drift:** 11:00 partly, 15 km/h from 270°: the near layer moved 114 px left in 10.2 s at both sizes
+(112 px per 10 s; 120 ± the gust asked).
+
+**Backing at the top of the page** (header: the monogram and three nav links; hero: name, status, one-liner, label):
+
+| State | 1440 header | 1440 hero | 1440 Shipped | 375 header | 375 hero | 375 Shipped |
+| --- | --- | --- | --- | --- | --- | --- |
+| 11:00 partly | none ×4 | halo, halo, halo, none | halo | none ×4 | halo, halo, halo, none | none |
+| 16:45 partly | none ×4 | halo ×4 | chip (dusk glow, #171) | none ×4 | halo, halo, halo, none | chip (#171) |
+| 13:00 overcast | none ×4 | none, halo, halo, halo | halo | none ×4 | none, halo, halo, halo | none |
+| 15:00 heavy rain | none ×4 | none, none, halo, halo | halo | none ×4 | none ×4 | none |
+
+**Review round 1** (`sheet-1440.png`, `sheet-375.png`, first build; and before it the dev server's first frames):
+
+- FAIL: the brief's feathered mask left soft, smeared rectangles in the puffs behind the hero and "Shipped", and dark
+  boxes in the overcast deck behind the header and the hero. → per-cloud clearing (#168).
+- FAIL: overcast as 5 thick rounded slabs read as UI panels, not stratus. → bands of 28–70px strips (#165).
+- FAIL: semi-transparent overlaps (hazy strips meeting end to end) showed as light "pills". → strips abut, never overlap;
+  haze on the whole layer (#176).
+- FAIL: the rain deck's rounded ends met in four-pointed "stars" at the wrap seam and the row junctions. → closed
+  strips with 4px ends, a seamless period.
+- FAIL: the sun's disc showed through the drizzle deck. → drizzle is a deck for the sun (#172).
+- FAIL: the cumulonimbus was the deck's colour (invisible) with a floating anvil. → a core, bigger tiers, the anvil on
+  them, lifted tones (#174).
+- FAIL (evidence): the forced bolt was never drawn: the matrix shot thunder with `lightning=off`, which also blocks the
+  debug strike, and 190 ms after it. → shot with lightning on, 60 ms after the strike.
+- PASS: no soft or noisy cloud edge; partly ~23%; no horizontal banding; dusk caps peach on violet bodies; night clouds
+  dark navy with moonlit caps and rims under a 66% moon; the clouds' flat silhouettes match the landscape's.
+
+**Review round 2** (final build, the same matrix): every round-1 fail fixed. Overcast and drizzle read as calm layered
+bands with staggered ends and thin slits of sky; the rain deck is closed with its ragged underside above the hills;
+thunder shows the bolt, the lit clouds round it and the tower with its anvil in the left gutter; no chip on the header
+or the hero in any shot of the matrix. Still weak: a cloud that thins behind the hero thins whole, so a large near
+cloud touching the one-liner's zone fades entirely for a few seconds; the 1024×768 scene sky is too short for the deck
+bands (#166).
+
+**Bundle and GPU:** DECISIONS #178, #179. **Open:** the 26/30 kB budget (#178); "Shipped" at dusk (#171).
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.
