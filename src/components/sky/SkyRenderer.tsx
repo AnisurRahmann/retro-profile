@@ -705,17 +705,9 @@ function start(
       atmCanvas.dataset.ready = "";
       ptsCanvas.dataset.ready = "";
       // The server-rendered first-paint fallback (src/components/sky/SkyFallback.tsx) has done its job: it fades out
-      // over 400ms (globals.css), then goes.
-      // (The marker is its own attribute: `[data-sky-fallback]` below selects the fallbacks to remove, and <html>
-      // must never be one of them.)
-      const html = document.documentElement;
-      if (html.dataset.skyFallbackDone !== "done") {
-        html.dataset.skyFallbackDone = "done";
-        window.setTimeout(
-          () => document.querySelectorAll("[data-sky-fallback]").forEach((el) => el.remove()),
-          500,
-        );
-      }
+      // over 400ms and is then hidden (globals.css). Never removed: React owns those nodes, and removing them here
+      // made the next client navigation throw "removeChild".
+      document.documentElement.dataset.skyFallbackDone = "done";
     }
     return lightning > 0;
   };

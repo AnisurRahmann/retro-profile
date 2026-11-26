@@ -329,13 +329,19 @@ html {
    loads: a CSS star field and an inline SVG of the landscape, where the canvases will draw it. Colours follow
    --sky-horizon and html[data-sky], both set before first paint by the inline script; without JavaScript the initial
    (night) values apply. SkyRenderer.tsx sets html[data-sky-fallback-done] once its canvases have drawn a first
-   frame: these fade out over 400ms and are then removed. */
+   frame: these fade out over 400ms and are then hidden. They stay in the DOM: React owns them, and a node removed
+   behind its back throws "removeChild" on the next client navigation. `:root` outranks the night rule for the stars
+   below. */
 [data-sky-fallback] {
   pointer-events: none;
   transition: opacity 400ms ease;
 }
-html[data-sky-fallback-done] [data-sky-fallback] {
+:root[data-sky-fallback-done] [data-sky-fallback] {
   opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 400ms ease,
+    visibility 0s linear 400ms;
 }
 /* One element, one box-shadow list of dots (the element's own 1px box is transparent): above the gradient, which comes
    earlier in the DOM at the same z-index, and under everything else. */
@@ -1085,7 +1091,8 @@ html:is([data-sky="night"], [data-sky="astronomical"], [data-sky="nautical"]) .s
   .status-line,
   .reveal,
   .card,
-  [data-sky-fallback] {
+  [data-sky-fallback],
+  :root[data-sky-fallback-done] [data-sky-fallback] {
     transition: none;
   }
   .ring-spin[data-spinning="true"],

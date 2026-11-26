@@ -222,6 +222,31 @@ pnpm build:e2e && pnpm e2e:only (the full Playwright suite, three runs)
 - **The review subagents did not run.** The harness refused to start `code-reviewer` and `security-reviewer` ("No reasoning level selected" for the subagent model selection `account:zai-individual-coding-plan/GLM-5.3`). I reviewed the T8–T10 and bundle diffs myself instead, against the project rules. That review found one thing, fixed (`1de0a3c`): the first-paint script took any `preview=1` on a URL while the client takes the first value, so `?preview=0&preview=1&sky=…` painted a preview sky until hydration. The override was never honoured after hydration, so the gate held. It is not an independent review.
 - **Not touched:** the other worktree (`feat/weather-v6`). It left this branch after T6, so it has none of T7–T10.
 
+### Review of PR #7 (2026-11-26)
+
+An independent review of the 20 commits. It re-ran the gates and measured each task against a production build
+(`next start`, `&preview=1`; probes in `.scratch/review/`, shots in `.shots/review-pr7/`).
+
+- **Measured:** T1: all 7 short lines fit at 375 (widest 195px of 307), status line 24px, 4px to the one-liner.
+  T3: stage 772 = 812 − 40, scene 200px (572–772), h1 at 88px, "Shipped" at 804 (8px peek); same in all 4 states.
+  T6: at 1440 max scroll the footer text ends 32px above the band. T7: footer 16px under the closing scene, scene
+  drawn 200ms after the jump. T9: badge "preview HH:MM" with `&preview=1`, none and no override without it. T10: the
+  4 hero elements are `none` at 03:30, 11:00, 16:45 and 17:20 at 375. T4 and T8 checked on crops and the no-JS shots.
+- **Bug found and fixed: client navigation threw `removeChild` twice.** Once the canvas had drawn, the renderer
+  `.remove()`d the first-paint fallbacks, but React owns those nodes: leaving the home page (e.g. to `/lifts`) made
+  React remove them again, and `NotFoundError` was thrown at 375 and 1440. The fallbacks are now hidden by CSS only
+  (`:root[data-sky-fallback-done] [data-sky-fallback]`: opacity 0, then `visibility: hidden` after 400ms). `:root`
+  is needed because the night stars rule had the same specificity and came later, so the stars would have stayed.
+  The reduced-motion rule gets the same selector, so there the fallback hides at once. `sky-firstpaint.spec.ts` now
+  checks the fallbacks are hidden (not gone), and has a new test per size: hand-over, go to `/lifts`, come back, no
+  page error.
+- **After the fix:** typecheck, lint, 280 unit tests, build, `check:bundle` (up-front 10.6 kB, renderer 25.5 kB)
+  pass. The full Playwright suite ran twice: 67/67 in one run; the other had 1 failure in `chat.spec.ts` ("a
+  rate-limited reply offers the call instead"), which passed in the second run and doesn't touch the sky. T5 flight
+  counts were 1 then 2 at both sizes, in both runs.
+- **Known gaps, not fixed:** the first-paint SVG masks use `#fff` stops (they're masks, not colour); the preview badge
+  shows the time when the override was set and doesn't tick forward.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.

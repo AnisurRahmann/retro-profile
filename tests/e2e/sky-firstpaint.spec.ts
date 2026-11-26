@@ -217,7 +217,8 @@ test.describe("first paint on a cold load (v5.1 T8)", () => {
         { timeout: 20_000 },
       );
       await page.waitForTimeout(2500);
-      expect(await page.locator("[data-sky-fallback]").count()).toBe(0);
+      // Hidden, not removed (React owns the nodes).
+      for (const el of await page.locator("[data-sky-fallback]").all()) await expect(el).toBeHidden();
       expect(await shippedTop()).toBe(shippedFirst);
       const live = await page.screenshot();
       await ctx.close();
@@ -267,3 +268,24 @@ test.describe("first paint on a cold load (v5.1 T8)", () => {
     });
   }
 });
+
+// The fallbacks are React's nodes: once the canvas has taken over they are hidden, never removed, so a client
+// navigation away from home and back unmounts them cleanly (removing them threw "removeChild" in PR #7's review).
+for (const size of SIZES) {
+  test(`T8 at ${size.width}: client navigation after the hand-over throws nothing`, async ({ page }) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.goto(`/?${DAY}`);
+    await page.waitForFunction(() => document.documentElement.dataset.skyFallbackDone === "done", null, {
+      timeout: 20_000,
+    });
+    await page.waitForTimeout(600);
+    await page.locator('a[href="/lifts"]').first().click();
+    await expect(page).toHaveURL(/\/lifts$/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/\?/);
+    await expect(page.locator('[data-on-sky="name"]')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+}
