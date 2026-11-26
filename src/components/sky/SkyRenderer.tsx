@@ -652,7 +652,7 @@ function start(
     midLuma = 0.2126 * mid[0]! + 0.7152 * mid[1]! + 0.0722 * mid[2]!;
     const hzCloud = cloudHz();
     // The wind carries each sheet along: across, and away in log depth. The offsets are never wrapped: the rotated
-    // octaves, the warp and the Worley cells share no period, so a wrap would jump the field (DECISIONS #127), and
+    // octaves, the warp and the Worley cells share no period, so a wrap would jump the field (DECISIONS #132), and
     // a float holds a sheet's place to a texel for days. The wind gusts (±20% at 0.07 Hz) and LOW and HIGH evolve.
     const depth = depthK(view.vw, hzCloud);
     const swell = gust(t);

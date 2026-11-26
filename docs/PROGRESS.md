@@ -116,7 +116,7 @@ Branch `feat/weather-v6`, off `fix/sky-v5.1` @ cd5feaf (T6), in its own worktree
 
 ### Baseline, before any change
 
-typecheck and lint clean; vitest 242 passed (18 files); `pnpm build` green. **`pnpm check:bundle` is red on the base branch**: the idle renderer measures 26.1 kB gzip against its 26.0 kB budget (up-front 10.7 kB of 13.0 kB), so v5.1's T4–T6 had already used all of it. See DECISIONS #115.
+typecheck and lint clean; vitest 242 passed (18 files); `pnpm build` green. **`pnpm check:bundle` is red on the base branch**: the idle renderer measures 26.1 kB gzip against its 26.0 kB budget (up-front 10.7 kB of 13.0 kB), so v5.1's T4–T6 had already used all of it. See DECISIONS #133.
 
 Evidence comes from `pnpm dev` on :3105 with `WEATHER_MOCK=1 CHAT_MOCK=1` (dist dir `.scratch/next-dev`, git-ignored), so no shot calls Open-Meteo. Shots go to `.shots/v6/<task>/`. There is no Sky Lab in this branch (no `sky:matrix`, no panel), so the matrix is `scripts/weather-v6-shots.ts`.
 
@@ -152,7 +152,7 @@ One line per "Done when" item. PASS / FAIL are from the code and a fresh screens
 | Done when | Result | Evidence |
 | --- | --- | --- |
 | Partly 11:00: puffy cumulus, bright tops, greyer bases | PASS | `partly-1100-1440x900.png`, `partly-1100-375x812.png` |
-| Smaller and denser toward the horizon; cirrus above | PASS | same (log depth, DECISIONS #116) |
+| Smaller and denser toward the horizon; cirrus above | PASS | same (log depth, DECISIONS #121) |
 | Overcast 13:00: textured grey sheet, no sun disc | PASS | `overcast-1300-1440x900.png`, `overcast-1300-375x812.png` (`__sky.sun`: `deck: true`, τ 2.3) |
 | Soft bright patch at the sun | PASS | measured at the sun rgb(110,113,119) against rgb(93,99,108) 140 px to its right (1440×900, final code) |
 | Golden dusk 16:45 partly: undersides orange, tops blue-grey | PASS | `golden-1645-partly-1440x900.png`, `golden-1645-partly-375x812.png` |
@@ -163,21 +163,21 @@ One line per "Done when" item. PASS / FAIL are from the code and a fresh screens
 | Reduced motion: nothing new animates in W1 | PASS | a still frame is the same sky with the sheets where the wind has left them (W2 adds their motion, with its still path) |
 | typecheck, lint, unit tests | PASS | 258 tests in 19 files (16 new in `tests/unit/sky-clouds.test.ts`) |
 
-Two things the first build got wrong and the tests and zooms caught, both fixed before this log: a 45% sky was 38% under cloud (DECISIONS #119), and the stratus deck's thin patches were bright-rimmed holes (#120). A third was clouds staying day-bright after sunset (#121).
+Two things the first build got wrong and the tests and zooms caught, both fixed before this log: a 45% sky was 38% under cloud (DECISIONS #124), and the stratus deck's thin patches were bright-rimmed holes (#125). A third was clouds staying day-bright after sunset (#126).
 
 **Not green, and why:**
 
-- **Idle bundle 30.1 kB gzip against a 26.0 kB budget.** The budget is raised to 31 kB and the gate kept (DECISIONS #128). The base branch was already over (26.1 kB). Open for veto.
-- **The pixel-contrast gate (`tests/e2e/sky-backing.spec.ts`, run on a W1 test build) fails 6 rows, none of them unreadable text.** Five are the desktop footer icons at the "closer" scroll (2.29–4.11:1): the same five fail on the base commit cd5feaf (its log: `.scratch/e2e-backing-base.log`), since T6 put them over open sky. The gate takes a filled icon as its glyph and measures the sky outside the icon's 1px-inset chip; on the chip the icon is about 5.9:1. The sixth is the phone's `receipts-note` at "closer" (3.23:1 in that run, 5.07:1 in a re-run): the chip's interior is 5.2:1, and the gate caught the chip's antialiased top edge blended with a v6 cumulus top beside it (rgb 101,103,107), where v5.1's sky there was dark navy. Fixing either means the backing's CSS or the gate, both outside this brief; left for a decision (DECISIONS #129).
+- **Idle bundle 30.1 kB gzip against a 26.0 kB budget.** The budget is raised to 31 kB and the gate kept (DECISIONS #133). The base branch was already over (26.1 kB). Open for veto.
+- **The pixel-contrast gate (`tests/e2e/sky-backing.spec.ts`, run on a W1 test build) fails 6 rows, none of them unreadable text.** Five are the desktop footer icons at the "closer" scroll (2.29–4.11:1): the same five fail on the base commit cd5feaf (its log: `.scratch/e2e-backing-base.log`), since T6 put them over open sky. The gate takes a filled icon as its glyph and measures the sky outside the icon's 1px-inset chip; on the chip the icon is about 5.9:1. The sixth is the phone's `receipts-note` at "closer" (3.23:1 in that run, 5.07:1 in a re-run): the chip's interior is 5.2:1, and the gate caught the chip's antialiased top edge blended with a v6 cumulus top beside it (rgb 101,103,107), where v5.1's sky there was dark navy. Fixing either means the backing's CSS or the gate, both outside this brief; left for a decision (DECISIONS #134).
 
 #### W2 cloud motion — `feat(weather): W2 …`
 
 | Done when | Result | Evidence |
 | --- | --- | --- |
 | Wind blows toward from + 180°: east–west to screen x, north–south into the depth | PASS | unit test; `w2/wind15-from270-1440x900-{0,1,2}.png` (3 frames 5 s apart: the same clouds travel left) and `-375x812-…` |
-| Wind 40 from 0° (north) | PASS as **receding** (DECISIONS #130): the same clouds sink toward the horizon and get smaller | `w2/wind40-from0-1440x900-{0,1,2}.png`, `-375x812-…`; the opposite wind for contrast: `w2/wind40-from180-…` (they come on) |
+| Wind 40 from 0° (north) | PASS as **receding** (DECISIONS #135): the same clouds sink toward the horizon and get smaller | `w2/wind40-from0-1440x900-{0,1,2}.png`, `-375x812-…`; the opposite wind for contrast: `w2/wind40-from180-…` (they come on) |
 | Speeds LOW 1, MID 0.6, HIGH 0.3, SCUD 1.6; never still in calm air | PASS | unit test |
-| Evolution: LOW 0.02/s, HIGH 0.008/s | PASS, as a drifting warp field (DECISIONS #131) | unit test |
+| Evolution: LOW 0.02/s, HIGH 0.008/s | PASS, as a drifting warp field (DECISIONS #136) | unit test |
 | Gusts ±20% at 0.07 Hz | PASS | unit test (min 0.80, max 1.20, mean 1.00) |
 | Calibration: a LOW feature in the upper third of 1440×900 at 15 km/h moves 60–120 px in 10 s | PASS: **measured 100 px in 10 s** (the band y 60–300 of two frames 10 s apart, correlated against 240 candidate shifts: 0.87) | `w2/cal-wind15-1440x900-{0,1}.png`; phone `w2/cal-wind15-375x812-{0,1}.png`: 16 px |
 | Reduced motion | PASS: a still frame integrates no drift, swell or evolution | `SkyRenderer.tsx` `draw()`: the sheets move only when a frame is not still |
@@ -194,13 +194,13 @@ The first build had the depth drift's sign inverted and matched the brief's word
 | Density per 100,000 px²: drizzle 8, rain 22, heavy-rain 48, thunder 40 | PASS | unit test; `w3/drizzle-1500-…`, `w3/rain-1500-…`, `w3/heavy-rain-1500-…` (both sizes; `sheet-w3-desktop.png`, `sheet-w3-phone.png`) |
 | Rain lighting: warm #FFD9A0 at 0.5 near lamps at night | PASS | `w3/lamp-rain-2130-1440x900.png` (3× zoom: warm streaks above the lamp head), `w3/rain-2130-{1440x900,375x812}.png` |
 | × 2.5 alpha in a lightning flash | PASS in code (`particles.ts`: alpha × (1 + 1.5 · flash)); shown in W4's rain | — |
-| Heavy rain: veil L1 60% / L2 35%, rain curtains, sky 10% darker | PASS | `w3/heavy-rain-1500-1440x900.png`, `-375x812.png` (DECISIONS #137) |
+| Heavy rain: veil L1 60% / L2 35%, rain curtains, sky 10% darker | PASS | `w3/heavy-rain-1500-1440x900.png`, `-375x812.png` (DECISIONS #142) |
 | Splashes: rain 30/s, heavy-rain 70/s per 1,000 px; skipped on a phone under 30 fps | PASS | `w3/heavy-rain-splash-1440x900.png`, `w3/rain-splash-1440x900.png` (4× zoom of the river); the rule is in `SkyRenderer.tsx` (mean frame time) and not forced on screen |
 | No sun disc in rain | PASS | `manifest.json`: `sun.deck` true for rain, heavy-rain and thunder |
-| Lights on with sky luminance, not the clock | PASS | `w3/heavy-rain-1300-lights-1440x900.png`: lit windows and lamps at 13:00 under a storm (DECISIONS #136) |
+| Lights on with sky luminance, not the clock | PASS | `w3/heavy-rain-1300-lights-1440x900.png`: lit windows and lamps at 13:00 under a storm (DECISIONS #141) |
 | Heavy-rain 15:00, wind 30 from 200° | Slants **left**, 13.4° from vertical | `w3/heavy-rain-1500-1440x900.png`: a wind from 200° blows toward 20°, which has an eastward component, and east is screen-left (the viewer faces south) |
 
-typecheck, lint and 271 unit tests (20 files) pass. Idle renderer 31.1 kB gzip: the budget goes to 32 kB for it (DECISIONS #138).
+typecheck, lint and 271 unit tests (20 files) pass. Idle renderer 31.1 kB gzip: the budget goes to 32 kB for it (DECISIONS #143).
 
 #### W4 lightning — `feat(weather): W4 …`
 
@@ -213,20 +213,20 @@ typecheck, lint and 271 unit tests (20 files) pass. Idle renderer 31.1 kB gzip: 
 | Scene response: sky +0.05 L, cloud lit, landscape rim #DDE6FF at 0.6, rain × 2.5, river reflection | PASS | the bolt shots: the rim along the hills and the bridge and the light on the water are clearest in `bolt-2100-375x812.png` |
 | Scheduler: thunder CG mean 9 s min 4, IC mean 5 s min 2; heavy rain CG off, IC 25 s | PASS | unit test, 10,000 simulated seconds per state |
 | First CG 1.2–2.5 s after the first frame; again within 1.5 s after the stage returns; at most once in 20 s | PASS: every minute's log opens with a bolt at 1.4–2.4 s; the return rule is in `SkyRenderer.tsx` (the stage = the top half of the viewport) and not forced on screen | `w4/thunder-60s-1440x900.png`, its log in `.scratch/w14.log` |
-| Placement rejects `[data-on-sky]` / card rects, retry 6, else IC | PASS (DECISIONS #141) | the log's `x` per bolt |
+| Placement rejects `[data-on-sky]` / card rects, retry 6, else IC | PASS (DECISIONS #146) | the log's `x` per bolt |
 | Photosafety: ≤ 3 pulses in any one second, unit test over 10,000 simulated seconds | PASS: peak 3 or fewer in each of three storm states | `tests/unit/sky-lightning.test.ts` |
 | Debug hooks `window.__sky.strike` and `window.__sky.lightningLog` (last 20) in dev/preview only | PASS | every W4 line above is printed from them |
 | None under reduced motion | PASS: count `{cg: 0, ic: 0}` with the hook called | `w4/thunder-reduced-1440x900.png` |
 | 60 s counts 4–10 CG, 8–16 IC | PASS in three natural minutes: **6 CG / 13 IC, 5 / 13, 8 / 16** | `w4/thunder-60s-1440x900.png` (the last of them) |
-| Atmosphere pass ≤ 2.0 ms desktop, ≤ 1.5 ms phone, every condition | **PASS on the median, with no margin**, after remedies (DECISIONS #145, #146). Final steady-state gate (`gpu.json`; the desktop was under load, 8–10): desktop 1920×1080 DPR 2, min / median / max: clear 1.25 / 1.34 / 1.37, partly 1.86 / **1.96** / 2.01, overcast 1.30 / 1.81 / 2.11, fog 0.94 / 1.37 / 1.40, drizzle 0.79 / 1.20 / 1.41, rain 0.76 / 1.46 / 1.74, heavy-rain 0.94 / 1.14 / 1.41, thunder 15:00 0.71 / 1.22 / 1.33, thunder 18:30 1.29 / 1.71 / 2.02; phone 375×812 DPR 3 medians 0.64–1.21 (largest single sample 1.71). In a quieter batch the same code read partly 1.79 and thunder at dusk 1.83; in a busier one partly 2.17 and thunder at dusk 2.18. The three largest desktop samples (2.01, 2.11, 2.02) are over. | `gpu.json`, interleaved attribution runs in DECISIONS #146 |
+| Atmosphere pass ≤ 2.0 ms desktop, ≤ 1.5 ms phone, every condition | **PASS on the median, with no margin**, after remedies (DECISIONS #150, #151). Final steady-state gate (`gpu.json`; the desktop was under load, 8–10): desktop 1920×1080 DPR 2, min / median / max: clear 1.25 / 1.34 / 1.37, partly 1.86 / **1.96** / 2.01, overcast 1.30 / 1.81 / 2.11, fog 0.94 / 1.37 / 1.40, drizzle 0.79 / 1.20 / 1.41, rain 0.76 / 1.46 / 1.74, heavy-rain 0.94 / 1.14 / 1.41, thunder 15:00 0.71 / 1.22 / 1.33, thunder 18:30 1.29 / 1.71 / 2.02; phone 375×812 DPR 3 medians 0.64–1.21 (largest single sample 1.71). In a quieter batch the same code read partly 1.79 and thunder at dusk 1.83; in a busier one partly 2.17 and thunder at dusk 2.18. The three largest desktop samples (2.01, 2.11, 2.02) are over. | `gpu.json`, interleaved attribution runs in DECISIONS #151 |
 
-Three things the evidence caught before this log, all fixed: bolts came in pairs 1.4 s apart because a strike that had to wait re-dated its next from a stale time (#140); the first build drew the bolt black (an invalid CSS colour left the previous stroke style in place); phones never got a bolt, because the hero spans their width (#141). The steady-state gate then failed at 2.17 ms and took an octave from LOW and HIGH (#146); W1's evidence was re-taken after it and still passes. Idle renderer 33.3 kB gzip of 34.0. A React hydration warning showed twice in about 150 dev page loads, both times on the first load after a code edit (the dev server recompiling); four loads of the same state afterwards were clean, and no test build shows it.
+Three things the evidence caught before this log, all fixed: bolts came in pairs 1.4 s apart because a strike that had to wait re-dated its next from a stale time (#145); the first build drew the bolt black (an invalid CSS colour left the previous stroke style in place); phones never got a bolt, because the hero spans their width (#146). The steady-state gate then failed at 2.17 ms and took an octave from LOW and HIGH (#151); W1's evidence was re-taken after it and still passes. Idle renderer 33.3 kB gzip of 34.0. A React hydration warning showed twice in about 150 dev page loads, both times on the first load after a code edit (the dev server recompiling); four loads of the same state afterwards were clean, and no test build shows it.
 
 #### W5 storm atmosphere — `feat(weather): W5 …`
 
 | Done when | Result | Evidence |
 | --- | --- | --- |
-| Thunder: a darker cloud base over the top 35% (DECISIONS #148) | PASS | `w5/thunder-1500-1440x900.png`, `thunder-1830-1440x900.png`, and `-375x812` |
+| Thunder: a darker cloud base over the top 35% (DECISIONS #153) | PASS | `w5/thunder-1500-1440x900.png`, `thunder-1830-1440x900.png`, and `-375x812` |
 | Wind-driven rain at 35° | PASS: 35° at 45 km/h, and at 5 km/h too | the same shots; `w5/thunder-1500-calm-1440x900.png` (5 km/h); unit test |
 | Dusk horizon glow dimmed 50% | PASS | `w5/thunder-1830-1440x900.png`, `thunder-1830-375x812.png` |
 | Thunder 15:00 and 18:30 at both sizes, between strikes | PASS (`lightning=off`) | `sheet-w5-desktop.png`, `sheet-w5-phone.png` |
@@ -235,30 +235,30 @@ Three things the evidence caught before this log, all fixed: bolts came in pairs
 
 | Done when | Result | Evidence |
 | --- | --- | --- |
-| Distance fog: L1 85%, L2 60%, L3 30%, L4 8% toward the fog colour | PASS (DECISIONS #149) | `w6/fog-0700-1440x900.png`, `fog-2200-1440x900.png`, `fog-bands-1440x900.png` (3× zoom: the hills faintest, the bridge and the boat nearest), `-375x812` |
-| Three ground-fog bands, 30 / 60 / 110 px, alpha .18–.32, noise stretched 12:1, at least 2 px/s | PASS per the brief; subtle on screen (DECISIONS #151): the bands drift at 2.2 / 3.4 / 5 px/s (unit test), and two frames 10 s apart differ by 0.25% of a pixel on average over the open land | `w6/fog-drift-1440x900-{0,1}.png`; `tests/unit/sky-fog.test.ts` |
+| Distance fog: L1 85%, L2 60%, L3 30%, L4 8% toward the fog colour | PASS (DECISIONS #154) | `w6/fog-0700-1440x900.png`, `fog-2200-1440x900.png`, `fog-bands-1440x900.png` (3× zoom: the hills faintest, the bridge and the boat nearest), `-375x812` |
+| Three ground-fog bands, 30 / 60 / 110 px, alpha .18–.32, noise stretched 12:1, at least 2 px/s | PASS per the brief; subtle on screen (DECISIONS #156): the bands drift at 2.2 / 3.4 / 5 px/s (unit test), and two frames 10 s apart differ by 0.25% of a pixel on average over the open land | `w6/fog-drift-1440x900-{0,1}.png`; `tests/unit/sky-fog.test.ts` |
 | Pale rayless sun, alpha ≤ 0.6 | PASS | the sun in `w6/fog-0700-1440x900.png` and `-375x812.png`; the alpha is capped in `bodies.ts` and in the backing model |
 | Stars hidden, moon pale and blurred | PASS: stars' alpha × (1 − fog); the moon blurred 2.5 px and 40% paler | `w6/fog-2200-1440x900.png`: no stars (the dotted arc is the time strip's path), and the moon (up, 93%) a soft pale disc in a wide halo. Corrected in W7: this row first said the moon was below the horizon at 22:00; it is up, and the blur was in the shot all along. On the phone the moon sits behind the hero's chip |
 | Fog 07:00 and 22:00 at both sizes, and two frames 10 s apart | PASS | `sheet-w6-desktop.png`, `sheet-w6-phone.png`, `w6/fog-drift-1440x900-{0,1}.png` |
 | Reduced motion | PASS: the ground fog's drift is held in a still frame | `SkyRenderer.tsx` `draw()` |
-| Gate | PASS: typecheck, lint, 282 tests, build; the idle renderer measures 34.5 kB gzip, so the budget is raised 34 → 35 kB (DECISIONS #152); up-front unchanged at 10.7 kB | `pnpm check:bundle` |
+| Gate | PASS: typecheck, lint, 282 tests, build; the idle renderer measures 34.5 kB gzip, so the budget is raised 34 → 35 kB (DECISIONS #157); up-front unchanged at 10.7 kB | `pnpm check:bundle` |
 
 #### W7 matrix review and gates — `feat(weather): W7 …`
 
-The matrix (DECISIONS #156): `npx tsx scripts/weather-v6-shots.ts matrix` on the dev server. 72 shots in `.shots/v6/matrix/`: every condition at 06:30, 11:00, 16:45 and 22:00 on 2026-11-26, the four rain conditions again on 2026-07-15 at 15:00, a forced bolt at the end of the thunder row, at 1440×900 and 375×812. Shots are named `<condition>-<time>-<size>.png`. What follows was read from the contact sheets and the larger review sheets, at full size and at 2–5× zooms where something looked off.
+The matrix (DECISIONS #161): `npx tsx scripts/weather-v6-shots.ts matrix` on the dev server. 72 shots in `.shots/v6/matrix/`: every condition at 06:30, 11:00, 16:45 and 22:00 on 2026-11-26, the four rain conditions again on 2026-07-15 at 15:00, a forced bolt at the end of the thunder row, at 1440×900 and 375×812. Shots are named `<condition>-<time>-<size>.png`. What follows was read from the contact sheets and the larger review sheets, at full size and at 2–5× zooms where something looked off.
 
 | Done when | Result | Evidence |
 | --- | --- | --- |
 | Contact sheets, one per size | done | `matrix/sheet-matrix-desk.png`, `matrix/sheet-matrix-phone.png`; to read: `matrix/review-desk-<condition>.png`, `matrix/review-phone-<two conditions>.png` |
 | **Round 1**, every cell, as a strict designer | **FAIL in 2 things, both fixed** (below). Elsewhere: no sun disc through a deck, no tiling, no banding, no hard horizon under a clear, partly or overcast sky, text legible in every cell | the round's shots were overwritten by the final capture; two before-fix crops are kept in `w7/` |
-| — A straight edge across the sky in fog, heavy rain and thunder, every time of day, both sizes: a lighter flat band from the top of the landscape's canvas down (1440×900 y ≈ 610; 375×812 y ≈ 522) | **FAIL → fixed** (DECISIONS #153) | before: `w7/before-seam-fog-0630-1440x900.png`, `w7/before-seam-heavy-rain-1100-1440x900.png` (crops, y 560–900 and 600–900); after: `matrix/fog-{0630,1100,1645,2200}-{1440x900,375x812}.png`, `matrix/heavy-rain-1100-{1440x900,375x812}.png`, `matrix/thunder-1100-375x812.png` |
-| — Night clouds rust-brown on near-black in every cloudy condition at 22:00: the town's glow showed only where a cloud faced the moon | **FAIL → fixed** (DECISIONS #154) | before: no shot kept; measured rgb(53,37,28) beside rgb(8,11,17). After: `matrix/overcast-2200-1440x900.png` (an even deck, grey overhead, warm toward the town's glow at the horizon), `matrix/partly-2200-1440x900.png` (dark blue-grey cloud, a silver moonlit edge) |
+| — A straight edge across the sky in fog, heavy rain and thunder, every time of day, both sizes: a lighter flat band from the top of the landscape's canvas down (1440×900 y ≈ 610; 375×812 y ≈ 522) | **FAIL → fixed** (DECISIONS #158) | before: `w7/before-seam-fog-0630-1440x900.png`, `w7/before-seam-heavy-rain-1100-1440x900.png` (crops, y 560–900 and 600–900); after: `matrix/fog-{0630,1100,1645,2200}-{1440x900,375x812}.png`, `matrix/heavy-rain-1100-{1440x900,375x812}.png`, `matrix/thunder-1100-375x812.png` |
+| — Night clouds rust-brown on near-black in every cloudy condition at 22:00: the town's glow showed only where a cloud faced the moon | **FAIL → fixed** (DECISIONS #159) | before: no shot kept; measured rgb(53,37,28) beside rgb(8,11,17). After: `matrix/overcast-2200-1440x900.png` (an even deck, grey overhead, warm toward the town's glow at the horizon), `matrix/partly-2200-1440x900.png` (dark blue-grey cloud, a silver moonlit edge) |
 | **Round 2**, recapture | **FAIL in 1 thing, fixed**; the two above pass | |
-| — Faint stars through the overcast deck on the phone at 22:00 | **FAIL → fixed** (DECISIONS #155) | after: `matrix/overcast-2200-375x812.png`, `matrix/rain-2200-375x812.png`: no stars |
+| — Faint stars through the overcast deck on the phone at 22:00 | **FAIL → fixed** (DECISIONS #160) | after: `matrix/overcast-2200-375x812.png`, `matrix/rain-2200-375x812.png`: no stars |
 | The night glow made even and graded toward the horizon | done, after round 2 read the first fix as too brown overhead. A self-review of the diff then found the grading's factor written the wrong way round (strongest overhead): corrected, and everything below re-measured on the corrected code | `matrix/overcast-2200-{1440x900,375x812}.png`, `matrix/thunder-2200-1440x900.png`: rgb(22,20,23) at the top of the deck, rgb(62,47,36) just above the hills |
 | **Final capture** on the final code, all 72 cells | **PASS**: the three fixes hold, nothing new. No page error; one shot logged the dev-only hydration warning (12 reloads of that state: none) | `sheet-matrix-desk.png`, `sheet-matrix-phone.png`, `matrix/manifest.json` |
 | What still does not look real | logged below, in the final report | |
-| Pixel-contrast gate (`tests/e2e/sky-backing.spec.ts`, final test build) | **not green: 6 rows, the same six as in W1** (DECISIONS #129), none of them new and none unreadable text | at 1440 `footer-linkedin` in clear 16:45 (1.98:1), partly 06:20 (2.75), partly 11:00 (3.30), clear 17:20 (3.38): the icon that fails on the base commit too, one state fewer (5 there); at 375 `receipts-note` in partly 06:20 (3.12, no chip) and partly 11:00 (3.32, chip), where a bright cumulus top meets the chip's edge. Log: `.scratch/e2e-backing-w7.log` |
+| Pixel-contrast gate (`tests/e2e/sky-backing.spec.ts`, final test build) | **not green: 6 rows, the same six as in W1** (DECISIONS #134), none of them new and none unreadable text | at 1440 `footer-linkedin` in clear 16:45 (1.98:1), partly 06:20 (2.75), partly 11:00 (3.30), clear 17:20 (3.38): the icon that fails on the base commit too, one state fewer (5 there); at 375 `receipts-note` in partly 06:20 (3.12, no chip) and partly 11:00 (3.32, chip), where a bright cumulus top meets the chip's edge. Log: `.scratch/e2e-backing-w7.log` |
 | Lighthouse mobile, production build, `/` (WEATHER_MOCK=1: the fixture's fog) | **PASS**: six runs 93 (cold, TBT 314 ms) · 98 · 98 · 98 · 98 · 98; CLS 0.0000 on every run; LCP 0.76 s; TBT 145–173 ms warm. Two earlier sixes, on builds along the way: 90 (cold) · 98 × 5, and 73 (cold) · 94 · 98 × 4 | `w7/lh-w7-{1..6}.json` |
 | Atmosphere pass ≤ 2.0 ms/frame desktop, ≤ 1.5 ms mobile, every condition | **PASS on a quiet machine** (load under 3; in W4 the desktop was at 8–16): every state under both, but thunder at dusk clears 2.0 by 0.06. 1920×1080 DPR 2, min / median / max of six samples: clear 0.76 / 0.78 / 0.80, partly 1.21 / 1.29 / 1.33, overcast 1.23 / 1.31 / 1.42, fog 0.65 / 0.69 / 0.74, drizzle 1.07 / 1.25 / 1.31, rain 1.19 / 1.34 / 1.49, heavy-rain 1.28 / 1.30 / 1.38, thunder 15:00 1.24 / 1.43 / 1.47, thunder 18:30 1.43 / 1.84 / 1.94. 375×812 DPR 3: medians 0.28–0.59, largest sample 0.61. The run before the glow's factor was corrected read thunder at dusk 1.57 / 1.61 / 1.84: the state itself varies that much between runs | `w7/gpu-final.json`, log `.scratch/gpu-final-w7.log` |
 | Scrolling 60 fps on desktop | **PASS** at 1440×900, with one honest caveat. Partly 11:00 and fog 07:00: 60.0 fps, frame gap p95 and max 16.8 ms. Thunder 11:00, eight runs (four with lightning on, four off): 60.0 fps in four, 59.6 in the others, each with a single 50 ms frame; no main-thread task over 21 ms in any run, so it is not a long task, and at rest the same state holds 60 fps for its first 7 s with no frame over 17 ms (three runs each of thunder, rain, fog and partly: the veil's strip re-renders cost nothing visible). Not found; logged below | `scripts/probe/scroll-trace.mts` on the final test build; traces `w7/scroll-trace-{partly-1100,thunder-1100,fog-0700}.json` and `w7/scroll-trace-thunder-1100-run{1,2,3}.json` |
@@ -273,17 +273,17 @@ Branch `feat/weather-v6`, off `fix/sky-v5.1` @ cd5feaf: seven commits, W1–W7, 
 
 | Task | Verdict | Screenshots |
 | --- | --- | --- |
-| W1 cloud model | **PASS** on every item (deviations #116–#129) | `w1/partly-1100-{1440x900,375x812}.png`, `overcast-1300-…`, `golden-1645-partly-…`, `night-0200-partly-…`; `sheet-w1-desktop.png`, `sheet-w1-phone.png` |
-| W2 cloud motion | **PASS**; a north wind makes the clouds recede (#130) | `w2/wind15-from270-1440x900-{0,1,2}.png`, `wind40-from0-…`, `wind40-from180-…`, `cal-wind15-1440x900-{0,1}.png` |
+| W1 cloud model | **PASS** on every item (deviations #121–#134) | `w1/partly-1100-{1440x900,375x812}.png`, `overcast-1300-…`, `golden-1645-partly-…`, `night-0200-partly-…`; `sheet-w1-desktop.png`, `sheet-w1-phone.png` |
+| W2 cloud motion | **PASS**; a north wind makes the clouds recede (#135) | `w2/wind15-from270-1440x900-{0,1,2}.png`, `wind40-from0-…`, `wind40-from180-…`, `cal-wind15-1440x900-{0,1}.png` |
 | W3 rain | **PASS** | `w3/drizzle-1500-…`, `rain-1500-…`, `heavy-rain-1500-…`, `rain-2130-…` (both sizes), `heavy-rain-1300-lights-1440x900.png`, `heavy-rain-splash-1440x900.png`, `lamp-rain-2130-1440x900.png`; `sheet-w3-desktop.png`, `sheet-w3-phone.png` |
 | W4 lightning | **PASS** | `w4/bolt-2100-{1440x900,375x812}.png`, `bolt-1530-…`, `sheet-flash-2100-…`, `thunder-60s-1440x900.png`, `thunder-reduced-1440x900.png` |
 | W5 storm atmosphere | **PASS** | `w5/thunder-1500-{1440x900,375x812}.png`, `thunder-1830-…`, `thunder-1500-calm-1440x900.png` |
-| W6 fog with depth | **PASS**; the ground fog is subtle (#151) | `w6/fog-0700-{1440x900,375x812}.png`, `fog-2200-…`, `fog-bands-1440x900.png`, `fog-drift-1440x900-{0,1}.png` |
-| W7 matrix and gates | **PASS** after three fixes; the pixel-contrast gate is **not green** (6 rows, #129) | `matrix/sheet-matrix-desk.png`, `matrix/sheet-matrix-phone.png` |
+| W6 fog with depth | **PASS**; the ground fog is subtle (#156) | `w6/fog-0700-{1440x900,375x812}.png`, `fog-2200-…`, `fog-bands-1440x900.png`, `fog-drift-1440x900-{0,1}.png` |
+| W7 matrix and gates | **PASS** after three fixes; the pixel-contrast gate is **not green** (6 rows, #134) | `matrix/sheet-matrix-desk.png`, `matrix/sheet-matrix-phone.png` |
 
 **W2, cloud travel.** 100 px in 10 s at 1440×900: a LOW cloud in the upper third (band y 60–300) at 15 km/h from 270°, two frames 10 s apart correlated against 240 shifts (0.87). The brief asks 60–120. At 375×812 the same wind moves a feature 16 px (the band is 70 px wide, so fewer shifts fit). `w2/cal-wind15-1440x900-{0,1}.png`, `w2/cal-wind15-375x812-{0,1}.png`.
 
-**W4, lightning counts.** Three natural minutes on screen (1440×900, thunder at 21:00), from `window.__sky.lightningLog`: **6 CG / 13 IC, 5 / 13, 8 / 16** (the brief asks 4–10 and 8–16). **Three pulses a second:** `tests/unit/sky-lightning.test.ts` runs the scheduler for 10,000 simulated seconds in each of three storm states (thunder; thunder with heavy rain; heavy rain without thunder) and finds a peak of **3 or fewer bright pulses in every second**: PASS. It holds because a strike has at most three pulses, all within 400 ms, and no two strikes begin within 1.4 s (#139).
+**W4, lightning counts.** Three natural minutes on screen (1440×900, thunder at 21:00), from `window.__sky.lightningLog`: **6 CG / 13 IC, 5 / 13, 8 / 16** (the brief asks 4–10 and 8–16). **Three pulses a second:** `tests/unit/sky-lightning.test.ts` runs the scheduler for 10,000 simulated seconds in each of three storm states (thunder; thunder with heavy rain; heavy rain without thunder) and finds a peak of **3 or fewer bright pulses in every second**: PASS. It holds because a strike has at most three pulses, all within 400 ms, and no two strikes begin within 1.4 s (#144).
 
 **GPU, ms per frame**, the atmosphere pass from the renderer's own timer, steady state, six samples a state, final code, a quiet machine (load under 3).
 
@@ -299,7 +299,7 @@ Branch `feat/weather-v6`, off `fix/sky-v5.1` @ cd5feaf: seven commits, W1–W7, 
 | thunder 15:00 | 1.24 / 1.43 / 1.47 | 0.57 / 0.59 / 0.60 |
 | thunder 18:30 | 1.43 / 1.84 / 1.94 | 0.51 / 0.55 / 0.56 |
 
-Budget: 2.0 ms desktop, 1.5 ms mobile. Every state is under both; the closest is thunder at dusk, 1.94 against 2.0. The same timer read a third to a half more while the desktop was busy (W4's gate, load 8–16: partly 1.86 / 1.96 / 2.01, overcast 1.30 / 1.81 / 2.11, thunder at dusk 1.29 / 1.71 / 2.02; phone medians 0.64–1.21): under load it passes on the median with no margin, and three of those samples are over 2.0 (#145, #146). One state also moves between quiet runs (thunder at dusk 1.61 and 1.84 at the median), so the last digit of any of these is not worth much.
+Budget: 2.0 ms desktop, 1.5 ms mobile. Every state is under both; the closest is thunder at dusk, 1.94 against 2.0. The same timer read a third to a half more while the desktop was busy (W4's gate, load 8–16: partly 1.86 / 1.96 / 2.01, overcast 1.30 / 1.81 / 2.11, thunder at dusk 1.29 / 1.71 / 2.02; phone medians 0.64–1.21): under load it passes on the median with no margin, and three of those samples are over 2.0 (#150, #151). One state also moves between quiet runs (thunder at dusk 1.61 and 1.84 at the median), so the last digit of any of these is not worth much.
 
 Scrolling at 1440×900, final test build: partly cloudy and fog 60.0 fps, no frame gap over 16.8 ms. Thunder, eight runs: 60.0 fps in four and 59.6 in four, each of those with one 50 ms frame; no main-thread task over 21 ms in any run.
 
@@ -309,18 +309,18 @@ Scrolling at 1440×900, final test build: partly cloudy and fog 60.0 fps, no fra
 
 **What still does not look real**, after two review rounds and three fixes:
 
-1. **Near cumulus are smooth, airbrushed masses**: soft 20 px edges and no inner billows, where a real one has a crisp, lumpy outline. The backing is at the brief's floor (0.4, so 2.5 CSS px a texel at DPR 1) and LOW has three octaves, which is what the 2.0 ms budget paid for (#146). `matrix/partly-1100-1440x900.png`, `matrix/partly-0630-1440x900.png` (pink dawn), `matrix/partly-1645-1440x900.png`.
-2. **A far thin cloud's edge shows the backing's steps**, 2.5 px at a time, from 3× zoom up. A crisper edge was tried and made it worse (#154). `matrix/partly-1100-1440x900.png` (the streaks low left and right).
+1. **Near cumulus are smooth, airbrushed masses**: soft 20 px edges and no inner billows, where a real one has a crisp, lumpy outline. The backing is at the brief's floor (0.4, so 2.5 CSS px a texel at DPR 1) and LOW has three octaves, which is what the 2.0 ms budget paid for (#151). `matrix/partly-1100-1440x900.png`, `matrix/partly-0630-1440x900.png` (pink dawn), `matrix/partly-1645-1440x900.png`.
+2. **A far thin cloud's edge shows the backing's steps**, 2.5 px at a time, from 3× zoom up. A crisper edge was tried and made it worse (#159). `matrix/partly-1100-1440x900.png` (the streaks low left and right).
 3. **Overcast at night is a flat, dark umber-grey deck.** Better than the rust marbling it was, but it has little structure: the moon's diffuse glow and a slow mottling. `matrix/overcast-2200-1440x900.png`, `-375x812.png`.
-4. **Ground fog is barely there over land**, at the briefed .18–.32 (#151). `w6/fog-drift-1440x900-{0,1}.png`.
+4. **Ground fog is barely there over land**, at the briefed .18–.32 (#156). `w6/fog-drift-1440x900-{0,1}.png`.
 5. **Golden-hour cloud is a muted tan-orange** rather than a glowing orange (16:45 is 19 minutes before this date's 17:04 sunset). `matrix/partly-1645-1440x900.png`, `matrix/rain-1645-1440x900.png`.
 6. Not weather, but in every shot: the hero's lines wear dark chips over bright cloud (the text backing, which this brief leaves alone). `matrix/partly-1100-1440x900.png`.
 
 **Open for a decision** (each in docs/DECISIONS.md):
 
-- **Bundle.** The idle renderer's budget went 26 → 31 → 32 → 34 → 35 kB gzip; it measures 34.7. The base branch was already over its 26 kB (26.1). The up-front sky JS is unchanged at 10.7 of 13.0 kB, so first paint is untouched (#128, #138, #147, #152).
-- **Pixel-contrast gate**, 6 rows of several hundred: the desktop `footer-linkedin` icon in four states (fails on the base commit too), and the phone's `receipts-note` in two partly-cloudy states, where a bright cumulus top meets its chip's edge (#129).
-- **A north wind makes the clouds recede**, the opposite of the brief's W2 wording; the viewer faces south (#130).
+- **Bundle.** The idle renderer's budget went 26 → 31 → 32 → 34 → 35 kB gzip; it measures 34.7. The base branch was already over its 26 kB (26.1). The up-front sky JS is unchanged at 10.7 of 13.0 kB, so first paint is untouched (#133, #143, #152, #157).
+- **Pixel-contrast gate**, 6 rows of several hundred: the desktop `footer-linkedin` icon in four states (fails on the base commit too), and the phone's `receipts-note` in two partly-cloudy states, where a bright cumulus top meets its chip's edge (#134).
+- **A north wind makes the clouds recede**, the opposite of the brief's W2 wording; the viewer faces south (#135).
 - **W5's "again within 1.5 s of the stage returning"** is in the code and never forced on screen.
 - **One 50 ms frame in half the thunder scroll runs** (59.6 fps against 60.0), with lightning on or off and no long task behind it. Not reproduced at rest and not found.
 - The GPU gate's first measurement was under load; the quiet one above is the final code.

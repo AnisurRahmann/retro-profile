@@ -65,7 +65,7 @@ import {
 
 /**
  * Cirrus: fbm octaves. LOW is 3 (hand-inlined), MID a patch mask and its cells, SCUD 2: what the GPU budget pays
- * for (W4: LOW and HIGH each gave up an octave when the steady-state pass measured over 2 ms; DECISIONS #146).
+ * for (W4: LOW and HIGH each gave up an octave when the steady-state pass measured over 2 ms; DECISIONS #151).
  */
 const HIGH_OCTAVES = 2;
 /** The softness of a cirrus and a SCUD edge, in noise. */
