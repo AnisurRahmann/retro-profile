@@ -59,6 +59,11 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
   page the landscape isn't fixed: it's drawn into two slots in the page (z −1), the stage's horizon and a 220px
   closing scene that ends 16px above the footer ("scene mode"). Scenes are pre-rendered: drawn once on the first
   frame, and ahead while within 1.5 viewport heights of the screen.
+- First paint (v5.1 T8): the page itself carries a fallback for the lazy-loaded canvases — a CSS star field and the
+  landscape as inline SVG (`src/components/sky/SkyFallback.tsx`, built from the same world and path data) — which the
+  renderer fades out over 400ms once its canvases have drawn. The hand-over must not move the landscape
+  (`tests/e2e/sky-firstpaint.spec.ts`); anything fixed that is not part of the page's flow goes before the stage,
+  not between the stage and the first section.
 - Loose text (text directly on the sky, `data-on-sky`) gets per-element backing, never a scrim:
   `src/lib/sky/backing.ts` estimates the brightest sky behind each box (gradient, cloud mirror, glow, fog, sun and
   moon, city glow, landscape) and picks none (≥ 7:1 `--text`, ≥ 4.8:1 secondary) · halo (text-shadow in `--ink`,

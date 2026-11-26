@@ -324,6 +324,192 @@ html {
   }
 }
 
+/* ── First-paint fallback (v5.1 T8) ────────────────────────
+   Server-rendered (src/components/sky/SkyFallback.tsx) so a cold load never shows a bare gradient while the renderer
+   loads: a CSS star field and an inline SVG of the landscape, where the canvases will draw it. Colours follow
+   --sky-horizon and html[data-sky], both set before first paint by the inline script; without JavaScript the initial
+   (night) values apply. SkyRenderer.tsx sets html[data-sky-fallback-done] once its canvases have drawn a first
+   frame: these fade out over 400ms and are then removed. */
+[data-sky-fallback] {
+  pointer-events: none;
+  transition: opacity 400ms ease;
+}
+html[data-sky-fallback-done] [data-sky-fallback] {
+  opacity: 0;
+}
+/* One element, one box-shadow list of dots (the element's own 1px box is transparent): above the gradient, which comes
+   earlier in the DOM at the same z-index, and under everything else. */
+.sky-fallback-stars {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -4;
+  width: 1px;
+  height: 1px;
+  border-radius: 50%;
+  background: transparent;
+  opacity: 0;
+}
+/* Night: what the first-paint script worked out, or no script at all. */
+html[data-sky="night"] .sky-fallback-stars,
+html:not([data-sky]) .sky-fallback-stars {
+  opacity: 1;
+}
+.sky-fallback {
+  /* How light the landscape is (landscape/colors.ts sunLight): 0.55 at night, then by the first-paint state. */
+  --fb-k: 0.55;
+  /* Each layer is its base colour hazed toward the horizon (HAZE 0.26 / 0.18 / 0.12 / 0.04) ... */
+  --fb-l1: color-mix(in oklab, var(--land-l1), var(--sky-horizon) 26%);
+  --fb-l2: color-mix(in oklab, var(--land-l2), var(--sky-horizon) 18%);
+  --fb-l3: color-mix(in oklab, var(--land-l3), var(--sky-horizon) 12%);
+  --fb-l4: color-mix(in oklab, var(--land-l4), var(--sky-horizon) 4%);
+  --fb-river: color-mix(in oklab, var(--sky-horizon), var(--land-l4) 30%);
+  /* ... with its lightness × --fb-k (colors.ts scaleL: L × k, a and b kept). Rectangular OKLab, not oklch(): for a
+     near-black layer Chrome resolves the polar form's hue to "none" and the ground came out maroon at night. */
+  --fb-l1-lit: oklab(from var(--fb-l1) calc(l * var(--fb-k)) a b);
+  --fb-l2-lit: oklab(from var(--fb-l2) calc(l * var(--fb-k)) a b);
+  --fb-l3-lit: oklab(from var(--fb-l3) calc(l * var(--fb-k)) a b);
+  --fb-l4-lit: oklab(from var(--fb-l4) calc(l * var(--fb-k)) a b);
+  --fb-ground: oklab(from var(--fb-l4) calc(l * var(--fb-k) + 0.03) a b);
+}
+html[data-sky="civil"] .sky-fallback {
+  --fb-k: 0.72;
+}
+html[data-sky="golden"] .sky-fallback {
+  --fb-k: 0.9;
+}
+html[data-sky="day"] .sky-fallback {
+  --fb-k: 1.05;
+}
+/* (The first declaration of each is for browsers without relative colour syntax: the layer, unlit.) */
+.sky-fallback [data-layer="L1"] {
+  fill: var(--fb-l1);
+  stroke: var(--fb-l1);
+  fill: var(--fb-l1-lit);
+  stroke: var(--fb-l1-lit);
+}
+.sky-fallback [data-layer="L2"] {
+  fill: var(--fb-l2);
+  stroke: var(--fb-l2);
+  fill: var(--fb-l2-lit);
+  stroke: var(--fb-l2-lit);
+}
+.sky-fallback [data-layer="L3"] {
+  fill: var(--fb-l3);
+  stroke: var(--fb-l3);
+  fill: var(--fb-l3-lit);
+  stroke: var(--fb-l3-lit);
+}
+.sky-fallback [data-layer="L4"] {
+  fill: var(--fb-l4);
+  stroke: var(--fb-l4);
+  fill: var(--fb-l4-lit);
+  stroke: var(--fb-l4-lit);
+}
+.sky-fallback g {
+  stroke-linecap: round;
+}
+/* Only the shapes' own stroke paths (fill="none") take the stroke: a filled shape drawn with it too would be a
+ * unit fatter than the canvas's on every side. */
+.sky-fallback :is(path, rect):not([fill="none"]) {
+  stroke: none;
+}
+.sky-fallback [data-ground] {
+  fill: var(--fb-ground);
+}
+.sky-fallback [data-river] {
+  fill: var(--fb-river);
+  stroke: none;
+}
+.sky-fallback [data-bank] {
+  opacity: 0.45;
+  stroke: none;
+}
+.sky-fallback [data-glint] {
+  fill: none;
+  stroke: oklab(from var(--fb-river) 0.12 a b);
+  opacity: 0.7;
+}
+/* The city's glow behind the skyline: at night only (the late-evening strength, about 0.1 at the horizon). */
+.sky-fallback [data-glow] {
+  fill: var(--city-glow);
+  opacity: 0;
+  stroke: none;
+}
+html[data-sky="night"] .sky-fallback [data-glow],
+html:not([data-sky]) .sky-fallback [data-glow] {
+  opacity: 0.1;
+}
+/* The clock face and its hands: punched out to the tea gardens behind the tower. */
+.sky-fallback [data-cut] {
+  fill: var(--fb-l2-lit);
+  stroke: var(--fb-l2-lit);
+}
+/* Phones: the stage scene, in the stage's scene slot (the canvas is appended after it, so it draws over it). */
+.sky-fallback-stage {
+  position: absolute;
+  left: 0;
+  bottom: -48px;
+  width: 100%;
+  height: calc(100% + 48px);
+  display: none;
+}
+@media (max-width: 639px) {
+  .sky-fallback-stage {
+    display: block;
+  }
+}
+.sky-fallback-stage > svg {
+  display: block;
+}
+.sky-fallback-stage > svg:first-child {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* Keane Bridge, centred on the viewport's width as the canvas centres it. */
+.sky-fallback-bridge {
+  position: absolute;
+  top: 0;
+  left: 50%;
+}
+/* From 1100px: the fixed band, over the first 1400 units. Its SVG is drawn at the band's own scale while the
+   viewport is no wider than 14 band heights (1400 units); wider than that it would be magnified, so it is hidden. */
+.sky-fallback-band {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  z-index: -3;
+  width: 100%;
+  height: var(--band-h);
+  display: none;
+}
+@media (min-width: 1100px) and (max-aspect-ratio: 252 / 100) {
+  .sky-fallback-band {
+    display: block;
+  }
+}
+.sky-fallback-band > svg:first-child {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* The first landmark set on the right gutter's centre: ((vw − 768) / 4 in from the right edge). The renderer hides
+   it where the solver puts the tower elsewhere (SkyRenderer.tsx relayoutLand). */
+.sky-fallback-landmarks {
+  position: absolute;
+  bottom: 0;
+  left: calc(75vw + 192px);
+  width: calc(var(--band-h) * 2.1);
+  height: var(--band-h);
+  margin-left: calc(var(--band-h) * -2.02);
+}
+.sky-fallback-landmarks[hidden] {
+  display: none;
+}
+
 /* ── Loose text ─────────────────────────────────────────────
    Text that sits directly on the sky carries data-on-sky. It gets backing only where it needs it, and only as much
    as it needs (src/lib/sky/backing.ts decides per element, src/components/sky/backing-runner.ts writes it):
@@ -877,7 +1063,8 @@ html:is([data-sky="night"], [data-sky="astronomical"], [data-sky="nautical"]) .s
   }
   .status-line,
   .reveal,
-  .card {
+  .card,
+  [data-sky-fallback] {
     transition: none;
   }
   .ring-spin[data-spinning="true"],

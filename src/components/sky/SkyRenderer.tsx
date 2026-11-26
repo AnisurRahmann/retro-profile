@@ -35,6 +35,7 @@ import {
 import { createParticles, mulberry32, type Particles, type ParticleState } from "./particles";
 import {
   closingWalk,
+  gutterCentre,
   landMode,
   PARALLAX,
   solveAnchors,
@@ -701,6 +702,18 @@ function start(
     if (frames === 1) {
       atmCanvas.dataset.ready = "";
       ptsCanvas.dataset.ready = "";
+      // The server-rendered first-paint fallback (src/components/sky/SkyFallback.tsx) has done its job: it fades out
+      // over 400ms (globals.css), then goes.
+      // (The marker is its own attribute: `[data-sky-fallback]` below selects the fallbacks to remove, and <html>
+      // must never be one of them.)
+      const html = document.documentElement;
+      if (html.dataset.skyFallbackDone !== "done") {
+        html.dataset.skyFallbackDone = "done";
+        window.setTimeout(
+          () => document.querySelectorAll("[data-sky-fallback]").forEach((el) => el.remove()),
+          500,
+        );
+      }
     }
     return lightning > 0;
   };
@@ -890,11 +903,18 @@ function start(
           Math.max(0, view.docH - view.vh),
           mode === "scene" ? "centre" : mode,
         );
-        b.land.resize(
-          view.vw,
-          H,
-          buildWorld(anchors, view.vw, view.vh, view.docH, H, mode === "scene" ? "centre" : mode),
-        );
+        const wd = buildWorld(anchors, view.vw, view.vh, view.docH, H, mode === "scene" ? "centre" : mode);
+        b.land.resize(view.vw, H, wd);
+        // The first-paint fallback drew Ali Amjad's Clock on its right gutter's centre at the top of the page, which
+        // is where the solver puts it on most viewports. Where it doesn't, the tower would jump when the canvas takes
+        // over: hide the fallback's landmarks there, they arrive with the canvas instead (v5.1 T8).
+        const clock = wd.marks.find((k) => k.id === "clock");
+        document
+          .querySelector("[data-sky-fallback-landmarks]")
+          ?.toggleAttribute(
+            "hidden",
+            !clock || Math.abs(((clock.x0 + clock.x1) / 2) * wd.s - gutterCentre(view.vw, "right")) > 3,
+          );
       } else {
         const H = b.slot!.clientHeight;
         if (H < 10) continue; // hidden (gutter mode)
