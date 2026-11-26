@@ -3,20 +3,35 @@
  * runs, every [data-on-sky] element wears the conservative CSS default (halo at a = 0.5, globals.css), which keeps
  * the first frame readable at any time of day. Then each element is relaxed to "none" or upgraded to "chip".
  *
- * Writes `data-backing` (none | halo | chip) and `--halo-a` / `--chip-a` (inline), only when they change.
+ * Writes `data-backing` (none | halo | chip) and `--halo-a` / `--chip-a` (inline), only when they change. The hero's
+ * text (HERO_TEXT) never wears a chip while a scrub or the time-lapse runs: the strongest halo instead (v5.1 T10).
  * Recomputes: whenever the renderer asks (the 60 s sky tick, weather, preview/scrub; throttled to 10 Hz), on
  * layout changes, and on scroll (8 Hz, only elements in view: one IntersectionObserver). New elements (chat
  * replies) are picked up by a MutationObserver.
  */
-import { backgroundFor, decide, parseCssColor, TEXT, type Box, type Decision, type Scene } from "@/lib/sky/backing";
+import {
+  backgroundFor,
+  decide,
+  parseCssColor,
+  TEXT,
+  weightOf,
+  type Box,
+  type Decision,
+  type Scene,
+  type Style,
+} from "@/lib/sky/backing";
 import { luminance, type RGB } from "@/lib/sky/color";
+import { skyStore } from "@/lib/sky/store";
 import { onViewGeometry, onViewScroll, runtime, view } from "@/lib/sky/view";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
 const SCROLL_MS = 125;
 const UPDATE_MS = 100;
 
-type Info = { rgb: RGB; px: number };
+/** The hero's text: `data-on-sky` ids (backing.ts Style.hero). */
+const HERO_TEXT = new Set(["name", "status", "one-liner", "label"]);
+
+type Info = { rgb: RGB; px: number; weight: number };
 export type BackingReport = { id: string; mode: string; a: number; contrast: number; bg: string };
 
 export function startBacking(scene: () => Omit<Scene, "vw" | "vh" | "cloudsIn">) {
@@ -27,13 +42,17 @@ export function startBacking(scene: () => Omit<Scene, "vw" | "vh" | "cloudsIn">)
   const report = new Map<HTMLElement, BackingReport>();
   let dead = false;
 
-  /** The element's dimmest text colour (mixed-colour lines are judged by their secondary part) and font size. */
+  /**
+   * The element's dimmest text colour (mixed-colour lines are judged by their secondary part), its font size (the
+   * smallest in it) and its own weight.
+   */
   const infoOf = (el: HTMLElement): Info => {
     let i = info.get(el);
     if (!i) {
       const cs = getComputedStyle(el);
       let rgb = parseCssColor(cs.color) ?? TEXT;
       let px = parseFloat(cs.fontSize) || 16;
+      const weight = weightOf(cs.fontWeight);
       const kids = el.querySelectorAll<HTMLElement>("*");
       for (let k = 0; k < Math.min(kids.length, 24); k++) {
         const kid = kids[k]!;
@@ -44,7 +63,7 @@ export function startBacking(scene: () => Omit<Scene, "vw" | "vh" | "cloudsIn">)
         if (c && luminance(c) < luminance(rgb)) rgb = c;
         px = Math.min(px, parseFloat(kc.fontSize) || px);
       }
-      i = { rgb, px };
+      i = { rgb, px, weight };
       info.set(el, i);
     }
     return i;
@@ -75,8 +94,12 @@ export function startBacking(scene: () => Omit<Scene, "vw" | "vh" | "cloudsIn">)
       if (r.width < 1 || r.height < 1) continue;
       const box = { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom };
       const bg = backgroundFor(s, box);
-      const { rgb, px } = infoOf(el);
-      const d = decide(bg, rgb, px, window.devicePixelRatio || 1);
+      const { rgb, px, weight } = infoOf(el);
+      const d = decide(bg, rgb, px, window.devicePixelRatio || 1, {
+        weight,
+        hero: HERO_TEXT.has(el.dataset.onSky ?? ""),
+        scrubbing: skyStore.get().scrubbing,
+      } satisfies Style);
       write(el, d);
       if (TEST) {
         const hex = `#${bg.map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("")}`;

@@ -56,21 +56,30 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
   particles (arc, stars, moon, sun, birds, planes, meteors, rain) · z −2 landscape band (fixed bottom, 18vh / 14svh,
   110–200px + 120px headroom: four parallax silhouette layers, night lights, city glow, fireflies, rickshaw,
   take-off) · z −1 grain. Body is transparent; `<html>` paints `--ink`. **No scrims.** Below 1100px on the home
-  page the landscape isn't fixed: it's drawn into two slots in the page (z −1), the stage's horizon and a 200px
-  closing band above the footer ("scene mode").
+  page the landscape isn't fixed: it's drawn into two slots in the page (z −1), the stage's horizon and a 220px
+  closing scene that ends 16px above the footer ("scene mode"). Scenes are pre-rendered: drawn once on the first
+  frame, and ahead while within 1.5 viewport heights of the screen.
+- First paint (v5.1 T8): the page itself carries a fallback for the lazy-loaded canvases — a CSS star field and the
+  landscape as inline SVG (`src/components/sky/SkyFallback.tsx`, built from the same world and path data) — which the
+  renderer fades out over 400ms once its canvases have drawn. The hand-over must not move the landscape
+  (`tests/e2e/sky-firstpaint.spec.ts`); anything fixed that is not part of the page's flow goes before the stage,
+  not between the stage and the first section.
 - Loose text (text directly on the sky, `data-on-sky`) gets per-element backing, never a scrim:
   `src/lib/sky/backing.ts` estimates the brightest sky behind each box (gradient, cloud mirror, glow, fog, sun and
-  moon, city glow, landscape) and picks none (≥ 7:1 `--text`, ≥ 4.8:1 secondary) · halo (text-shadow in `--ink`,
+  moon, city glow, landscape) and picks none (≥ 7:1 `--text`, ≥ 4.8:1 secondary, ≥ 3.2:1 large text) · halo (text-shadow in `--ink`,
   `--halo-a` from the calibrated `HALO_CURVE`) · chip (glass pseudo-element, `--ink` at ≥ 0.62, blur 8px, radius 6).
-  Cards stay glass. The gate is the pixel test `tests/e2e/sky-backing.spec.ts` (≥ 4.5:1 for every loose element,
-  8 states × 3 scrolls × 1440/375). New text on the sky needs `data-on-sky` and a box that hugs it (`w-fit`).
+  Cards stay glass. The hero's four text elements take a halo up to 0.9 before a chip and never a chip while a scrub
+  runs (`decide`'s `hero` and `scrubbing`). The gate is the pixel test `tests/e2e/sky-backing.spec.ts` (≥ 4.5:1 for
+  every loose element, 3:1 for large text; 8 states × 3 scrolls × 1440/375). New text on the sky needs `data-on-sky` and a box that hugs it (`w-fit`).
 - Sky v2/v3 rules: the celestial layer never scrolls (parallax 0); the landscape is real parallax (L1 0.04, L2 0.15,
   L3 0.45, L4 0.9). ≥ 1100px each landmark reaches its gutter centre (alternating sides, ≤ 90% of the gutter; the
   bridge may run under the column) when its section's top is at 40%; below 1100px, scene mode
   (`src/lib/sky/landscape/anchors.ts`).
   Scroll is read by a passive listener and applied in rAF; landscape paths never re-run per scroll frame (strip
   bitmaps). Time travel goes through `src/lib/sky/scrub.ts` (preview minutes, back to now in 1.6 s). Nothing dims
-  the sun or moon behind text (only cloud and altitude change them); the backing counts them instead.
+  the sun or moon behind text (only cloud and altitude change them); the backing counts them instead. `?sky` / `?wx`
+  work in dev and test builds; in production only with `NEXT_PUBLIC_SKY_DEBUG=1` or `&preview=1`, and then the page
+  shows the fixed "preview HH:MM" badge (`html[data-sky-preview]`, `SKY_PREVIEW_BADGE`; never in the test build).
 - Sky rules: state comes from sun elevation (suncalc), never clock hour. Every displayed time is Asia/Dhaka via Intl.
   Weather comes only from `/api/sylhet` (server-cached Open-Meteo, 15 min); the browser never calls Open-Meteo.
   The keyframe palette lives in `src/lib/sky/palette.ts` (the only hex outside `globals.css`); retune it only with
@@ -80,7 +89,9 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
   scroll. Budgets (gzip, excluding suncalc, enforced by `pnpm check:bundle`): up-front sky JS ≤ 13 kB, idle-loaded
   renderer ≤ 26 kB (DECISIONS #101); inline first-paint script < 1.5 kB; atmosphere GPU ≤ 2 ms at 1920×1080 DPR 2 (`scripts/probe/gpu-sky.mts`);
   no long task > 50 ms while scrolling (`scripts/probe/scroll-trace.mts`). Tests and e2e run with `WEATHER_MOCK=1`;
-  never hit Open-Meteo from a test.
+  never hit Open-Meteo from a test. A release bundle holds no e2e hooks and no debug-only code: `next.config.ts` `env`
+  gives `NEXT_PUBLIC_E2E` and `NEXT_PUBLIC_SKY_DEBUG` a value to fold, and code behind them uses a constant of its own
+  module (`TEST`, `DEBUG`), never an import or a parameter (DECISIONS #120; `check:bundle` fails on `window.__sky`).
 - Accessibility beats design when they conflict; log it.
 
 ## Docs

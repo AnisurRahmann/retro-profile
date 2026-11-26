@@ -3,6 +3,7 @@ import { Closer } from "@/components/Closer";
 import { hasPortrait, Portrait } from "@/components/Portrait";
 import { ReceiptCard } from "@/components/ReceiptCard";
 import { StatusLine } from "@/components/StatusLine";
+import { SkyFallbackBand, SkyFallbackStage } from "@/components/sky/SkyFallback";
 import { SkyLabel } from "@/components/sky/SkyLabel";
 import { SkyStage } from "@/components/sky/SkyStage";
 import { Waveform } from "@/components/Waveform";
@@ -27,7 +28,11 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd).replace(/</g, "\\u003c") }}
       />
-      <SkyStage copy={ui.sky}>
+      {/* First-paint fallback (v5.1 T8) for the fixed band (from 1100px), under the canvases (z −3). It is fixed, so it
+          can stand anywhere: here, before the stage, because the first section's margin goes by the stage's next
+          sibling (globals.css `main > .sky-stage + .section`) and must not wait for this to be removed. */}
+      <SkyFallbackBand />
+      <SkyStage copy={ui.sky} fallback={<SkyFallbackStage />}>
         {/* Mobile: a 56px portrait beside the name, the rest full width under them; without a photo (the initials
             fallback) the avatar is hidden below 640px and the name comes first. Desktop: the 88px portrait beside
             the whole block. */}

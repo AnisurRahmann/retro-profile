@@ -7,6 +7,7 @@
  *   its gutter and scaled to ≤ 90% of the gutter's width, except Keane Bridge, whose spans run on under the column
  *   (the clock tower stands at the gutter centre, the bridge reaches left from it).
  * - buildStageScene / buildClosingScene: scene mode (< 1100px), the stage's horizon and the band above the footer.
+ * - buildFillers: the generic fillers alone (the first-paint fallback, SkyFallback.tsx).
  */
 import { mulberry32 } from "../random";
 import {
@@ -298,6 +299,27 @@ export function buildWorld(
     plane: geom?.gate ?? null,
     planeK: geom?.k ?? 1,
     airport: geom,
+    marks: b.marks,
+  };
+}
+
+/**
+ * The generic fillers alone over the first `units` units: the first-paint fallback's world (SkyFallback.tsx). No
+ * landmark and no airport is placed, so nothing is skipped around one and nothing depends on the viewport or the page.
+ */
+export function buildFillers(units: number): World {
+  const length = { L1: units, L2: units, L3: units, L4: units };
+  const b = builder(1, 0, length);
+  b.fill();
+  return {
+    s: 1,
+    layers: b.layers,
+    lights: b.lights,
+    start: 0,
+    length,
+    plane: null,
+    planeK: 1,
+    airport: null,
     marks: b.marks,
   };
 }

@@ -1,6 +1,6 @@
 # Progress
 
-Branch `redesign/talk-to-my-agent` (off `main` @ 9fb4a5a). Nothing pushed, nothing deployed.
+Branch `fix/sky-v5.1` (off `main` @ 3cb5d0d): the Sylhet Sky v5.1 work, below under "v5.1 resume"; the last entry is its final report. Before that, `redesign/talk-to-my-agent` (off `main` @ 9fb4a5a). Nothing pushed, nothing deployed.
 
 ## File map
 
@@ -19,6 +19,7 @@ Which file does what (as found by grep, 2026-11-26). Paths are relative to the r
   - `src/components/sky/SkyLabel.tsx`, `SkyStrip.tsx`, `SylhetClock.tsx`, `SkyGlyph.tsx`: the time · weather · place label, the sun-path strip (on phones the 44px arc handle), the clock, the glyphs.
 - The sky background
   - `src/components/sky/SkyBackdrop.tsx`, `SkyMount.tsx`: the fixed layer stack; the renderer is lazy-loaded after idle.
+  - `src/components/sky/SkyFallback.tsx`: the first-paint fallback (v5.1 T8), server-rendered: the CSS star field, and the landscape as inline SVG built from the canvas's own world and path data (the phone's stage scene, the desktop band). `SkyStage.tsx` takes it into the scene slot; the renderer removes it once its canvases have drawn.
   - `src/components/sky/SkyController.tsx`: fetches `/api/sylhet`, paints the CSS gradient, sets the label's place.
   - `src/components/sky/SkyRenderer.tsx`: the canvas renderer: atmosphere, particles, the landscape bands (fixed band, stage scene, closing scene), their lighting, the take-off trigger, the `window.__sky` test hooks.
   - `src/components/sky/landscape.ts`: draws one landscape band (layer strips, rims, tea rows, the city glow, the ground fade).
@@ -26,18 +27,18 @@ Which file does what (as found by grep, 2026-11-26). Paths are relative to the r
   - `src/components/sky/particles.ts`: stars, the moon, meteors, rain. `bodies.ts`: the sun sprites, the dotted arc, `drawHalo` (the 22° ring).
   - `src/components/sky/atmosphere.ts`, `sky-shader.ts`, `cloud-field.ts`, `ambient.ts`, `hooks.ts`: the WebGL2 sky, its shader, the CPU cloud mirror, birds / planes / fireflies / rickshaw, shared hooks.
 - Text backing
-  - `src/lib/sky/backing.ts`: the model (`decide`, `HALO_CURVE`, the chip's alpha). `src/components/sky/backing-runner.ts`: writes `data-backing`, `--halo-a`, `--chip-a` on each `[data-on-sky]` element.
+  - `src/lib/sky/backing.ts`: the model (`decide`, `HALO_CURVE`, the chip's alpha, the large-text rule, the hero's rules). `src/components/sky/backing-runner.ts`: writes `data-backing`, `--halo-a`, `--chip-a` on each `[data-on-sky]` element.
 - Sky maths (`src/lib/sky/`)
   - `arc.ts`: the sun/moon arc, `stageHeightFor`, `SCENE_HORIZON`. `view.ts`: live page geometry. `horizon.ts`: where the horizon is on screen.
-  - `store.ts`: the sky store, the `?sky` / `?wx` overrides, `SKY_DEBUG`. `first-paint.ts`: the inline first-paint script.
+  - `store.ts`: the sky store, the `?sky` / `?wx` overrides and where they are honoured (`SKY_DEBUG`, `overridesAllowed`, the production preview badge). `first-paint.ts`: the inline first-paint script.
   - `model.ts`, `gradient.ts`, `palette.ts`, `astro.ts`, `time.ts`, `scrub.ts`, `weather.ts`, `color.ts`: the sky model, colours, the keyframe palette, astronomy, Dhaka time, time travel, the weather shape, colour maths.
 - Landscape (`src/lib/sky/landscape/`)
-  - `anchors.ts`: parallax, landmark anchors, `landMode`, `sceneBand`, the scene walks. `world.ts`: `buildWorld` (the fixed band), `buildStageScene`, `buildClosingScene`.
+  - `anchors.ts`: parallax, landmark anchors, `landMode`, `sceneBand`, the scene walks. `world.ts`: `buildWorld` (the fixed band), `buildStageScene`, `buildClosingScene`, `buildFillers` (the generic fillers alone, for the first-paint fallback).
   - `shapes.ts`: the silhouettes as SVG path data. `plane.ts`: the plane, its take-off path, `planePx`, `createArrival` (the arrival trigger).
   - `colors.ts`: layer colours, `teaRowColor`, `sunLight`. `lights.ts`: window schedules, the city glow alpha.
 - Tests and tools
   - `tests/unit/sky-*.test.ts`: arc, plane, landscape, horizon, contrast, render, gradient (incl. the first-paint script).
-  - `tests/e2e/sky.spec.ts`, `sky-backing.spec.ts` (the pixel gate), `sky-nowebgl.spec.ts`, `pixels.ts`.
+  - `tests/e2e/sky.spec.ts`, `sky-backing.spec.ts` (the pixel gate), `sky-nowebgl.spec.ts`, `sky-firstpaint.spec.ts` (the first paint without JavaScript, and the hand-over to the canvas), `pixels.ts`. `tests/unit/sky-fallback.test.tsx`: the fallback's markup. `tests/unit/sky-overrides.test.ts`: the overrides in each kind of build, the preview badge. `tests/e2e/sky-hero-backing.spec.ts`: the hero's text wears no chip on a phone.
   - `scripts/check-bundle.ts` (the budgets), `scripts/shots-sky.ts`, `scripts/probe/` (review shots and probes).
 
 ## v5.1 resume (2026-11-26)
@@ -109,6 +110,142 @@ At 03:30 clear, 375×812 and 1440×900:
 - The band stays fixed. The page just ends `--band-h` higher: the footer gets a bottom margin of the band's height from 1100px up (max scroll went from 1321 to 1483 at 1440×900).
 - Shots: `.shots/v5.1/T6/t6-0330-after-1440x900-bottom.png` (before: `.shots/v5.1/baseline/base-0330-clear-1440x900-bottom.png`; together in `sheet-before-after.png`), `t6-1920x1080-maxscroll.png`.
 - Not in scope, left alone: the chat dock button (bottom-left) still sits over the band, and the plane's take-off still climbs through the sky just under the footer for its 4.6 s. DECISIONS #114.
+
+#### T7 · the closing scene on mobile
+
+- PASS: at 375×812 at max scroll there is no empty band over 40px between the closer card and the footer. Measured from the scene canvas itself (rows with drawn pixels): the card ends at y 539, the hills begin at 554.5 (15.5px under it) and every row from there to the footer is drawn (hills, airport, river, ground); no empty run at all. Same at 11:00 partly cloudy and 16:45 clear.
+- PASS: the scene is already drawn 200 ms after a jump from the top of the page to the bottom: the canvas has `data-ready` and opacity 1 at that moment (`.shots/v5.1/T7/sky-2026-11-26T03-30-wx-clear-375x812-200ms-after-jump.png`, and the same for 11:00 and 16:45; sheet `sheet.png`). Before the pre-render it was drawn by then but still fading in (opacity 0.47).
+- The numbers: the scene is 220px (491–711 at max scroll); the footer starts 16px after it (727). Before: closer 415, scene 463–663, footer 727, with a 48px margin above the scene and 64px below it.
+- Shots: `.shots/v5.1/T7/sky-2026-11-26T{03-30-wx-clear,11-00-wx-partly,16-45-wx-clear}-375x812-{200ms-after-jump,maxscroll}.png`, `sheet.png`, `sheet-tablet.png` (768×1024, unchanged behaviour but the same scene).
+- How: `margin-top: -48px` on the scene and `margin-top: 16px` on the footer below 1100px; in the renderer each scene is drawn once on the first frame and then drawn ahead while within 1.5 viewport heights (`IntersectionObserver`, `rootMargin: "150% 0px"`). DECISIONS #115.
+
+#### Found by the full Playwright run after T7
+
+`main` itself is not green. The same suite on 3cb5d0d (a throwaway worktree, same machine): **53 passed, 3 failed**: the place-name test, the "Book 30 min" hover test and the 1440 contrast gate (the footer's LinkedIn icon at 4.23:1). On the branch after T7: 57 passed, 3 failed. Each one:
+
+- **T6 follow-up, a regression, fixed.** With the footer above the band the LinkedIn icon measured 2.29:1 (it was 4.23 on `main`, over the darker band). The chip itself was right (ink at 0.77, opacity 1). A solid icon fills its box, so the chip's rounded corners left sky inside the gate's shot (the box grown by the chip's footprint), 3–6px from the glyph, and the gate measured that sky. An element that is only an icon now gets a chip that reaches past the shot (`inset: -3px -8px`). Measured after: 5.07 at 16:45, 5.04 at 11:00. The gate passes at both sizes (88 and 200 measurements; worst 4.82 and 4.75).
+- **The phone swipe test, a regression in the test, fixed.** It swiped at y = 160, which is the text block in the postcard stage, so nothing scrubbed (by design: text is not the handle). It now swipes 70px under the text block. 3 runs of 3.
+- **"Book 30 min" hover, flaky on `main`, fixed.** The test hovers as soon as the plane reads "parked", which is true while it is still fading in over 600 ms, and the trigger asked for a fully visible plane. The plane now goes and finishes fading in as it taxis; arrivals still wait for it. 3 runs of 3 (on `main` it failed in the one baseline run).
+- **The place name, failing on `main`, fixed. Outside the brief, so it is its own commit.** `nearestPlace` is documented as "the landmark whose section is nearest its 40% line", but it compared the compressed anchor scroll. With Receipts on the page the sections are closer than the landmarks' minimum gap, Keane Bridge is pushed back to scroll 0, and the label said "city rooftops" all through Shipped (and "Osmani Airport" through Receipts). It now goes by where each section's 40% line is (`Anchor.at`). The landmark *positions* are unchanged. The test's second half, which never ran on `main`, also put the clock tower at its gutter centre when Shipped's top is at 40%; under the min-gap rule the tower reaches that centre at scroll 0, so the test now looks for its closest approach over the whole walk (it is 0px, at the top of the page). 3 runs of 3. DECISIONS #116.
+
+#### T8 · first paint on a cold load: no blank stage
+
+- PASS: without JavaScript at 375×812 the hero shows the gradient, the stars, the hills and the bridge in the first paint (`.shots/v5.1/T8/t8-nojs-375x812.png`, read with `sheet-t8-nojs-phone.png`). Nothing is scripted: the page is the server's own markup. Seen: the night gradient (zenith 6, 11, 22), stars over the sky (136 lit pixels beside and under the text), the text block, the tea hills darker than the sky above them, Keane Bridge's deck darker than the river under it, the shade tree and a lamp post. `tests/e2e/sky-firstpaint.spec.ts` asserts each of these with `javaScriptEnabled: false`.
+- PASS: the same at 1440×900 (`t8-nojs-1440x900.png`): stars across the sky (23 beside the hero), the band at the foot with the far hills, the tea hills, palms, lamp posts, the parked rickshaw, Ali Amjad's Clock on the right gutter's centre and Keane Bridge reaching left from it.
+- PASS: with JavaScript on, no visual jump when the canvas replaces the fallback. Shots at 100 ms (the fallback, no canvas yet) and at 2 s (the canvas has taken over, the fallback removed): `t8-1100-375x812-{100ms,2s}.png`, `t8-1100-1440x900-{100ms,2s}.png` (read with `sheet-t8-handover-phone.png`, `sheet-t8-handover-desk.png`); `t8-1100-*-live.png` is the settled state 2.5 s later and matches the 2 s shot. Seen at 100 ms: the gradient, the text, the landscape in its final place, no sun and no time yet. At 2 s: the same landscape, plus the sun with its arc, the tea rows and the time label.
+- PASS: the landscape is in the same position. The Playwright test holds every script chunk back for 2.5 s, shoots the fallback, then the canvas, and finds the skyline of each column in both: 90 of 90 columns on the phone and 162 of 162 on the desktop, offset median 0 px, 90th percentile 0, max 1. The sky above the hills is the same colour (0 and 1 level off), the hills within 5 levels (the canvas adds its tea rows). The first section under the hero keeps its place too (`#shipped` at the same y before and after).
+- PASS: the fallback is removed by opacity → 0 over 400 ms once the live canvases have drawn their first frame, and taken out of the document 500 ms after that (`html[data-sky-fallback-done]`, set by the renderer on its first frame).
+- Night hand-over at 375×812, 03:30 clear (`t8-0330-375x812-{100ms,2s}.png`, `sheet-t8-night-phone.png`): the landscape in the same place. The canvas brings the moon and its arc, its own stars, the bridge's deck lights and the lit lamp; the CSS stars fade out over 400 ms while the canvas's are already there.
+- Two defects of my own first version, found by this hand-over test and fixed before the commit: (1) the fallback's filled shapes inherited the layer's stroke colour at SVG's default width of 1 unit, so every hill edge, tree crown and the tower's spire was a unit fatter than the canvas's (skyline offset median 1 px, 15–20 on thin tips); (2) the band fallback stood between the stage and the first section in the markup, which switches off the phones' `main > .sky-stage + .section`, so on a phone "Shipped" sat 32px high until the fallback was removed, then jumped down. The band fallback now comes before the stage, and the test checks that the section does not move.
+- How: `src/components/sky/SkyFallback.tsx` (a server component) builds the landscape as inline SVG from the same functions the canvas uses (`buildStageScene`, `buildFillers`, the ridge functions and the shapes' path data), so every silhouette is where the canvas will draw it. Its colours are CSS variables that mix each layer toward the horizon as `landscape/colors.ts` does and follow `html[data-sky]`, which the first-paint script sets before paint. Stars: one element with about 60 box-shadow dots from a fixed seed (mulberry32), shown when the first-paint script finds the sun below −6°, and on a page without JavaScript. DECISIONS #117.
+- Not in the fallback, by choice (DECISIONS #117): the desktop band's riverside trees and houses (the canvas skips them around the landmarks, which stand where the viewport puts them), the canvas's own detail (tea rows, night lights, the sun, moon and arc), the slow life, and tablets from 640 to 1099px (their stage scene depends on the viewport's width). All of it arrives with the canvas, in place.
+
+#### T9 · reviewing day and dusk in production
+
+- PASS: in a production build without the flag, `?sky` is ignored. `tests/unit/sky-overrides.test.ts` loads the sky store as that build bundles it (`NODE_ENV=production`, no `NEXT_PUBLIC_SKY_DEBUG`): `parseOverrides("?sky=2026-11-26T16:45&wx=rain")` is `{ timeOverride: null, wxOverride: null }`, and the first-paint script paints midday for `?sky=2026-12-15T02:00` and marks nothing.
+- PASS: with `&preview=1` it is applied and the badge is visible. The same test: the override is parsed (16:45 Dhaka, rain); the first-paint script paints 02:00 as night and marks the page "preview 02:00", the same paint as a build that needs no key; `previewBadge` gives "preview 16:45"; and the rule in `globals.css` draws that mark (`html[data-sky-preview]::after`) with `content: attr(data-sky-preview)`, fixed, at the bottom left, in the mono font. Only the exact value counts (`preview=0`, `preview=true` are ignored).
+- The same on a real build, `pnpm build` with no flag, served with `WEATHER_MOCK=1` (`.shots/v5.1/T9/production-build-output.txt`):
+  - plain `/`: no badge, the live sky (07:09).
+  - `/?sky=2026-11-26T16:45&wx=clear`: ignored. No badge, sky "day", zenith `rgb(35, 44, 60)` as on the plain URL, label "07:09".
+  - the same with `&preview=1`: applied. Already at DOMContentLoaded the first-paint script has painted it (sky "golden") and set "preview 16:45"; settled, the badge renders as `"preview 16:45"`, fixed 12px from the left and 12px from the bottom, 12px mono, and the label reads "16:45 · 21°C · clear". Its gradient is the test build's for 16:45 (`rgb(16, 36, 73)` / `rgb(36, 64, 115)` / `rgb(199, 113, 23)`).
+  - `/?sky=…&preview=0`: ignored. `/?wx=thunder&preview=1`: applied, badge "preview 07:09" (the time the sky is drawn for), label "thunderstorm".
+  - No page errors in any of them.
+- Test output: `tests/unit/sky-overrides.test.ts` — 13 passed (13) (`.shots/v5.1/T9/unit-test-output.txt`); typecheck, lint and vitest green (269 passed).
+- Shots: `.shots/v5.1/T9/t9-prod-{375x812,1440x900}-preview-1645.png` (the badge; sheets `sheet-t9-badge.png`, `sheet-t9-hero.png`), `t9-prod-{375x812,1440x900}-sky-ignored.png`, `t9-prod-1440x900-plain.png`, `t9-prod-1440x900-preview-wx-thunder.png`.
+- How: `overridesAllowed` in `src/lib/sky/store.ts` (always where `SKY_DEBUG`; otherwise in a production build only with `preview=1`). The badge is one attribute on `<html>`, set by the first-paint script before hydration and kept by `SkyController` after, so the badge and the override always switch together. The first-paint script is 1404 B in a plain production build (limit 1500). Default production behaviour is unchanged: a URL without `preview=1` gets the same markup, paint and label as before. DECISIONS #118.
+
+#### T10 · heavy chips on the mobile hero
+
+- PASS: at 375×812, 11:00 partly cloudy, none of the 4 hero text elements is a chip. `data-backing`: name = none, status = none, one-liner = none, label = none (`.shots/v5.1/T10/data-backing.txt`). The screenshot (`.shots/v5.1/T10/t10-1100-partly-375x812.png`) shows the name, the status line, the one-liner and the label as text on the blue sky, no box behind any of them.
+- PASS: 16:45 clear: name = none, status = none, one-liner = none, label = none; text over the sky with the sunset under it (`t10-1645-clear-375x812.png`).
+- PASS: 17:20 clear: the same four at none; text over the dusk (`t10-1720-clear-375x812.png`). Sheet of the three: `sheet-t10-phones.png`.
+- PASS: the pixel-contrast gate still passes, with large text now asked for 3:1 as WCAG 1.4.3 does and everything else for 4.5:1: `tests/e2e/sky-backing.spec.ts` at 375: 88 measurements, worst 4.82:1; at 1440: 200 measurements, worst 4.75:1. (Same as before the change: 4.82 and 4.75.)
+- While the sky is dragged (a scrub) and after it is released, the same four are still none in each of the three states, and in six more (06:20 partly, 09:00 fog, 12:00 clear, 14:00 heavy rain, 18:30 clear, 21:00 thunder). `tests/e2e/sky-hero-backing.spec.ts` holds the three states to it.
+- What the module does now (`src/lib/sky/backing.ts`): (1) large text, a computed font size of 24px or more, or 18.66px or more at weight 700 or more, is held to 3:1 (3.2:1 in the model, which keeps the same margin over the gate as 4.8 does for 4.5); everything else keeps its target. (2) The hero's four elements take a halo up to alpha 0.9 before a chip. (3) While a scrub, a drag or the time-lapse runs they never get a chip: the strongest halo (0.9) instead. (4) Chips have no border: they already had none (the v4 chip); a test now says so.
+- Why they were chips in the brief's screenshot and are not now: T3 moved the text block to the top of the stage, where the sky is dark at every hour, so on a phone the four read at 7:1 or more without any backing. The module's targets did the rest of what the brief asked for and keep it so if the layout or the sky changes. DECISIONS #119.
+
+### Final report (v5.1)
+
+Branch `fix/sky-v5.1`, 18 commits on `main` @ 3cb5d0d (the last one is this report). Nothing pushed, nothing deployed.
+
+**Step 0: why the earlier work wasn't showing.** The v5 tasks had never been done. There was no `fix(sky): T…` commit on any branch, no stash, and no other worktree with T1–T10 in it: `main` was simply doing what it does, and that is what localhost:3000 showed. The dev server on :3000 was stopped by port, `.next` was deleted and `pnpm dev` started again. The one task the brief called "verified fixed" (T2, the 22° ring) was not fixed either: `wx=clear` pins the humidity at 60%, and the ring still drew above 85%.
+
+**T1–T10.** PASS means every "Done when" item of that task passed, from the code and a fresh screenshot, in the task log above. Paths are under `.shots/v5.1/`.
+
+| Task | Result | Screenshots |
+| --- | --- | --- |
+| T1 status line never wraps | PASS | `T1/t1-375x812-line1.png`, `T1/sheet.png` |
+| T2 no ring around the moon | PASS | `T2/t2-after-0330-clear-375x812-top.png`, `T2/sheet-after.png` (before: `T2/sheet-moon-humid-before.png`) |
+| T3 the postcard stage | PASS | `T3/t3-0330-clear-375x812-top.png`, `T3/sheet-pass1.png`, `T3/sheet-bottom-pass1.png` |
+| T4 the night landscape | PASS | `T4/t4-after-0330-375x812-top.png`, `T4/sheet-before.png`, `T4/sheet-after.png`, `T4/sheet-desktop-before-after.png` |
+| T5 the plane | PASS | `T5/night-0330-375x812-climb-both.png`, `T5/sheet-phone.png`, `T5/sheet-desktop.png`, `T5/sheet-climb-both.png` |
+| T6 the footer above the band | PASS | `T6/t6-0330-after-1440x900-bottom.png`, `T6/t6-1920x1080-maxscroll.png`, `T6/sheet-before-after.png`, `T6b/crop-footer-icons-zoom.png` |
+| T7 the closing scene | PASS | `T7/sky-2026-11-26T03-30-wx-clear-375x812-200ms-after-jump.png`, `T7/sheet.png`, `T7/sheet-tablet.png` |
+| T8 the first paint | PASS | `T8/t8-nojs-{375x812,1440x900}.png`, `T8/t8-1100-{375x812,1440x900}-{100ms,2s}.png`, `T8/t8-0330-375x812-{100ms,2s}.png`, `T8/sheet-t8-{nojs-phone,handover-phone,handover-desk,night-phone}.png` |
+| T9 overrides in production | PASS | the test output: `T9/unit-test-output.txt`, `T9/production-build-output.txt`; `T9/t9-prod-{375x812,1440x900}-preview-1645.png`, `T9/t9-prod-{375x812,1440x900}-sky-ignored.png`, `T9/sheet-t9-badge.png` |
+| T10 no chips on the hero | PASS | `T10/t10-{1100-partly,1645-clear,1720-clear}-375x812.png`, `T10/data-backing.txt`, `T10/sheet-t10-phones.png` |
+
+**The e2e plane flight counts** (`T5 at …` in `tests/e2e/sky.spec.ts`, 03:30 clear):
+
+```
+[t5 375] flights after the first arrival at the bottom: 1; after coming back: 2
+[t5 1440] flights after the first arrival at the bottom: 1; after coming back: 2
+```
+
+**`pnpm build` and `pnpm check:bundle`** (exit 0 each), then typecheck and lint clean:
+
+```
+pnpm typecheck && pnpm lint && pnpm test:   Test Files  21 passed (21)   Tests  280 passed (280)
+pnpm build
+  Creating an optimized production build ...
+✓ Compiled successfully in 1079ms
+  Collecting page data using 7 workers ...
+  Finalizing page optimization ...
+build output: no [[placeholders]]
+pnpm check:bundle
+sky up-front: 10.6 kB gzip (15 modules; budget 13.0 kB)
+sky renderer (idle): 25.6 kB gzip (2 modules in static/chunks/3-9z9ifuv5lu0.js, static/chunks/11pdxatygrv74.js; budget 26.0 kB)
+pnpm build:e2e && pnpm e2e:only (the full Playwright suite, three runs)
+  run 1:  2 failed   63 passed (2.4m)
+  run 2:  65 passed (2.0m)
+  run 3:  65 passed (2.1m)
+```
+
+**Not fixed, or worth knowing.**
+
+- **Two chat tests failed in run 1 of the full suite** (`tests/e2e/chat.spec.ts`: the suggestion chip, and typing + Enter) and in no other run. Both waited 10 s for the mock agent's stream to finish in the first seconds of the run, when every worker starts a WebGL page at once. Alone they pass (8 of 8 in 4 s, the two in 2 s each), and they passed in runs 2 and 3. Left as they are: it is a load-dependent timing flake in a test the brief does not touch.
+- **The renderer was over its budget at the end** (`check:bundle` failed: 26.6 kB gzip against 26 kB). Release bundles were carrying the e2e hooks, the backing report, `?bolt` / `?life`, the GPU timer and `?skyscale`, because a `NEXT_PUBLIC_` variable that is not set at build time becomes a lookup the minifier cannot fold. Fixed without touching the budget (DECISIONS #120): 25.6 kB, which is 25,554 B against 26,000. That is 446 B of room: the next thing added to the renderer will need something taken out.
+- **The pixel-contrast gate changed.** It asked 4.5:1 of every element; it now asks 3:1 of large text, as WCAG 1.4.3 does and as the backing module now does too. Left at 4.5 it would have failed the heading exactly where the module lets it stand. Its result did not move (worst 4.82:1 at 375, 4.75:1 at 1440), and no heading measured near 3:1. It is a change to a guardrail, so it is flagged here.
+- **What the first-paint fallback leaves out** (DECISIONS #117): the desktop band's riverside trees and houses, whose places depend on the viewport; a landscape fallback on tablets from 640 to 1099px, whose stage scene depends on the viewport's width; and at night the canvas's own stars replace the CSS ones in a 400 ms cross-fade. All of it arrives with the canvas, in place.
+- **"Shipped" peeks 8px on a phone** (T3): the bottom of the brief's 8–40px, and what its own numbers give (40 − 32). Only the top 2–3px of the glyphs show.
+- **Outside the brief, and said here so nothing is a surprise.** (a) `main` itself failed three tests; they are fixed: the footer icon's chip against the contrast gate, the phone swipe test's coordinates, and a race in the "Book 30 min" hover. (b) The sky label's place name was wrong through Shipped and Receipts on `main`; fixed in its own commit (`f8d9519`). (c) Two defects of my own first version of T8 were caught by its hand-over test before it was committed: filled fallback shapes inherited a stroke and were a unit too fat, and the band fallback stood between the stage and the first section and switched off the phones' 32px margin until it was removed.
+- **The review subagents did not run.** The harness refused to start `code-reviewer` and `security-reviewer` ("No reasoning level selected" for the subagent model selection `account:zai-individual-coding-plan/GLM-5.3`). I reviewed the T8–T10 and bundle diffs myself instead, against the project rules. That review found one thing, fixed (`1de0a3c`): the first-paint script took any `preview=1` on a URL while the client takes the first value, so `?preview=0&preview=1&sky=…` painted a preview sky until hydration. The override was never honoured after hydration, so the gate held. It is not an independent review.
+- **Not touched:** the other worktree (`feat/weather-v6`). It left this branch after T6, so it has none of T7–T10.
+
+### Review of PR #7 (2026-11-26)
+
+An independent review of the 20 commits. It re-ran the gates and measured each task against a production build
+(`next start`, `&preview=1`; probes in `.scratch/review/`, shots in `.shots/review-pr7/`).
+
+- **Measured:** T1: all 7 short lines fit at 375 (widest 195px of 307), status line 24px, 4px to the one-liner.
+  T3: stage 772 = 812 − 40, scene 200px (572–772), h1 at 88px, "Shipped" at 804 (8px peek); same in all 4 states.
+  T6: at 1440 max scroll the footer text ends 32px above the band. T7: footer 16px under the closing scene, scene
+  drawn 200ms after the jump. T9: badge "preview HH:MM" with `&preview=1`, none and no override without it. T10: the
+  4 hero elements are `none` at 03:30, 11:00, 16:45 and 17:20 at 375. T4 and T8 checked on crops and the no-JS shots.
+- **Bug found and fixed: client navigation threw `removeChild` twice.** Once the canvas had drawn, the renderer
+  `.remove()`d the first-paint fallbacks, but React owns those nodes: leaving the home page (e.g. to `/lifts`) made
+  React remove them again, and `NotFoundError` was thrown at 375 and 1440. The fallbacks are now hidden by CSS only
+  (`:root[data-sky-fallback-done] [data-sky-fallback]`: opacity 0, then `visibility: hidden` after 400ms). `:root`
+  is needed because the night stars rule had the same specificity and came later, so the stars would have stayed.
+  The reduced-motion rule gets the same selector, so there the fallback hides at once. `sky-firstpaint.spec.ts` now
+  checks the fallbacks are hidden (not gone), and has a new test per size: hand-over, go to `/lifts`, come back, no
+  page error.
+- **After the fix:** typecheck, lint, 280 unit tests, build, `check:bundle` (up-front 10.6 kB, renderer 25.5 kB)
+  pass. The full Playwright suite ran twice: 67/67 in one run; the other had 1 failure in `chat.spec.ts` ("a
+  rate-limited reply offers the call instead"), which passed in the second run and doesn't touch the sky. T5 flight
+  counts were 1 then 2 at both sizes, in both runs.
+- **Known gaps, not fixed:** the first-paint SVG masks use `#fff` stops (they're masks, not colour); the preview badge
+  shows the time when the override was set and doesn't tick forward.
 
 ## Weather v6: clouds, rain, lightning, fog (2026-11-26)
 
@@ -324,7 +461,6 @@ Scrolling at 1440×900, final test build: partly cloudy and fog 60.0 fps, no fra
 - **W5's "again within 1.5 s of the stage returning"** is in the code and never forced on screen.
 - **One 50 ms frame in half the thunder scroll runs** (59.6 fps against 60.0), with lightning on or off and no long task behind it. Not reproduced at rest and not found.
 - The GPU gate's first measurement was under load; the quiet one above is the final code.
-
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.

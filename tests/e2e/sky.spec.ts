@@ -275,11 +275,15 @@ test("on a phone a vertical swipe on the sky scrolls the page and doesn't scrub;
     }).observe(document.body, { childList: true, subtree: true });
   });
   const cdp = await page.context().newCDPSession(page);
+  // The postcard stage (v5.1 T3): the text block is at the top, so the open sky (the handle) is under it.
+  const hero = (await page.locator("[data-sky-hero]").boundingBox())!;
+  const skyY = hero.y + hero.height + 70;
+  expect(skyY).toBeLessThan(500);
   // Headless Chromium sometimes drops the first synthetic gesture of a session: retry until the page moves.
   for (let i = 0; i < 3 && (await page.evaluate(() => window.scrollY)) < 100; i++) {
     await cdp.send("Input.synthesizeScrollGesture", {
       x: 180,
-      y: 160,
+      y: skyY,
       yDistance: -300,
       gestureSourceType: "touch",
       speed: 600,
@@ -294,12 +298,12 @@ test("on a phone a vertical swipe on the sky scrolls the page and doesn't scrub;
   await page.evaluate(() => window.scrollTo(0, 0));
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchStart",
-    touchPoints: [{ x: 100, y: 160 }],
+    touchPoints: [{ x: 100, y: skyY }],
   });
   for (let i = 1; i <= 10; i++)
     await cdp.send("Input.dispatchTouchEvent", {
       type: "touchMove",
-      touchPoints: [{ x: 100 + 18 * i, y: 161 }],
+      touchPoints: [{ x: 100 + 18 * i, y: skyY + 1 }],
     });
   await expect(preview(page)).toBeVisible();
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
@@ -374,13 +378,22 @@ test("the place name follows the landmarks as you walk down the page, without mo
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(place(page)).toHaveText("tea gardens, Sylhet");
   expect(await weatherX()).toBe(x0);
-  // Desktop: each landmark reaches its gutter, never the middle of the column.
-  await walkTo(page, "shipped");
-  await page.waitForTimeout(300);
-  const land = (await sky(page))!.land!;
-  expect(land.mode).toBe("gutter");
-  const clock = land.marks.find((m) => m.id === "clock")!;
-  expect(Math.abs(clock.x - (1440 - 336 / 2))).toBeLessThan(30);
+  // Desktop: each landmark reaches its gutter. Sections close together push landmarks apart in scroll
+  // (anchors.ts MIN_GAP_VH), so the clock tower reaches the right gutter's centre at its own anchor, which is not
+  // always where its section's top is at 40%: look for its closest approach over the whole walk.
+  expect((await sky(page))!.land!.mode).toBe("gutter");
+  const closest = await page.evaluate(async () => {
+    let best = Infinity;
+    const max = document.documentElement.scrollHeight - innerHeight;
+    for (let y = 0; y <= max; y += 40) {
+      window.scrollTo(0, y);
+      await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
+      const m = window.__sky!.land!.marks.find((k) => k.id === "clock")!;
+      best = Math.min(best, Math.abs(m.x - (1440 - 336 / 2)));
+    }
+    return best;
+  });
+  expect(closest).toBeLessThan(30);
   // B1: the airport is the end of the walk, reached at the bottom of the page on its gutter centre; every landmark
   // is in the world once.
   await bottom(page);
@@ -486,7 +499,9 @@ for (const size of [
     await page.evaluate(() => window.scrollTo(0, 0));
     await bottom(page);
     await page.waitForTimeout(5000);
-    expect((await sky(page))!.plane!.flights).toBe(first + 1);
+    const again = (await sky(page))!.plane!.flights;
+    console.info(`[t5 ${size.width}] flights after the first arrival at the bottom: ${first}; after coming back: ${again}`);
+    expect(again).toBe(first + 1);
     await ctx.close();
   });
 }

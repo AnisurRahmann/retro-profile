@@ -64,6 +64,8 @@ export const MIN_GAP_VH = 0.6;
 
 export type Anchor = Spec & {
   /** scroll at which it reaches its target */ s: number;
+  /** scroll at which its section's top is at 40% of the viewport, before landmarks were kept apart: what the label goes by. */
+  at: number;
   /** world x, CSS px */ x: number;
   /** screen x it reaches at that scroll */ target: number;
 };
@@ -97,23 +99,28 @@ export function solveAnchors(
   const end = Number.isFinite(maxScroll) ? Math.max(0, maxScroll - END_MARGIN) : Infinity;
   const list = LANDMARKS.filter((l) => sections[l.section] !== undefined).map((l) => ({
     l,
+    at: anchorScroll(sections[l.section]!, vh, end),
     s: anchorScroll(sections[l.section]!, vh, end),
   }));
   const last = list[list.length - 1];
   if (last?.l.id === "airport" && Number.isFinite(end)) last.s = end;
   for (let i = list.length - 2; i >= 0; i--)
     list[i]!.s = Math.max(0, Math.min(list[i]!.s, list[i + 1]!.s - MIN_GAP_VH * vh));
-  return list.map(({ l, s }) => {
+  return list.map(({ l, s, at }) => {
     const target = mode === "gutter" ? gutterCentre(vw, l.side) : vw / 2;
-    return { ...l, s, target, x: target + s * PARALLAX[l.layer] };
+    return { ...l, s, at, target, x: target + s * PARALLAX[l.layer] };
   });
 }
 
-/** The place the label names at a scroll position: the landmark whose section is nearest its 40% line. */
+/**
+ * The place the label names at a scroll position: the landmark whose section is nearest its 40% line. That is
+ * `at`, not the anchor's own scroll `s`: when sections are close, landmarks are reached earlier so they keep apart
+ * (solveAnchors), and going by `s` the label named the next section's landmark (v5.1: "city rooftops" at Shipped).
+ */
 export function nearestPlace(anchors: Anchor[], scrollY: number): PlaceId | null {
   let best: Anchor | null = null;
   for (const a of anchors)
-    if (!best || Math.abs(a.s - scrollY) < Math.abs(best.s - scrollY)) best = a;
+    if (!best || Math.abs(a.at - scrollY) < Math.abs(best.at - scrollY)) best = a;
   return best?.place ?? null;
 }
 

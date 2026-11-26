@@ -10,7 +10,7 @@ import { EVO_PERIOD, EVOLUTION, SHEETS, cloudPlan, depthK, gust, planeWind, type
 import { LAMPS_AT, SPLASH_RATE } from "@/lib/sky/rain";
 import { bolt, boltAlpha, createLightningScheduler, sheetAlpha, strikeEnd, type Kind, type Strike } from "@/lib/sky/lightning";
 import { LIGHTNING_CORE, LIGHTNING_HALO, LIGHTNING_MID } from "@/lib/sky/palette";
-import { effectiveWeather, SKY_DEBUG, skyStore, skyTime, WX_DEFAULTS } from "@/lib/sky/store";
+import { effectiveWeather, skyStore, skyTime, WX_DEFAULTS } from "@/lib/sky/store";
 import { dayOfYear, dhakaParts } from "@/lib/sky/time";
 import { sunColor } from "@/lib/sky/gradient";
 import { nightPoint, sunPath, type ArcGeom } from "@/lib/sky/arc";
@@ -40,6 +40,7 @@ import { createParticles, mulberry32, type Particles, type ParticleState } from 
 import {
   bandHeight,
   closingWalk,
+  gutterCentre,
   landMode,
   PARALLAX,
   solveAnchors,
@@ -67,7 +68,8 @@ import {
   type Horizon,
 } from "@/lib/sky/horizon";
 
-const TEST = SKY_DEBUG;
+/** The sky's debug flag (store.ts SKY_DEBUG), written out here so a release build folds what it guards away (as atmosphere.ts does). */
+const DEBUG = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_SKY_DEBUG === "1" || process.env.NEXT_PUBLIC_E2E === "1";
 
 /** Smoothed shader inputs, keyed by uniform name. Each converges over ~4 s (exponential, τ = 1 s); 0.12 s while scrubbing. */
 type Targets = Record<string, number | number[]>;
@@ -169,9 +171,9 @@ function start(
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
   const coarse = matchMedia("(pointer: coarse)").matches;
   const q = new URLSearchParams(window.location.search);
-  const forceBolt = SKY_DEBUG && q.get("bolt") === "1";
+  const forceBolt = DEBUG && q.get("bolt") === "1";
   /** Dev and test builds: `lightning=off` schedules no strike (evidence of the storm between strikes). */
-  const noLightning = SKY_DEBUG && q.get("lightning") === "off";
+  const noLightning = DEBUG && q.get("lightning") === "off";
   const origin = performance.now();
   const now = () => (performance.now() - origin) / 1000;
   const rng = mulberry32(Date.now() & 0xffffffff);
@@ -232,6 +234,22 @@ function start(
     const top = b.docTop - view.y - b.land.lift;
     return top < view.vh && top + b.land.height + b.land.lift > 0;
   };
+  // Scenes are pre-rendered before they enter the viewport (v5.1 T7). Each is drawn once on the first frame, and
+  // drawn ahead while it is within 1.5 viewport heights of the screen, so it is already there, and no longer fading
+  // in, when it arrives: even a jump from far away (from the top of the page to the bottom) finds it drawn.
+  const approaching = new Set<Element>();
+  /** Scenes not drawn yet: each is drawn once whatever is on screen. */
+  const undrawn = new Set<Band>();
+  const approachIO = new IntersectionObserver(
+    (es) => {
+      for (const e of es) {
+        if (e.isIntersecting) approaching.add(e.target);
+        else approaching.delete(e.target);
+      }
+    },
+    { rootMargin: "150% 0px" },
+  );
+  const drawable = (b: Band) => visible(b) || undrawn.has(b) || (!!b.slot && approaching.has(b.slot));
   // The horizon tracks the visible ground in scene mode (src/lib/sky/horizon.ts): the CSS gradient (--sky-h/--sky-b
   // on its layer), the shader (uHorizonY/B) and the backing model all read it.
   const gradEl = document.querySelector<HTMLElement>("[data-sky-gradient]");
@@ -407,7 +425,7 @@ function start(
     target = targetsOf(model);
     pts?.ensureDay(dayOfYear(skyTime(s)));
     backing?.update();
-    if (TEST && w2.__sky)
+    if (DEBUG && w2.__sky)
       Object.assign(w2.__sky, {
         state: model.astro.state,
         elevation: model.astro.elevation,
@@ -595,7 +613,7 @@ function start(
   // Dev/test builds: main-thread ms per frame, logged every 60 frames next to the GPU timer.
   const cpu: number[] = [];
   const draw = (t: number, dt: number, still: boolean) => {
-    const c0 = SKY_DEBUG ? performance.now() : 0;
+    const c0 = DEBUG ? performance.now() : 0;
     // Under thunder: a bolt about every 9 s and a sheet flash every 5 s; under heavy rain, sheet flashes every
     // 25 s. The first bolt comes 1.2–2.5 s after the first frame, and again within 1.5 s of the stage coming
     // back, at most once in 20 s. Never in a still frame (reduced motion): nothing is scheduled or drawn.
@@ -671,7 +689,7 @@ function start(
     if (still || t - lastClouds >= CLOUD_REFRESH_S) refreshClouds(t);
     updateHorizon(still);
     // Debug: one sheet alone (?sheet=low|mid|high|scud), to attribute the GPU budget.
-    const only = SKY_DEBUG ? q.get("sheet") : null;
+    const only = DEBUG ? q.get("sheet") : null;
     const cov = v2("uCover").map((c, i) => !only || only === SHEETS[i] ? c : 0);
     const u: Targets = {
       ...cur,
@@ -730,7 +748,7 @@ function start(
           ? { x0: hero.x, y0: hero.y - view.y, x1: hero.x + hero.w, y1: hero.y + hero.h - view.y }
           : null,
       );
-      if (TEST && w2.__sky) {
+      if (DEBUG && w2.__sky) {
         w2.__sky.sun = {
           x: ss.x,
           y: ss.y,
@@ -805,7 +823,8 @@ function start(
         const world = b.land.world;
         // Off screen, the closing scene can still re-arm the arrival.
         if (world?.airport && !visible(b)) arrival.update(false, closingRatio < 0.15, false);
-        if (!world || !visible(b)) continue;
+        if (!world || !drawable(b)) continue;
+        undrawn.delete(b);
         const f: LifeFrame = {
           t,
           moving: !still,
@@ -873,7 +892,7 @@ function start(
         );
         if (!("ready" in b.canvas.dataset)) b.canvas.dataset.ready = "";
       }
-      if (TEST && w2.__sky) {
+      if (DEBUG && w2.__sky) {
         const main = active[0]!;
         const mw = main.land.world;
         const walk = walkOf(main);
@@ -893,7 +912,7 @@ function start(
           };
       }
     }
-    if (SKY_DEBUG && !still) {
+    if (DEBUG && !still) {
       cpu.push(performance.now() - c0);
       if (cpu.length >= 60) {
         const avg = cpu.reduce((a, b) => a + b, 0) / cpu.length;
@@ -905,13 +924,17 @@ function start(
       }
     }
     frames++;
-    if (TEST && w2.__sky) {
+    if (DEBUG && w2.__sky) {
       w2.__sky.frames = frames;
       if (life) w2.__sky.plane = life.plane(t);
     }
     if (frames === 1) {
       atmCanvas.dataset.ready = "";
       ptsCanvas.dataset.ready = "";
+      // The server-rendered first-paint fallback (src/components/sky/SkyFallback.tsx) has done its job: it fades out
+      // over 400ms and is then hidden (globals.css). Never removed: React owns those nodes, and removing them here
+      // made the next client navigation throw "removeChild".
+      document.documentElement.dataset.skyFallbackDone = "done";
     }
     return lightning > 0;
   };
@@ -934,7 +957,7 @@ function start(
       tracker.moving ||
       (ambient?.active() ?? false);
     const cap = coarse ? (raining || scrolling || s.scrubbing ? 30 : 20) : busy ? 60 : 24;
-    if (TEST && w2.__sky) w2.__sky.cap = cap;
+    if (DEBUG && w2.__sky) w2.__sky.cap = cap;
     if (cap < 60 && dt < 1 / cap - 0.004) return;
     approach(cur, target, 1 - Math.exp(-dt / (s.scrubbing || s.preview !== null ? 0.12 : 1)));
     if (model.night > 0.3 && model.cloudCover < 0.6 && !reduce) {
@@ -951,7 +974,7 @@ function start(
       fps = Math.round(fpsFrames / (t - fpsWindow));
       fpsFrames = 0;
       fpsWindow = t;
-      if (TEST && w2.__sky) w2.__sky.fps = fps;
+      if (DEBUG && w2.__sky) w2.__sky.fps = fps;
     }
   };
 
@@ -966,14 +989,14 @@ function start(
     } else if (!go && running) {
       running = false;
       cancelAnimationFrame(raf);
-      if (TEST && w2.__sky) w2.__sky.fps = 0;
+      if (DEBUG && w2.__sky) w2.__sky.fps = 0;
     }
   };
 
   const still = () => {
     Object.assign(cur, clone(target));
     draw(0, 0, true);
-    if (TEST && w2.__sky) w2.__sky.fps = 0;
+    if (DEBUG && w2.__sky) w2.__sky.fps = 0;
   };
 
   // Astronomy every 60 s (and on every store change: weather, preview).
@@ -1053,7 +1076,16 @@ function start(
   let resizeTimer = 0;
   /** Scene slots on this page get a canvas each; bands whose slot left the page (client navigation) are dropped. */
   const ensureScenes = () => {
-    bands = bands.filter((b) => b.id === "fixed" || b.slot?.isConnected);
+    bands = bands.filter((b) => {
+      if (b.id === "fixed" || b.slot?.isConnected) return true;
+      undrawn.delete(b);
+      if (b.slot) {
+        approaching.delete(b.slot);
+        approachIO.unobserve(b.slot);
+        closingIO.unobserve(b.slot);
+      }
+      return false;
+    });
     document.querySelectorAll<HTMLElement>("[data-sky-scene]").forEach((slot) => {
       if (bands.some((b) => b.slot === slot)) return;
       const c = document.createElement("canvas");
@@ -1062,15 +1094,19 @@ function start(
       slot.appendChild(c);
       const stage = slot.dataset.skyScene !== "closing";
       const l = createLandscape(c, LIFT, GROUND_FADE);
-      if (l)
-        bands.push({
+      if (l) {
+        const band: Band = {
           id: stage ? "stage" : "closing",
           canvas: c,
           land: l,
           frame: null,
           slot,
           docTop: 0,
-        });
+        };
+        bands.push(band);
+        undrawn.add(band);
+      }
+      approachIO.observe(slot);
       if (!stage) closingIO.observe(slot);
     });
   };
@@ -1088,11 +1124,18 @@ function start(
           Math.max(0, view.docH - view.vh),
           mode === "scene" ? "centre" : mode,
         );
-        b.land.resize(
-          view.vw,
-          H,
-          buildWorld(anchors, view.vw, view.vh, view.docH, H, mode === "scene" ? "centre" : mode),
-        );
+        const wd = buildWorld(anchors, view.vw, view.vh, view.docH, H, mode === "scene" ? "centre" : mode);
+        b.land.resize(view.vw, H, wd);
+        // The first-paint fallback drew Ali Amjad's Clock on its right gutter's centre at the top of the page, which
+        // is where the solver puts it on most viewports. Where it doesn't, the tower would jump when the canvas takes
+        // over: hide the fallback's landmarks there, they arrive with the canvas instead (v5.1 T8).
+        const clock = wd.marks.find((k) => k.id === "clock");
+        document
+          .querySelector("[data-sky-fallback-landmarks]")
+          ?.toggleAttribute(
+            "hidden",
+            !clock || Math.abs(((clock.x0 + clock.x1) / 2) * wd.s - gutterCentre(view.vw, "right")) > 3,
+          );
       } else {
         const H = b.slot!.clientHeight;
         if (H < 10) continue; // hidden (gutter mode)
@@ -1136,12 +1179,12 @@ function start(
       });
     life = createLife(tx);
     ambient = createAmbient(rng, readToken("--signal"), tx, {
-      force: SKY_DEBUG && q.get("life") === "1",
+      force: DEBUG && q.get("life") === "1",
     });
-    atm = await createAtmosphere(atmCanvas, SKY_DEBUG, isDead);
+    atm = await createAtmosphere(atmCanvas, isDead);
     if (dead) return;
     if (!atm) onNoWebGL();
-    if (TEST)
+    if (DEBUG)
       w2.__sky = {
         state: model.astro.state,
         elevation: model.astro.elevation,
@@ -1186,6 +1229,7 @@ function start(
     unsubBus();
     ro.disconnect();
     closingIO.disconnect();
+    approachIO.disconnect();
     motion.removeEventListener("change", applyMotion);
     document.removeEventListener("visibilitychange", onVisibility);
     atmCanvas.removeEventListener("webglcontextlost", onLost);

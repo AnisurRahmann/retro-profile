@@ -108,6 +108,12 @@ if (!upfrontIds.length || !idleIds.length) {
   console.error("check:bundle: found no sky modules; the build layout changed?");
   process.exit(1);
 }
+// The e2e hooks (window.__sky) are compiled in only by NEXT_PUBLIC_E2E=1 (next.config.ts env). A runtime lookup
+// instead would keep them in every production bundle.
+if ([...modules.values()].some((m) => m.src.includes("__sky"))) {
+  console.error("check:bundle: the e2e hooks (window.__sky) are in a production bundle (next.config.ts env)");
+  process.exit(1);
+}
 if (fails.length) {
   console.error(`check:bundle: over budget: ${fails.join(", ")}`);
   process.exit(1);
