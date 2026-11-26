@@ -3,6 +3,7 @@ import {
   LAMPS_AT,
   MAX_SLANT,
   RAIN_DENSITY,
+  slantWind,
   RAIN_LAYER,
   RAIN_LAYERS,
   RAIN_MAX,
@@ -30,6 +31,12 @@ describe("the slant of the rain", () => {
     // From 200° (south-south-west) it blows toward 20°, which has an eastward component: left, at atan(0.34 · tan 35°).
     expect(deg(rainSlant(30, 200))).toBeCloseTo(13.4, 0);
     expect(Math.tan(rainSlant(30, 200))).toBeLessThan(0);
+  });
+
+  it("is wind-driven in a thunderstorm whatever the wind: at least 30 km/h, so the full 35°", () => {
+    expect(deg(rainSlant(slantWind(5, true), 270))).toBeCloseTo(35, 6);
+    expect(deg(rainSlant(slantWind(5, false), 270))).toBeCloseTo(10.5, 1);
+    expect(slantWind(45, true)).toBe(45);
   });
 
   it("stays vertical in a north or south wind (along the view)", () => {

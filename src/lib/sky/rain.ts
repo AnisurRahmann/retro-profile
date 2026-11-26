@@ -46,6 +46,8 @@ export function layerCounts(n: number): Record<RainLayer, number> {
 }
 
 export const MAX_SLANT = (35 * Math.PI) / 180;
+/** A thunderstorm's rain is wind-driven whatever the forecast says: its slant is taken at 30 km/h or more, the full 35°. */
+export const slantWind = (kmh: number, thunder: boolean) => (thunder ? Math.max(kmh, 30) : kmh);
 
 /**
  * The streaks' angle from the vertical (radians): atan((km/h ÷ 3.6) ÷ 7.5), the wind's speed against a drop's

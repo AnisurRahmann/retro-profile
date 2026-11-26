@@ -66,6 +66,13 @@ const TASKS: Record<string, Shot[]> = {
     ...both("golden-1645-partly", q("16:45", "partly")),
     ...both("night-0200-partly", q("02:00", "partly")),
   ],
+  w5: [
+    // Between strikes: the dev-only `lightning=off` keeps the scheduler quiet.
+    ...both("thunder-1500", q("15:00", "thunder", "wind=45&from=315&lightning=off")),
+    ...both("thunder-1830", q("18:30", "thunder", "wind=45&from=315&lightning=off")),
+    // A storm's rain is wind-driven even under a light forecast wind.
+    { name: "thunder-1500-calm-1440x900", q: q("15:00", "thunder", "wind=5&from=270&lightning=off"), size: "desk" },
+  ],
   w4: [
     // A forced bolt at its return stroke (the leader takes 70–110 ms): the storm's clouds are in after 5 s.
     ...both("bolt-2100", q("21:00", "thunder", "wind=45&from=315"), { strike: "cg", at: 120, log: true }),

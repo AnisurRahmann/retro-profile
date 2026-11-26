@@ -166,7 +166,7 @@ export function decide(bg: RGB, text: RGB, fontPx: number, dpr = 2): Decision {
 
 // ── The background model ─────────────────────────────────────────────────────────────────────────────────────
 
-type SkyInput = Pick<SkyModel, "colors" | "glow" | "cloudCover" | "fog" | "astro">;
+type SkyInput = Pick<SkyModel, "colors" | "glow" | "cloudCover" | "fog" | "astro"> & { condition?: SkyModel["condition"] };
 
 const lin = (c: RGB): RGB => c.map(toLinear) as RGB;
 const gam = (c: RGB): RGB => c.map((v) => toGamma(Math.min(1, Math.max(0, v)))) as RGB;
@@ -211,9 +211,14 @@ export function skyAt(
   // Horizon glow: horizon × 1.331 (linear) at alpha 0.75 · glow · exp(−((H − y) / 0.42)² · 2.2), under the sun,
   // centred on the horizon line (in gutter mode H = 1: the viewport bottom).
   const gy = y <= hz.b ? hz.h : HORIZON_AWAY;
-  const g = Math.min(1, m.glow) * 0.75 * Math.exp(-(((gy - y) / 0.42) ** 2) * 2.2);
+  const storm = m.condition === "thunder";
+  // A storm dims the dusk glow by half, and its cloud base over the top of the viewport is half as lit.
+  const g = Math.min(1, m.glow) * (storm ? 0.5 : 1) * 0.75 * Math.exp(-(((gy - y) / 0.42) ** 2) * 2.2);
   if (g > 0) best = brighter(best, over(hRgb, gam(scale(H, 1.331)), g));
-  if (clouds > 0) best = brighter(best, cloudOver(hRgb, cloudLit(m), clouds, cloudLight(m)));
+  if (clouds > 0) {
+    const base = storm ? 1 - 0.5 * smoothstep(0.55, 0.2, y) : 1;
+    best = brighter(best, cloudOver(hRgb, scale(cloudLit(m), base), clouds, cloudLight(m)));
+  }
   // Fog: base desaturated 60%, × 1.19, at alpha fog · 0.55 · smoothstep(.35, 1, p), strongest at the horizon.
   const fy = m.fog * smoothstep(0.35, 1, p) * 0.55;
   if (fy > 0) {

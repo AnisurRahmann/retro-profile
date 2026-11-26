@@ -7,7 +7,7 @@
 import { arcPoint, DEFAULT_GEOM, moonPass, sunPass, type ArcGeom, type Pass } from "./arc";
 import { astro, type Astro } from "./astro";
 import { toCss, skyColors, smoothstep, type SkyColors } from "./gradient";
-import { RAIN_DENSITY, rainSlant } from "./rain";
+import { RAIN_DENSITY, rainSlant, slantWind } from "./rain";
 import type { Condition, SylhetWeather } from "./weather";
 
 export type SkyModel = {
@@ -91,7 +91,7 @@ export function skyModel(date: Date, w: SylhetWeather, g: ArcGeom = DEFAULT_GEOM
     rainDark,
     rainDensity: RAIN_DENSITY[w.condition] ?? 0,
     windKmh: w.windKmh,
-    rainSlant: rainSlant(w.windKmh, w.windFromDeg),
+    rainSlant: rainSlant(slantWind(w.windKmh, w.condition === "thunder"), w.windFromDeg),
     thunder: w.condition === "thunder",
     moon: {
       x: moonPt.cx / g.w,

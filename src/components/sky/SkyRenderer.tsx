@@ -85,6 +85,8 @@ function targetsOf(m: SkyModel): Targets {
     uGolden: m.glow,
     // Cloud light follows the sun: 1 above 2°, 0 at 6° under.
     uTwilight: smoothstep(-6, -2, m.astro.elevation),
+    // A thunderstorm's darker base and dimmed horizon glow (W5).
+    uStorm: m.thunder ? 1 : 0,
     uNight: m.night,
     uCloudCover: m.cloudCover,
     uFog: m.fog,
@@ -168,6 +170,8 @@ function start(
   const coarse = matchMedia("(pointer: coarse)").matches;
   const q = new URLSearchParams(window.location.search);
   const forceBolt = SKY_DEBUG && q.get("bolt") === "1";
+  /** Dev and test builds: `lightning=off` schedules no strike (evidence of the storm between strikes). */
+  const noLightning = SKY_DEBUG && q.get("lightning") === "off";
   const origin = performance.now();
   const now = () => (performance.now() - origin) / 1000;
   const rng = mulberry32(Date.now() & 0xffffffff);
@@ -596,7 +600,7 @@ function start(
     let lightning = 0;
     const flashAt = [0, 0, 0, 0];
     const onStage = view.y < view.vh * 0.5;
-    if (!still && !lost && (model.thunder || n("uRainDark") >= 1)) {
+    if (!still && !lost && !noLightning && (model.thunder || n("uRainDark") >= 1)) {
       if (!stormOn) {
         stormOn = true;
         // The first bolt 1.2–2.5 s in; the first sheet flash never before its second has passed (never at the

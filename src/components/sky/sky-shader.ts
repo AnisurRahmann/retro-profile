@@ -104,7 +104,7 @@ void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Posit
 export const FRAG = `#version 300 es
 precision highp float;
 uniform vec2 uRes;
-uniform float uScale,uTime,uSunX,uGlow,uCloudCover,uFog,uRainDark,uLightning,uMoonIllum,uMoonUp,uNight,uGolden,uTwilight;
+uniform float uScale,uTime,uSunX,uGlow,uCloudCover,uFog,uRainDark,uLightning,uMoonIllum,uMoonUp,uNight,uGolden,uTwilight,uStorm;
 uniform vec2 uMoonPos;
 uniform float uHorizonY,uHorizonB,uCloudHz;
 uniform vec3 uZenith,uMid,uHorizon;
@@ -190,6 +190,10 @@ ph=phase(dot(normalize(vec3((css-ctr)/focal,1.)),normalize(vec3((lc-ctr)/focal,1
 vec3 shd=mix(uMid*.6,mix(${gl(CLOUD_SHADOW)},${gl(NIGHT_SHADOW)},uNight),uTwilight);
 vec3 lit=mix(uHorizon*1.2,mix(${gl(CLOUD_LIT)},${gl(MOONLIGHT)}*(.2+.8*uMoonIllum*uMoonUp),uNight),uTwilight);
 shd=mix(shd,${gl(CLOUD_SHADOW_RAIN)},uRainDark);lit=mix(lit,${gl(CLOUD_LIT_RAIN)},uRainDark);
+// A storm's base (uStorm): the cloud base overhead is the darkest part of the sky. The top 35% of the viewport,
+// eased, takes half the light out of it.
+float base=smoothstep(.55*vp.y,.2*vp.y,css.y)*uStorm;
+shd*=1.-.3*base;lit*=1.-.5*base;
 float haze=smoothstep(0.,${FL(HAZE)},v)*(1.-.6*uFog);
 if(uLo.w>.001){
 ${plane("low", "uLo")}
@@ -232,7 +236,7 @@ over(acc,vec3(.62,.66,.76),mg*.16*exp(-r*r*.9));
 if(uGlow>.001){
 vec2 e=(css-vec2(uSunX*vp.x,css.y<=uHorizonB?uHorizonY:1.45*vp.y))/vec2(.9*vp.x,.42*vp.y);
 float g=exp(-dot(e,e)*2.2);
-over(acc,uHorizon*1.331,uGlow*.75*g);
+over(acc,uHorizon*1.331,uGlow*.75*g*(1.-.5*uStorm));
 }
 // Rain (uRainDark: 0.3 drizzle … 1 heavy rain): curtains of heavier rain drifting across the sky with the wind.
 if(uRainDark>.001){

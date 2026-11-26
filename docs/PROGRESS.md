@@ -222,6 +222,15 @@ typecheck, lint and 271 unit tests (20 files) pass. Idle renderer 31.1 kB gzip: 
 
 Three things the evidence caught before this log, all fixed: bolts came in pairs 1.4 s apart because a strike that had to wait re-dated its next from a stale time (#140); the first build drew the bolt black (an invalid CSS colour left the previous stroke style in place); phones never got a bolt, because the hero spans their width (#141). The steady-state gate then failed at 2.17 ms and took an octave from LOW and HIGH (#146); W1's evidence was re-taken after it and still passes. Idle renderer 33.3 kB gzip of 34.0. A React hydration warning showed twice in about 150 dev page loads, both times on the first load after a code edit (the dev server recompiling); four loads of the same state afterwards were clean, and no test build shows it.
 
+#### W5 storm atmosphere — `feat(weather): W5 …`
+
+| Done when | Result | Evidence |
+| --- | --- | --- |
+| Thunder: a darker cloud base over the top 35% (DECISIONS #148) | PASS | `w5/thunder-1500-1440x900.png`, `thunder-1830-1440x900.png`, and `-375x812` |
+| Wind-driven rain at 35° | PASS: 35° at 45 km/h, and at 5 km/h too | the same shots; `w5/thunder-1500-calm-1440x900.png` (5 km/h); unit test |
+| Dusk horizon glow dimmed 50% | PASS | `w5/thunder-1830-1440x900.png`, `thunder-1830-375x812.png` |
+| Thunder 15:00 and 18:30 at both sizes, between strikes | PASS (`lightning=off`) | `sheet-w5-desktop.png`, `sheet-w5-phone.png` |
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.
