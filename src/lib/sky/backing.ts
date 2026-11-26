@@ -8,10 +8,10 @@
  *   1px × 6px around the text), solved to CHIP_TARGET: comfortably over the 4.5 gate, not to the "none" 7:1.
  *
  * The background is estimated from the renderer's CPU-side model, never sampled from pixels at runtime: the
- * gradient colour at the element's height, the brightest cloud tops the 64×36 cloud mirror puts over its box,
- * the horizon glow, fog, the sun's disc and blooms and the moon's disc and glow when they reach the box, and the
- * city glow when the box overlaps the landscape at night. Lightning is left out (a ≤ 260 ms pulse on the cloud
- * layer, not a state anyone reads against).
+ * gradient colour at the element's height, the brightest cloud the 64×36 cloud mirror puts over its box, the
+ * horizon glow, fog, the sun's disc and blooms (or its diffuse patch under a deck) and the moon's disc and glow when
+ * they reach the box, and the city glow when the box overlaps the landscape at night. Lightning is left out (a
+ * transient on the cloud layer, not a state anyone reads against).
  *
  * Pure: the DOM side is src/components/sky/backing-runner.ts. The gate is the Playwright pixel test
  * (tests/e2e/sky-backing.spec.ts), which measures what the browser actually painted.
@@ -28,9 +28,9 @@ import {
   type Lab,
   type RGB,
 } from "./color";
-import { dayness, sunColor } from "./gradient";
+import { sunColor } from "./gradient";
 import type { SkyModel } from "./model";
-import { CITY_GLOW } from "./palette";
+import { CITY_GLOW, CLOUD_LIT, MOONLIGHT } from "./palette";
 import { groundColor, riverColor, sunLight } from "./landscape/colors";
 import { RIVER } from "./landscape/shapes";
 import { gradientLab, gradientRgb, HORIZON_AWAY, skyParam, type Horizon } from "./horizon";
@@ -171,7 +171,6 @@ type SkyInput = Pick<SkyModel, "colors" | "glow" | "cloudCover" | "fog" | "astro
 const lin = (c: RGB): RGB => c.map(toLinear) as RGB;
 const gam = (c: RGB): RGB => c.map((v) => toGamma(Math.min(1, Math.max(0, v)))) as RGB;
 const scale = (c: RGB, k: number): RGB => c.map((v) => v * k) as RGB;
-const mixRgb = (p: RGB, q: RGB, t: number): RGB => p.map((v, i) => v + (q[i]! - v) * t) as RGB;
 const luma = (c: RGB) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 const smoothstep = (e0: number, e1: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
@@ -194,9 +193,9 @@ export function gradientAt(m: Pick<SkyModel, "colors">, y: number, hz: Horizon =
 }
 
 /**
- * The brightest the sky layers can be at height y: the gradient, with the horizon glow, the brightest cloud tops
- * and golden undersides (alpha × `clouds`, the cloud presence over the box) and the fog composited exactly as the
- * shader does (linear-light colours at their maximum alpha, then composited in sRGB by the browser).
+ * The brightest the sky layers can be at height y: the gradient, with the horizon glow, the brightest cloud
+ * (cloudOver, at the cloud presence over the box) and the fog composited exactly as the shader does (linear-light
+ * colours at their maximum alpha, then composited in sRGB by the browser).
  */
 export function skyAt(
   m: SkyInput,
@@ -208,22 +207,13 @@ export function skyAt(
   const p = skyParam(y, hz, HORIZON_AWAY);
   const base = lin(hRgb);
   const H = lin(oklabToRgb(m.colors.horizon));
-  const day = dayness(m.astro.elevation);
   let best = hRgb;
   // Horizon glow: horizon × 1.331 (linear) at alpha 0.75 · glow · exp(−((H − y) / 0.42)² · 2.2), under the sun,
   // centred on the horizon line (in gutter mode H = 1: the viewport bottom).
   const gy = y <= hz.b ? hz.h : HORIZON_AWAY;
   const g = Math.min(1, m.glow) * 0.75 * Math.exp(-(((gy - y) / 0.42) ** 2) * 2.2);
   if (g > 0) best = brighter(best, over(hRgb, gam(scale(H, 1.331)), g));
-  if (clouds > 0) {
-    const l = luma(base);
-    const grey = base.map((v) => l + (v - l) * 0.5) as RGB;
-    const night = scale(base, 0.55);
-    const tops = scale(grey, 1.405);
-    const under = mixRgb(scale(grey, 0.95), scale(H, 1.1), Math.min(1, m.glow) * 0.495);
-    for (const c of [tops, under])
-      best = brighter(best, over(hRgb, gam(mixRgb(night, c, day)), 0.85 * clouds));
-  }
+  if (clouds > 0) best = brighter(best, cloudOver(hRgb, cloudLit(m), clouds, cloudLight(m)));
   // Fog: base desaturated 60%, × 1.19, at alpha fog · 0.55 · smoothstep(.35, 1, p), strongest at the horizon.
   const fy = m.fog * smoothstep(0.35, 1, p) * 0.55;
   if (fy > 0) {
@@ -236,8 +226,52 @@ export function skyAt(
   return best;
 }
 
-/** The sun as the particle layer draws it (bodies.ts): disc radius, cloud in front 0..1, altitude fade. */
-export type SunDisc = { x: number; y: number; r: number; alt: number; cloud: number; fog: number };
+const mixRgb = (p: RGB, q: RGB, t: number): RGB => p.map((v, i) => v + (q[i]! - v) * t) as RGB;
+
+/**
+ * The lit colour of the clouds under this sky, as the shader has it: daylight's while the sun is above 2°, fading
+ * out of them to the horizon colour × 1.2 by 6° under (a cloud after sunset is lit by the sky, not the sun), and at
+ * night the brighter of moonlight and the city's glow. Golden hour (the horizon colour × 1.52) only while it is
+ * still daylight. The brightest of these is counted, whatever the clouds do with it.
+ */
+function cloudLit(m: SkyInput): RGB {
+  const e = m.astro.elevation;
+  const twilight = smoothstep(-6, -2, e);
+  const H = lin(oklabToRgb(m.colors.horizon));
+  const moon = scale(lin(hexToRgb(MOONLIGHT)), 0.35 + 0.65 * (m.astro.moon?.fraction ?? 1));
+  const night = brighter(moon, scale(lin(hexToRgb(CITY_GLOW)), 0.35));
+  let lit = brighter(mixRgb(scale(H, 1.2), lin(hexToRgb(CLOUD_LIT)), twilight), night);
+  if (m.glow * twilight > 0) lit = brighter(lit, scale(H, 1.521));
+  return lit;
+}
+
+/**
+ * How much of its lit colour a cloud can show. The shader's shade() is Lambert on the cloud's normal plus the
+ * Henyey–Greenstein phase (g 0.65) toward the light, both × the light's strength (SkyRenderer's light(): the sun's
+ * while it has any, else the moon's, else a quarter on a moonless night), and by moonlight only the edge that faces
+ * the moon. Counted at its most: a normal facing the light, and the phase 45° from it (closer than that is the sun's
+ * or the moon's own neighbourhood, which the disc and its glow cover).
+ */
+function cloudLight(m: SkyInput): number {
+  const e = m.astro.elevation;
+  const sun = smoothstep(-6, -1.5, e);
+  const moon = m.astro.moon;
+  const strength = Math.max(sun, moon && moon.altitudeDeg > 0 ? 0.35 + 0.65 * moon.fraction : 0.25 * (1 - sun));
+  return strength * (0.7 - 0.42 * smoothstep(-6, -14, e) + 0.6 * 0.12);
+}
+
+/**
+ * A cloud sheet over the sky at presence `p` (its density × alpha, 0..1), at most `k` lit: lit × k ×
+ * (0.35 + 0.65·exp(−τ·2.2)), τ = density × thickness, at the LOW sheet's thickness and alpha (clouds.ts SHEET.low:
+ * a thin edge lets more light through than a thick core, so brightness per unit of presence peaks at its edge).
+ */
+export function cloudOver(hRgb: RGB, lit: RGB, p: number, k = 1): RGB {
+  return over(hRgb, gam(scale(lit, k * (0.35 + 0.65 * Math.exp(-((2.2 * 1.6) / 0.95) * p)))), p);
+}
+
+/** The sun as the particle layer draws it (bodies.ts): disc radius, the cloud's optical depth in front of it, and
+ *  whether it is under a deck (no disc, a diffuse bright patch). */
+export type SunDisc = { x: number; y: number; r: number; alt: number; tau: number; deck: boolean; fog: number };
 /** The moon: disc radius, visibility 0..1 (cloud, fog, night), glow strength (the shader's mg). */
 export type MoonDisc = { x: number; y: number; r: number; visible: number; glow: number };
 
@@ -250,6 +284,14 @@ const PROFILE: [number, number][] = [
   [0.85, 0.1],
   [1, 0],
 ];
+/** The bloom sprite's alpha at its centre, its three blooms stacked (bodies.ts BLOOM_PEAK). */
+export const BLOOM_PEAK = 1 - (1 - 0.35) * (1 - 0.12) * (1 - 0.05);
+/**
+ * The sun's diffuse patch under a deck: its radius as a share of the viewport width, its alpha at the centre, and how
+ * fast a deck thins it. The brief had exp(−τ); under an overcast deck (τ ≈ 1.4) that is 3%, which measured as
+ * rgb(72,80,93) at the sun against rgb(71,78,91) beside it: nothing. τ / 3 reads as a soft bright patch (DECISIONS).
+ */
+export const SUN_PATCH = { radius: 0.22, alpha: 0.12, thin: 3 } as const;
 function profile(t: number): number {
   if (t >= 1) return 0;
   for (let i = 1; i < PROFILE.length; i++) {
@@ -265,21 +307,29 @@ const distTo = (b: Box, x: number, y: number) =>
   Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.y0 - y, 0, y - b.y1));
 
 /** The sun's disc and blooms over `bg` at distance d from its centre (bodies.ts: 3×, 8×, 20× r at .35, .12, .05). */
-export function sunOver(bg: RGB, s: SunDisc, d: number): RGB {
+export function sunOver(bg: RGB, s: SunDisc, d: number, vw: number): RGB {
   const fade = smoothstep(-0.9, 0.6, s.alt);
   if (fade <= 0) return bg;
   const col = sunColor(s.alt);
-  const c = s.cloud;
-  const grow = 1 + 0.6 * c;
-  let a = 0;
-  for (const [k, ak] of [
-    [20, 0.05],
-    [8, 0.12],
-    [3, 0.35],
-  ] as const)
-    a = 1 - (1 - a) * (1 - ak * profile(d / (k * s.r * grow)));
-  let out = over(bg, col, Math.min(1, a * (1 - 0.75 * c) * fade));
-  if (d < s.r) out = over(out, col, (1 - 0.85 * c) * (1 - 0.5 * s.fog) * fade);
+  const bloom = (radius: number) => {
+    let a = 0;
+    for (const [k, ak] of [
+      [20, 0.05],
+      [8, 0.12],
+      [3, 0.35],
+    ] as const)
+      a = 1 - (1 - a) * (1 - ak * profile(d / (k * radius)));
+    return a;
+  };
+  if (s.deck) {
+    // No disc: a diffuse bright patch, the bloom sprite's shape out to SUN_PATCH.radius of the viewport width,
+    // at SUN_PATCH.alpha × exp(−τ / SUN_PATCH.thin) in its centre.
+    const a = (SUN_PATCH.alpha * Math.exp(-s.tau / SUN_PATCH.thin)) * (bloom(SUN_PATCH.radius * vw / 20) / BLOOM_PEAK) * fade;
+    return a > 0.0005 ? over(bg, col, a) : bg;
+  }
+  const c = 1 - Math.exp(-s.tau);
+  let out = over(bg, col, Math.min(1, bloom(s.r * (1 + 0.6 * c)) * (1 - 0.75 * c) * fade));
+  if (d < s.r) out = over(out, col, Math.exp(-1.8 * s.tau) * (1 - 0.5 * s.fog) * fade);
   return out;
 }
 
@@ -357,7 +407,7 @@ export function backgroundFor(s: Scene, b: Box): RGB {
     best = brighter(best, c);
   }
   if (s.moon) best = moonOver(best, s.moon, distTo(b, s.moon.x, s.moon.y));
-  if (s.sun) best = sunOver(best, s.sun, distTo(b, s.sun.x, s.sun.y));
+  if (s.sun) best = sunOver(best, s.sun, distTo(b, s.sun.x, s.sun.y), s.vw);
   return best;
 }
 

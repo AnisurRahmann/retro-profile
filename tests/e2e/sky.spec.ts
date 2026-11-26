@@ -9,7 +9,7 @@ type Sky = {
   frames?: number;
   webgl?: boolean;
   cap?: number;
-  sun?: { x: number; y: number; up: boolean; cloud: number; dim: number };
+  sun?: { x: number; y: number; up: boolean; tau: number; deck: boolean; dim: number };
   moon?: { x: number; y: number; up: boolean };
   plane?: { state: string; flights: number };
   place?: string | null;

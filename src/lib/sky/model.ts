@@ -68,22 +68,6 @@ export function windVector(kmh: number, fromDeg: number): [number, number] {
   return [-east * speed, -north * speed * 0.25];
 }
 
-/** Minimum cloud drift (px/s) even in calm air: 5 desktop, 3 mobile. */
-export const MIN_DRIFT = { desktop: 5, mobile: 3 };
-
-/**
- * Cloud drift on screen (px/s): max(min, 0.6 × km/h) in the real wind direction (N–S foreshortened × 0.25), with
- * at least 60% of the minimum sideways so a north or south wind still reads as moving.
- */
-export function driftVector(kmh: number, fromDeg: number, min: number): [number, number] {
-  const speed = Math.max(min, 0.6 * kmh);
-  const to = ((fromDeg + 180) * Math.PI) / 180;
-  let vx = -Math.sin(to) * speed;
-  const vy = -Math.cos(to) * speed * 0.25;
-  if (Math.abs(vx) < 0.6 * min) vx = (vx < 0 || Object.is(vx, -0) ? -1 : 1) * 0.6 * min;
-  return [vx, vy];
-}
-
 export function skyModel(date: Date, w: SylhetWeather, g: ArcGeom = DEFAULT_GEOM): SkyModel {
   const a = astro(date);
   const sp = sunPass(date);

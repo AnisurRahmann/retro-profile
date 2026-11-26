@@ -40,6 +40,22 @@ export const LAND_L3 = "#171D2A";
 export const LAND_L4 = "#0C1018";
 /** Moonlight: the 1px rim along the top of the hills and the bridge while the moon is up (landscape.ts). */
 export const MOON_RIM = "#C9D4E8";
+
+/**
+ * Clouds (Weather v6, sky-shader.ts): where a cloud faces the light and where it is in shadow, by the state of the sky.
+ * backing.ts reads the same colours to judge text over them.
+ */
+export const CLOUD_LIT = "#F4F1EA";
+export const CLOUD_SHADOW = "#5D6880";
+/** Golden hour: the undersides of the clouds and their tops. */
+export const CLOUD_UNDER_GOLD = "#FF9A5A";
+export const CLOUD_TOP_GOLD = "#7A86A8";
+/** Night: moonlight on the clouds, and the shadow between them. */
+export const MOONLIGHT = "#9FB0CC";
+export const NIGHT_SHADOW = "#0B101C";
+/** Rain and thunder: a nimbostratus deck. */
+export const CLOUD_LIT_RAIN = "#8D96A8";
+export const CLOUD_SHADOW_RAIN = "#232837";
 /** Runway lights: the threshold (green) and the far end (red); the plane's red beacon uses the same red. */
 export const RWY_GREEN = "#62E08E";
 export const RWY_RED = "#FF5A4E";

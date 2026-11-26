@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { brand } from "@/lib/brand";
 import { onSky } from "@/lib/signal-bus";
 import { hexToRgb, oklabToRgb, rgbToOklab, toGamma, toLinear, type Lab } from "@/lib/sky/color";
-import { dayness } from "@/lib/sky/gradient";
-import { driftVector, MIN_DRIFT, skyModel, type SkyModel } from "@/lib/sky/model";
-import { effectiveWeather, SKY_DEBUG, skyStore, skyTime } from "@/lib/sky/store";
+import { smoothstep } from "@/lib/sky/gradient";
+import { skyModel, type SkyModel } from "@/lib/sky/model";
+import { SHEETS, cloudPlan, depthK, planeWind, type SheetId } from "@/lib/sky/clouds";
+import { effectiveWeather, SKY_DEBUG, skyStore, skyTime, WX_DEFAULTS } from "@/lib/sky/store";
 import { dayOfYear, dhakaParts } from "@/lib/sky/time";
 import { sunColor } from "@/lib/sky/gradient";
 import { nightPoint, sunPath, type ArcGeom } from "@/lib/sky/arc";
@@ -20,9 +21,9 @@ import {
   view,
 } from "@/lib/sky/view";
 import { startBacking, type BackingRunner } from "./backing-runner";
-import { createAtmosphere, type Atmosphere } from "./atmosphere";
+import { ATMOSPHERE_SCALE, createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createSun, drawArc, type SunState } from "./bodies";
-import { CLOUD_REFRESH_S, createCloudField } from "./cloud-field";
+import { CLOUD_REFRESH_S, createCloudField, type SheetState } from "./cloud-field";
 import { createLandscape, GLOW_HORIZON, LIFT, type Landscape } from "./landscape";
 import { createLife, TAKEOFF_S, type Life, type LifeFrame } from "./life";
 import { createAmbient, type Ambient } from "./ambient";
@@ -34,6 +35,7 @@ import {
 } from "@/lib/sky/landscape/lights";
 import { createParticles, mulberry32, type Particles, type ParticleState } from "./particles";
 import {
+  bandHeight,
   closingWalk,
   landMode,
   PARALLAX,
@@ -62,37 +64,32 @@ import {
   type Horizon,
 } from "@/lib/sky/horizon";
 
-const TEST = process.env.NEXT_PUBLIC_E2E === "1";
-/** The clear-sky cirrus floor on phones (an aesthetic choice, DECISIONS). */
-const CIRRUS_FLOOR = 0.06;
+const TEST = SKY_DEBUG;
 
 /** Smoothed shader inputs, keyed by uniform name. Each converges over ~4 s (exponential, τ = 1 s); 0.12 s while scrubbing. */
 type Targets = Record<string, number | number[]>;
 
 const linear = (lab: Lab) => oklabToRgb(lab).map(toLinear);
 
+/** Conditions whose cloud deck hides the sun's disc: only a diffuse bright patch is left where it is. */
+const DECK = new Set(["overcast", "rain", "heavy-rain", "thunder"]);
+
 function targetsOf(m: SkyModel): Targets {
+  const plan = cloudPlan(m.condition, m.cloudCover, WX_DEFAULTS[m.condition].cloudCover);
   return {
     uSunX: m.sunX,
     uGlow: m.glow,
     uGolden: m.glow,
-    uDay: dayness(m.astro.elevation),
+    // Cloud light follows the sun: 1 above 2°, 0 at 6° under.
+    uTwilight: smoothstep(-6, -2, m.astro.elevation),
     uNight: m.night,
     uCloudCover: m.cloudCover,
     uFog: m.fog,
     uRainDark: m.rainDark,
-    uWind: driftVector(
-      m.windKmh,
-      m.windFromDeg,
-      view.vw < COLUMN_BREAK ? MIN_DRIFT.mobile : MIN_DRIFT.desktop,
-    ),
     uMoonPos: [m.moon.x, m.moon.y],
-    // Phones, clear day or golden hour: an aesthetic floor of thin cirrus in the top 30% of the stage (not data).
-    uCirrus:
-      view.vw < 640 && view.stage > 0 && m.cloudCover < CIRRUS_FLOOR && m.astro.elevation > -2
-        ? CIRRUS_FLOOR
-        : 0,
-    uCirrusY: 0.3 * (view.stage - (view.sections.stage ?? 0)),
+    // The cloud sheets' coverage (HIGH, MID, LOW, SCUD) and the LOW sheet's shape: billow, domain warp, stratus deck.
+    uCover: [...plan.cover],
+    uStyle: [plan.billow, plan.warp, plan.stratus, 0],
     sunPos: [m.sun.x, m.sun.y],
     sunAlt: m.sun.alt,
     uMoonIllum: m.moon.fraction,
@@ -141,7 +138,7 @@ type Window2 = Window & {
     frames?: number;
     webgl?: boolean;
     cap?: number;
-    sun?: { x: number; y: number; up: boolean; cloud: number; dim: number };
+    sun?: { x: number; y: number; up: boolean; tau: number; deck: boolean; dim: number };
     moon?: { x: number; y: number; up: boolean };
     geom?: ArcGeom;
     plane?: { state: string; flights: number };
@@ -273,7 +270,10 @@ function start(
   };
   const sunLayer = createSun(() => Math.min(window.devicePixelRatio || 1, 2));
   const clouds = createCloudField();
-  const drift: [number, number] = [0, 0];
+  /** Where each cloud sheet is being sampled (scene units): the wind, integrated, so a change of wind never jumps. */
+  const sheet = Object.fromEntries(SHEETS.map((s) => [s, { x: 0, z: 0, evo: 0 }])) as Record<SheetId, SheetState>;
+  /** The wind's direction on the cloud planes: cirrus stretch along it. */
+  let windDir: [number, number] = [1, 0];
   let lastClouds = -Infinity;
   let geom = geomNow();
   let model = skyModel(skyTime(), effectiveWeather(skyStore.get()), geom);
@@ -322,33 +322,60 @@ function start(
   const n = (k: string) => cur[k] as number;
   const v2 = (k: string) => cur[k] as number[];
 
+  /**
+   * The clouds' horizon, where the land meets the sky: in scene mode the visible ground (the gradient's horizon);
+   * with the fixed band, the far hills' skyline (their ridge averages 34 band units down), not the viewport bottom,
+   * which would leave the visible sky only v 0.82–1 and no perspective at all.
+   */
+  const cloudHz = () => (sceneMode() ? hz.h : view.vh - 0.66 * bandHeight(view.vw, view.vh));
+  const cloudInputs = () => {
+    const cov = v2("uCover");
+    const style = v2("uStyle");
+    return {
+      sheets: sheet,
+      cover: { high: cov[0]!, mid: cov[1]!, low: cov[2]!, scud: cov[3]! },
+      billow: style[0]!,
+      warp: style[1]!,
+      stratus: style[2]!,
+      fog: n("uFog"),
+      wind: windDir,
+      vw: view.vw,
+      cloudHz: cloudHz(),
+      px: 1 / (ATMOSPHERE_SCALE * (window.devicePixelRatio || 1)),
+    };
+  };
   const refreshClouds = (t: number) => {
     clouds.resize(view.vw, view.vh);
-    clouds.update({
-      drift,
-      z: 0.015 * t,
-      cover: n("uCloudCover"),
-      rainDark: n("uRainDark"),
-      cirrus: n("uCirrus"),
-      cirrusY: n("uCirrusY"),
-    });
+    clouds.update(cloudInputs());
     lastClouds = t;
     if (!runtime.cloudsIn) {
       runtime.cloudsIn = (x0, y0, x1, y1) => clouds.maxIn(x0, y0, x1, y1);
       notifyGeometry();
     }
   };
+  /** The density each sheet's coverage means (the shader's threshold). */
+  const thresholds = (cov: number[]): number[] => {
+    const style = v2("uStyle");
+    return SHEETS.map((id, i) => clouds.threshold(id, cov[i]!, style[0]!, style[1]!, style[2]!));
+  };
+  /**
+   * Where the clouds are lit from: the sun's place on screen while any light is left in it, and after it has set
+   * the moon's, or the zenith by a quarter's strength on a moonless night.
+   */
+  const light = (): number[] => {
+    const [fx, fy] = v2("sunPos");
+    const moonUp = n("uMoonUp");
+    const [mx, my] = v2("uMoonPos");
+    const ox = (0.5 * view.vw) * (1 - moonUp) + mx! * view.vw * moonUp;
+    const oy = my! * view.vh * moonUp;
+    const os = 0.25 * (1 - moonUp) + (0.35 + 0.65 * n("uMoonIllum")) * moonUp;
+    const k = smooth01(-6, -1.5, n("sunAlt"));
+    return [ox + (fx! * view.vw - ox) * k, oy + (fy! * view.vh - oy) * k, 0, os + (1 - os) * k];
+  };
 
   const moonR = () => (view.vw < COLUMN_BREAK ? 12 : 14);
-  /**
-   * How much cloud is in front of a point 0..1: the cloud field's opacity there, thickened by rain (a storm deck
-   * is darker than its alpha says) and by full cover (no gaps in an overcast sky).
-   */
-  const occlusion = (x: number, y: number) => {
-    const cover = n("uCloudCover");
-    const c = clouds.ready ? clouds.at(x, y) : cover;
-    return Math.min(1, c * (1 + 0.6 * n("uRainDark")) + Math.max(0, cover - 0.85) * 3);
-  };
+  /** Cloud in front of a point 0..1, from the optical depth of the LOW and MID sheets there (its disc is exp(−1.8 τ)). */
+  const occlusion = (x: number, y: number) => 1 - Math.exp(-1.8 * clouds.tau(x, y));
   const particleState = (): ParticleState => ({
     night: n("uNight"),
     cloudCover: n("uCloudCover"),
@@ -383,7 +410,8 @@ function start(
       up: model.sun.up,
       glow: n("uGlow"),
       horizon: oklabToRgb(model.colors.horizon),
-      cloud: occlusion(x, y),
+      tau: clouds.tau(x, y),
+      deck: DECK.has(model.condition),
       fog: n("uFog"),
       cover: n("uCloudCover"),
       // Only cloud and altitude change the sun: nothing dims it behind text (loose text gets its own backing).
@@ -405,7 +433,15 @@ function start(
     return {
       m,
       sun: m.sun.up
-        ? { x: sx, y: sy, r: sunR(), alt: m.sun.alt, cloud: occlusion(sx, sy), fog: m.fog }
+        ? {
+            x: sx,
+            y: sy,
+            r: sunR(),
+            alt: m.sun.alt,
+            tau: clouds.tau(sx, sy),
+            deck: DECK.has(m.condition),
+            fog: m.fog,
+          }
         : null,
       moon:
         m.moon.up && moonVis > 0.01
@@ -468,20 +504,39 @@ function start(
         lightning = strikeAt >= 0 ? lightningEnvelope(t - strikeAt) : 0;
       }
     } else if (still && model.thunder && forceBolt) lightning = 1;
-    if (!still) {
-      drift[0] += v2("uWind")[0]! * dt;
-      drift[1] += v2("uWind")[1]! * dt;
-    }
+    const hzCloud = cloudHz();
+    // The wind carries each sheet along: across, and away in log depth. The offsets are never wrapped: the rotated
+    // octaves, the warp and the Worley cells share no period, so a wrap would jump the field (DECISIONS #127), and
+    // a float holds a sheet's place to a texel for days.
+    const depth = depthK(view.vw, hzCloud);
+    const wl = planeWind(model.windKmh, model.windFromDeg, "low", depth);
+    const wl2 = Math.hypot(wl[0], wl[1]);
+    windDir = wl2 > 1e-9 ? [wl[0]! / wl2, wl[1]! / wl2] : [1, 0];
+    if (!still)
+      for (const id of SHEETS) {
+        const w = planeWind(model.windKmh, model.windFromDeg, id, depth);
+        sheet[id].x += w[0] * dt;
+        sheet[id].z += w[1] * dt;
+      }
     if (still || t - lastClouds >= CLOUD_REFRESH_S) refreshClouds(t);
     updateHorizon(still);
+    // Debug: one sheet alone (?sheet=low|mid|high|scud), to attribute the GPU budget.
+    const only = SKY_DEBUG ? q.get("sheet") : null;
+    const cov = v2("uCover").map((c, i) => !only || only === SHEETS[i] ? c : 0);
     const u: Targets = {
       ...cur,
       uHorizonY: hz.h,
       uHorizonB: hz.b,
       uTime: still ? 0 : t,
       uLightning: lightning,
-      uDrift: drift,
-      uZ: 0.015 * t,
+      uCloudHz: hzCloud,
+      uTh: thresholds(cov),
+      uHi: [sheet.high.x, sheet.high.z, sheet.high.evo, cov[0]!],
+      uMi: [sheet.mid.x, sheet.mid.z, sheet.mid.evo, cov[1]!],
+      uLo: [sheet.low.x, sheet.low.z, sheet.low.evo, cov[2]!],
+      uSc: [sheet.scud.x, sheet.scud.z, sheet.scud.evo, cov[3]!],
+      uWindv: windDir,
+      uLight: light(),
     };
     if (atm && !lost) atm.draw(u);
     if (pts) {
@@ -524,7 +579,14 @@ function start(
           : null,
       );
       if (TEST && w2.__sky) {
-        w2.__sky.sun = { x: ss.x, y: ss.y, up: ss.up, cloud: ss.cloud, dim: ss.dim };
+        w2.__sky.sun = {
+          x: ss.x,
+          y: ss.y,
+          up: ss.up,
+          tau: ss.tau,
+          deck: ss.deck,
+          dim: ss.dim,
+        };
         w2.__sky.moon = { x: ps.moon.x * view.vw, y: ps.moon.y * view.vh, up: ps.moon.up };
         w2.__sky.geom = geom;
       }
@@ -572,7 +634,7 @@ function start(
           x: ss.x,
           k:
             ss.up && alt < 12
-              ? (1 - Math.max(0, alt) / 12) * (1 - ss.cloud) * smooth01(-0.9, 0.6, alt)
+              ? (1 - Math.max(0, alt) / 12) * (1 - occlusion(ss.x, ss.y)) * smooth01(-0.9, 0.6, alt)
               : 0,
           rgb: sunColor(alt),
           r: ss.r,

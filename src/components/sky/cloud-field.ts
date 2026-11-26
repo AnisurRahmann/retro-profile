@@ -1,106 +1,192 @@
 /**
- * CPU mirror of the atmosphere's cloud field (sky-shader.ts) on a 64×36 grid, refreshed every 500 ms: the sun and
- * moon need to know how much cloud is in front of them, and the crepuscular rays need the gaps. Same noise
- * lattice, same fbm, same warp; values are cloud opacity 0..1 (the shader's cloudA before fog and damping, / 0.85).
+ * CPU mirror of the atmosphere's clouds (sky-shader.ts): the same noise, the same sheets, sample by sample. The
+ * sun and the moon need the cloud in front of them (the optical depth of LOW and MID at their disc), the
+ * crepuscular rays need the gaps, and the backing model (src/lib/sky/backing.ts) the most cloud over a text box,
+ * from a 64×36 grid refreshed every 500 ms. It also solves, from the cloud noise's own distribution, the density a
+ * coverage means (the shader's threshold), so a coverage means what it says.
  */
-import { NOISE_SIZE, noiseData, OCTAVES } from "./sky-shader";
+import {
+  CELLS_PER_UNIT,
+  EDGE,
+  HAZE,
+  SHEET,
+  SHEETS,
+  STRATUS,
+  cellData,
+  lod,
+  noiseData,
+  planePoint,
+  type SheetId,
+} from "@/lib/sky/clouds";
 
 export const GRID_W = 64;
 export const GRID_H = 36;
 export const CLOUD_REFRESH_S = 0.5;
+/** The softness of a cirrus and a SCUD edge, in noise (sky-shader.ts). */
+const SOFT = { high: 0.25, scud: 0.15 } as const;
 
-const N = NOISE_SIZE;
-
-/** cirrus: the clear-sky aesthetic floor (0 or 0.06) applied above cirrusY px (mirrors the shader's uCirrus). */
-/** How opaque the clear-sky cirrus wisps are, relative to a cloud of the same density. */
-export const CIRRUS_ALPHA = 0.45;
+/** Where a sheet is being sampled: its offset in noise units (the wind, integrated by the renderer). */
+export type SheetState = { x: number; z: number; evo: number };
 export type CloudInputs = {
-  drift: [number, number];
-  z: number;
-  cover: number;
-  rainDark: number;
-  cirrus?: number;
-  cirrusY?: number;
+  sheets: Record<SheetId, SheetState>;
+  /** Coverage of each sheet, 0..1. */
+  cover: Record<SheetId, number>;
+  billow: number;
+  warp: number;
+  /** 1 when the LOW sheet is a stratus deck (clouds.ts STRATUS). */
+  stratus: number;
+  fog: number;
+  /** The wind's direction on the cloud planes (unit): cirrus stretch along it. */
+  wind: [number, number];
+  vw: number;
+  /** The clouds' horizon line, CSS px. */
+  cloudHz: number;
+  /** The CSS size of one atmosphere pixel. */
+  px: number;
 };
 
+const N = 256;
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+const wrap = (v: number) => ((v % N) + N) % N;
+const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+const sm = (e0: number, e1: number, x: number) => {
+  const t = clamp01((x - e0) / (e1 - e0));
+  return t * t * (3 - 2 * t);
+};
+/** A bilinear read of one channel of a noise texture, as the GPU filters it. */
+const tap = (data: Uint8Array, x: number, y: number, ch: number) => {
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  let fx = x - ix;
+  let fy = y - iy;
+  fx = fx * fx * (3 - 2 * fx);
+  fy = fy * fy * (3 - 2 * fy);
+  const at = (cx: number, cy: number) => data[(wrap(cy) * N + wrap(cx)) * 4 + ch]!;
+  const a = at(ix, iy);
+  const b = at(ix + 1, iy);
+  const c = at(ix, iy + 1);
+  const d = at(ix + 1, iy + 1);
+  return (a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy) / 255;
+};
+/** R * p = (1.6x − 1.2y, 1.2x + 1.6y); RC is a turn of 36.9°. */
+const rot = (x: number, y: number): [number, number] => [1.6 * x - 1.2 * y, 1.2 * x + 1.6 * y];
+const rotC = (x: number, y: number): [number, number] => [0.8 * x - 0.6 * y, 0.6 * x + 0.8 * y];
+
 export function createCloudField() {
-  const tex = noiseData();
+  const noiseTex = noiseData();
+  const cellTex = cellData();
   const grid = new Float32Array(GRID_W * GRID_H);
+  /** Each sheet's cloud noise as a sorted sample of 1,024 densities, by style. */
+  const dist = new Map<string, Float32Array>();
   let vw = 1,
     vh = 1,
     ready = false;
+  let cur: CloudInputs | null = null;
 
-  // GLSL: f = smoothstep-warped fract; texture((i + f + .5) / N) with LINEAR + REPEAT = bilinear between lattice
-  // points i and i + 1 with weight f.
-  const lat = (x: number, y: number) => tex[(((y % N) + N) % N) * N + (((x % N) + N) % N)]! / 255;
-  const noise = (px: number, py: number) => {
-    const ix = Math.floor(px);
-    const iy = Math.floor(py);
-    let fx = px - ix;
-    let fy = py - iy;
-    fx = fx * fx * (3 - 2 * fx);
-    fy = fy * fy * (3 - 2 * fy);
-    const a = lat(ix, iy);
-    const b = lat(ix + 1, iy);
-    const c = lat(ix, iy + 1);
-    const d = lat(ix + 1, iy + 1);
-    return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
-  };
-  // R = mat2(1.6, 1.2, -1.2, 1.6), column-major: R * p = (1.6 px − 1.2 py, 1.2 px + 1.6 py).
-  const fbm3 = (px: number, py: number) => {
+  const vn = (x: number, y: number) => tap(noiseTex, x, y, 0);
+  /** Worley: the vector to the centre of the cell. */
+  const cellv = (x: number, y: number): [number, number] => [
+    tap(cellTex, x, y, 1) * 2.5 - 1.25,
+    tap(cellTex, x, y, 2) * 2.5 - 1.25,
+  ];
+  const fbm = (x: number, y: number, fp: number, n: 2 | 3) => {
     let v = 0;
     let a = 0.5;
-    for (let i = 0; i < 3; i++) {
-      v += a * noise(px, py);
-      const nx = 1.6 * px - 1.2 * py;
-      py = 1.2 * px + 1.6 * py;
-      px = nx;
+    for (let i = 0; i < n; i++) {
+      v += a * mix(0.5, vn(x, y), lod(fp, i));
+      [x, y] = rot(x, y);
       a *= 0.5;
     }
     return v;
   };
-  const detail = (px: number, py: number) => {
-    for (let i = 0; i < 3; i++) {
-      const nx = 1.6 * px - 1.2 * py;
-      py = 1.2 * px + 1.6 * py;
-      px = nx;
-    }
-    let v = 0;
-    let a = 0.0625;
-    for (let i = 3; i < OCTAVES; i++) {
-      v += a * noise(px, py);
-      const nx = 1.6 * px - 1.2 * py;
-      py = 1.2 * px + 1.6 * py;
-      px = nx;
-      a *= 0.5;
-    }
-    return v;
+  /** LOW's density before its threshold, at noise coordinates q. */
+  const low = (qx: number, qy: number, fp: number, warp: number, billow: number, evo: number, stratus: number) => {
+    const ax = qx * 0.5 + 1.7 + evo;
+    const ay = qy * 0.5 + 9.2 + evo * 0.6;
+    const w1x = tap(noiseTex, ax, ay, 0) - 0.5;
+    const w1y = tap(noiseTex, ax, ay, 1) - 0.5;
+    const bx = (qx + warp * w1x) * 0.5 + 8.3 - evo * 0.7;
+    const by = (qy + warp * w1y) * 0.5 + 2.8 - evo;
+    const w2x = tap(noiseTex, bx, by, 0) - 0.5;
+    const w2y = tap(noiseTex, bx, by, 1) - 0.5;
+    let x = qx + warp * (w1x + w2x);
+    let y = qy + warp * (w1y + w2y);
+    // Four octaves about their mean, as the shader has them (it also samples the first one just up-screen and to
+    // the right, for the cloud's normal and its golden-hour undersides: colour only).
+    let f = 0.5 * mix(0.5, vn(x, y), lod(fp)) + 0.21875;
+    [x, y] = rot(x, y);
+    f += 0.25 * (mix(0.5, vn(x, y), lod(fp, 1)) - 0.5);
+    [x, y] = rot(x, y);
+    f += 0.125 * (mix(0.5, vn(x, y), lod(fp, 2)) - 0.5);
+    [x, y] = rot(x, y);
+    f += 0.0625 * (mix(0.5, vn(x, y), lod(fp, 3)) - 0.5);
+    const kc = clamp01(1.5 - 2.5 * CELLS_PER_UNIT.low * fp);
+    const [cx, cy] = cellv(...rotC(qx * CELLS_PER_UNIT.low, qy * CELLS_PER_UNIT.low));
+    const d = f * mix(1, mix(0.5, 1 - kc * Math.hypot(cx, cy), kc), billow);
+    return mix(d, STRATUS.floor + (1 - STRATUS.floor) * d, stratus);
   };
-  const sm = (e0: number, e1: number, x: number) => {
-    const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
-    return t * t * (3 - 2 * t);
+  /** MID's density before its threshold: a patch mask times its cells' domes. */
+  const mid = (qx: number, qy: number, fp: number) => {
+    const kc = clamp01(1.5 - 2.5 * CELLS_PER_UNIT.mid * fp);
+    const [cx, cy] = cellv(...rotC(qx * CELLS_PER_UNIT.mid, qy * CELLS_PER_UNIT.mid));
+    return vn(qx * 0.25 + 3.1, qy * 0.25 + 7.7) * (0.4 + 0.6 * mix(0.5, 1 - kc * Math.hypot(cx, cy), kc));
   };
 
-  /** Cloud opacity at a CSS px point (0 clear … 1 the densest deck). */
-  const sample = (x: number, y: number, c: CloudInputs) => {
-    const ci = c.cirrus && c.cirrusY ? c.cirrus * (1 - sm(0.7 * c.cirrusY, c.cirrusY, y)) : 0;
-    const cover = Math.max(c.cover, ci);
-    if (cover <= 0.005) return 0;
-    const qx = (x - c.drift[0]) / 400;
-    const qy = (y - c.drift[1]) / (190 + 210 * (1 - y / vh));
-    const wx = fbm3(qx * 0.6 + 1.7 + c.z, qy * 0.6 + 9.2 + c.z * 0.6);
-    const wy = fbm3(qx * 0.6 + 8.3 - c.z * 0.7, qy * 0.6 + 2.8 - c.z);
-    const px = qx + 1.6 * (wx - 0.5);
-    const py = qy + 1.6 * (wy - 0.5);
-    const lo = fbm3(px, py);
-    const d = (lo + detail(px, py) - 0.48) * 1.9 + 0.5;
-    const th = 0.85 + (0.25 - 0.85) * cover - 0.3 * c.rainDark;
-    const dens = sm(th, th + 0.22, d);
-    if (dens <= 0) return 0;
-    const thick = sm(th, th + 0.5, d);
-    const a = Math.min(0.85, dens * (0.55 + 0.3 * thick) * (1 + 0.08 * c.rainDark)) / 0.85;
-    // Cirrus wisps are thin: 45% where only the floor makes them.
-    return ci > c.cover ? a * CIRRUS_ALPHA : a;
+  /**
+   * The density a coverage means for a sheet: the quantile of its noise's distribution. The distribution doesn't
+   * depend on where the wind has left the sheet, so it's sampled once per sheet and style, without wind.
+   */
+  const threshold = (s: SheetId, cover: number, billow: number, warp: number, stratus = 0) => {
+    const key = `${s}|${billow}|${warp}|${stratus}`;
+    let sorted = dist.get(key);
+    if (!sorted) {
+      const n = 1024;
+      const vals = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        // Scattered, not on a lattice.
+        const qx = ((i * 0.6180339887) % 1) * 64;
+        const qy = ((i * 0.7548776662) % 1) * 64;
+        vals[i] = s === "low" ? low(qx, qy, 0, warp, billow, 0, stratus) : s === "mid" ? mid(qx, qy, 0) : fbm(qx, qy, 0, s === "high" ? 3 : 2);
+      }
+      vals.sort();
+      sorted = vals;
+      dist.set(key, sorted);
+    }
+    return sorted[Math.min(sorted.length - 1, Math.floor((1 - Math.min(1, Math.max(0, cover))) * sorted.length))]!;
+  };
+
+  const height = (y: number, c: CloudInputs) => (c.cloudHz - y) / c.cloudHz;
+  /** A sheet's density at a CSS px: 0 under the cloud horizon. */
+  const density = (s: SheetId, x: number, y: number, c: CloudInputs): number => {
+    const v = height(y, c);
+    if (v <= 0) return 0;
+    const { x: ax, s: depth, fp } = planePoint(x, y, s, c.vw, c.cloudHz, c.px);
+    const st = c.sheets[s];
+    const qx = ax + st.x * SHEET[s].freq;
+    const qy = depth + st.z * SHEET[s].freq;
+    const cover = c.cover[s];
+    // Every edge is centred on the threshold (the shader's too), so a coverage is the share of the sky past its middle.
+    const th = threshold(s, cover, c.billow, c.warp, c.stratus);
+    const e = (s === "low" ? mix(EDGE, STRATUS.edge, c.stratus) : s === "mid" ? EDGE : s === "high" ? SOFT.high : SOFT.scud) / 2;
+    if (s === "low") return sm(th - e, th + e, low(qx, qy, fp, c.warp, c.billow, st.evo, c.stratus));
+    if (s === "mid") return sm(th - e, th + e, mid(qx, qy, fp));
+    if (s === "high") {
+      const [wx, wz] = c.wind;
+      return sm(th - e, th + e, fbm((wx * qx + wz * qy) / SHEET.high.stretch, -wz * qx + wx * qy, fp, 3));
+    }
+    return sm(th - e, th + e, fbm(qx, qy, fp, 2));
+  };
+  /** A sheet's opacity at a CSS px: its density, but a stratus deck's is never under STRATUS.opaque while it has any
+   *  cover at all (the shader's `op`). */
+  const opacity = (s: SheetId, x: number, y: number, c: CloudInputs) => {
+    const d = density(s, x, y, c);
+    return s === "low" && d > 0 ? Math.max(d, STRATUS.opaque * c.stratus) : d;
+  };
+  /** What a sheet adds to a pixel: opacity × its alpha × the haze at the horizon × (1 − fog). */
+  const alphaOf = (s: SheetId, x: number, y: number, c: CloudInputs) => {
+    if (c.cover[s] <= 0.001) return 0;
+    const op = opacity(s, x, y, c);
+    return op <= 0 ? 0 : op * SHEET[s].alpha * sm(0, HAZE, height(y, c)) * (1 - 0.6 * c.fog);
   };
 
   return {
@@ -109,32 +195,35 @@ export function createCloudField() {
       vh = Math.max(1, h);
     },
     update(c: CloudInputs) {
+      cur = c;
       for (let j = 0; j < GRID_H; j++) {
         const y = ((j + 0.5) / GRID_H) * vh;
-        for (let i = 0; i < GRID_W; i++)
-          grid[j * GRID_W + i] = sample(((i + 0.5) / GRID_W) * vw, y, c);
+        for (let i = 0; i < GRID_W; i++) {
+          const x = ((i + 0.5) / GRID_W) * vw;
+          let m = 0;
+          for (const s of SHEETS) m = Math.max(m, alphaOf(s, x, y, c));
+          grid[j * GRID_W + i] = m;
+        }
       }
       ready = true;
     },
     get ready() {
       return ready;
     },
-    sample,
-    /** Bilinear read of the grid at a CSS px point. */
+    /** Cloud alpha at a CSS px point (0 clear … 0.95 the densest deck). */
     at(x: number, y: number): number {
-      if (!ready) return 0;
-      const gx = Math.min(GRID_W - 1.001, Math.max(0, (x / vw) * GRID_W - 0.5));
-      const gy = Math.min(GRID_H - 1.001, Math.max(0, (y / vh) * GRID_H - 0.5));
-      const i = Math.floor(gx);
-      const j = Math.floor(gy);
-      const fx = gx - i;
-      const fy = gy - j;
-      const g = (a: number, b: number) => grid[b * GRID_W + a]!;
-      const top = g(i, j) + (g(i + 1, j) - g(i, j)) * fx;
-      const bot = g(i, j + 1) + (g(i + 1, j + 1) - g(i, j + 1)) * fx;
-      return top + (bot - top) * fy;
+      if (!cur) return 0;
+      let m = 0;
+      for (const s of SHEETS) m = Math.max(m, alphaOf(s, x, y, cur));
+      return m;
     },
-    /** Maximum over a rectangle (grid cells it touches), for the backing model (src/lib/sky/backing.ts). */
+    /** Optical depth of LOW and MID at a CSS px: what the sun's and the moon's light crosses (a disc is exp(−1.8 τ)). */
+    tau(x: number, y: number): number {
+      if (!cur) return 0;
+      return density("low", x, y, cur) * SHEET.low.thick + density("mid", x, y, cur) * SHEET.mid.thick;
+    },
+    threshold,
+    /** Maximum over a rectangle (the grid cells it touches), for the backing model (src/lib/sky/backing.ts). */
     maxIn(x0: number, y0: number, x1: number, y1: number): number {
       if (!ready) return -1;
       let m = 0;

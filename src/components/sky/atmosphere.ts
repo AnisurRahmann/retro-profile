@@ -1,7 +1,8 @@
 /** WebGL2 atmosphere layer. Returns null when WebGL2 or the shader is unavailable (the CSS gradient stays). */
-import { FRAG, NOISE_SIZE, noiseData, VERT } from "./sky-shader";
+import { NOISE_SIZE, cellData, noiseData } from "@/lib/sky/clouds";
+import { FRAG, VERT } from "./sky-shader";
 
-/** Uniform values by GLSL name: numbers → float, [x, y] → vec2, [r, g, b] → vec3. */
+/** Uniform values by GLSL name: numbers → float, [x, y] → vec2, [r, g, b] → vec3, [x, y, z, w] → vec4. */
 export type Uniforms = Record<string, number | number[]>;
 
 export type Atmosphere = {
@@ -38,6 +39,7 @@ export async function createAtmosphere(canvas: HTMLCanvasElement, debug: boolean
       const s = gl.createShader(type)!;
       gl.shaderSource(s, src);
       gl.compileShader(s);
+      if (debug && !gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.warn("[sky] shader:", gl.getShaderInfoLog(s));
       gl.attachShader(prog, s);
     }
     gl.linkProgram(prog);
@@ -51,17 +53,24 @@ export async function createAtmosphere(canvas: HTMLCanvasElement, debug: boolean
     gl.useProgram(prog);
     loc.clear();
     gl.bindVertexArray(gl.createVertexArray());
-    // Value-noise lattice as a texture: seeded, so the cloud field is the same on every load.
-    const data = noiseData();
-    gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, NOISE_SIZE, NOISE_SIZE, 0, gl.RED, gl.UNSIGNED_BYTE, data);
-    for (const [k, v] of [
-      [gl.TEXTURE_MIN_FILTER, gl.LINEAR],
-      [gl.TEXTURE_MAG_FILTER, gl.LINEAR],
-      [gl.TEXTURE_WRAP_S, gl.REPEAT],
-      [gl.TEXTURE_WRAP_T, gl.REPEAT],
-    ]) gl.texParameteri(gl.TEXTURE_2D, k!, v!);
+    // The noise textures (src/lib/sky/clouds.ts): four value-noise lattices, and the Worley cells. Seeded, so the
+    // cloud field is the same on every load; one filtered fetch per lookup instead of four hashes.
+    for (const [unit, name, data] of [
+      [0, "uNoise", noiseData()],
+      [1, "uCells", cellData()],
+    ] as const) {
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, NOISE_SIZE, NOISE_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+      for (const [k, v] of [
+        [gl.TEXTURE_MIN_FILTER, gl.LINEAR],
+        [gl.TEXTURE_MAG_FILTER, gl.LINEAR],
+        [gl.TEXTURE_WRAP_S, gl.REPEAT],
+        [gl.TEXTURE_WRAP_T, gl.REPEAT],
+      ]) gl.texParameteri(gl.TEXTURE_2D, k!, v!);
+      gl.uniform1i(gl.getUniformLocation(prog, name), unit);
+    }
     return true;
   };
   if (!(await build())) return null;
@@ -103,6 +112,7 @@ export async function createAtmosphere(canvas: HTMLCanvasElement, debug: boolean
         const v = u[k]!;
         if (typeof v === "number") gl.uniform1f(l, v);
         else if (v.length === 2) gl.uniform2fv(l, v);
+        else if (v.length === 4) gl.uniform4fv(l, v);
         else gl.uniform3fv(l, v);
       }
       gl.drawArrays(gl.TRIANGLES, 0, 3);

@@ -395,19 +395,3 @@ describe("fireflies", () => {
     expect(fireflyCount(7, true)).toBe(0);
   });
 });
-
-import { driftVector, MIN_DRIFT } from "@/lib/sky/model";
-
-describe("cloud drift", () => {
-  it("never drops below the minimum (5 px/s desktop, 3 mobile) and grows with real wind, in its direction", () => {
-    const calm = driftVector(1, 270, MIN_DRIFT.desktop); // 1 km/h from the west → toward the east (left)
-    expect(Math.hypot(calm[0], calm[1] / 0.25)).toBeCloseTo(5, 6);
-    expect(calm[0]).toBeLessThan(0);
-    const mobile = driftVector(0, 90, MIN_DRIFT.mobile); // from the east → right
-    expect(mobile[0]).toBeCloseTo(3, 6);
-    const windy = driftVector(20, 270, MIN_DRIFT.desktop);
-    expect(-windy[0]).toBeCloseTo(12, 6); // 0.6 × 20
-    // A north wind still drifts sideways a little.
-    expect(Math.abs(driftVector(1, 0, 5)[0])).toBeGreaterThanOrEqual(3);
-  });
-});
