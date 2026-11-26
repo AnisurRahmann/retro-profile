@@ -1110,3 +1110,9 @@ html:is([data-sky="night"], [data-sky="astronomical"], [data-sky="nautical"]) .s
     opacity: 0.6;
   }
 }
+
+/* The volumetric clouds lab (/lab/clouds, dev and test builds): no site chrome. Its canvas covers the sky stack,
+   and SkyMount doesn't load the home renderer there (docs/volumetric/BRIEF.md). */
+body:has([data-vol-lab]) > header {
+  display: none;
+}

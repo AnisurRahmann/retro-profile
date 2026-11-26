@@ -631,6 +631,22 @@ bands (#166).
 
 **Bundle and GPU:** DECISIONS #178, #179. **Open:** the 26/30 kB budget (#178); "Shipped" at dusk (#171).
 
+## Volumetric clouds lab (2026-11-27)
+
+Branch `feat/volumetric-lab` (from `feat/weather-v6`). **Resume from `docs/volumetric/`:** `BRIEF.md` (the single
+source of context), `TASKS.md` and `plan.json` (the board: T0–T8, M1, owners, dependencies, `owns` globs), the
+`handoffs/` folder, and `prompts/` (the owner's per-task prompts). The home page sky is unchanged (DECISIONS #180).
+
+- **T0 done:**
+  - Brief, contract (`src/components/sky/volumetric/types.ts`) and the lab skeleton at `/lab/clouds`.
+  - A full-screen WebGL2 pass draws the gradient, a placeholder sun and the ground, with GPU timing and
+    `window.__vol`.
+  - Every later task's file exists as a typed placeholder.
+  - Tests: `vol-assembly`, `vol-gate`, `vol-scene` (28 unit tests) and `lab-smoke` (e2e) are green.
+  - Hand-off: `docs/volumetric/handoffs/T0.md`. Decisions #180–#186.
+- **Next:** T1, T2, T3 and T4 in parallel (GLM: T1, T2, T3; Claude Code: T4). Then T5 (needs T4) and T6 (needs T3),
+  then M1, T7 and T8. T8 stops at `needs-human` for the owner's review.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.

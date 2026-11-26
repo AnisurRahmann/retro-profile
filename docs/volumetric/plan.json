@@ -1,0 +1,287 @@
+{
+  "project": "volumetric-lab",
+  "base": "feat/volumetric-lab",
+  "brief": "docs/volumetric/BRIEF.md",
+  "board": "docs/volumetric/TASKS.md",
+  "gates": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm check:bundle",
+  "agents": {
+    "claude": "Claude Code",
+    "glm": "GLM through the Claude Code CLI"
+  },
+  "tasks": [
+    {
+      "id": "T0",
+      "name": "skeleton",
+      "title": "Brief, interfaces, lab skeleton",
+      "agent": "claude",
+      "deps": [],
+      "branch": "feat/volumetric-lab",
+      "prompt": "docs/volumetric/prompts/T0.md",
+      "commit": "feat(vol): T0 brief, interfaces, lab skeleton",
+      "owns": [
+        "docs/volumetric/BRIEF.md",
+        "docs/volumetric/TASKS.md",
+        "docs/volumetric/plan.json",
+        "docs/volumetric/prompts/**",
+        "docs/volumetric/handoffs/T0.md",
+        "docs/DECISIONS.md",
+        "docs/PROGRESS.md",
+        "src/components/sky/volumetric/types.ts",
+        "src/components/sky/volumetric/renderer.ts",
+        "src/components/sky/volumetric/assemble.ts",
+        "src/components/sky/volumetric/debug-views.ts",
+        "src/components/sky/volumetric/common.glsl.ts",
+        "src/lib/sky/volumetric/scene.ts",
+        "src/lib/sky/volumetric/gate.ts",
+        "src/app/lab/clouds/page.tsx",
+        "src/app/lab/clouds/LabClient.tsx",
+        "tests/unit/vol-assembly.test.ts",
+        "tests/unit/vol-gate.test.ts",
+        "tests/unit/vol-scene.test.ts",
+        "tests/e2e/lab-smoke.spec.ts",
+        "tests/unit/copy-scan.test.ts",
+        "src/components/sky/SkyMount.tsx",
+        "src/app/globals.css",
+        "src/components/sky/volumetric/*.glsl.ts",
+        "src/components/sky/volumetric/noise-gpu.ts",
+        "src/components/sky/volumetric/targets.ts",
+        "src/components/sky/volumetric/tiers.ts",
+        "src/lib/sky/volumetric/**",
+        "src/app/lab/clouds/controls/**"
+      ],
+      "doneWhen": [
+        "the gates are green",
+        "/lab/clouds draws the gradient with a placeholder sun in dev, and tests/e2e/lab-smoke.spec.ts passes",
+        "every later task's files exist as typed placeholders",
+        "tests/unit/vol-assembly.test.ts checks the module contract"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "T1",
+      "name": "noise",
+      "title": "Noise textures on the GPU",
+      "agent": "glm",
+      "deps": ["T0"],
+      "branch": "vol/T1-noise",
+      "prompt": "docs/volumetric/prompts/T1.md",
+      "commit": "feat(vol): T1 noise textures",
+      "owns": [
+        "src/lib/sky/volumetric/noise/**",
+        "src/components/sky/volumetric/noise-gpu.ts",
+        "tests/unit/vol-noise.test.ts",
+        "docs/volumetric/handoffs/T1.md",
+        "docs/volumetric/TASKS.md#T1"
+      ],
+      "doneWhen": [
+        "createNoiseTextures builds SHAPE (64³ / 128³ high, RGBA8), DETAIL (32³) and BLUE (64×64) on the GPU in < 150 ms (logged)",
+        "every channel tiles: opposite faces match within 1e-3 in the CPU reference tests; values in 0..1",
+        "?debug=noise shows slices of the three textures with a z slider (registerDebugView)",
+        ".shots/volumetric-lab/T1-noise.png at 1440×900"
+      ],
+      "status": "todo"
+    },
+    {
+      "id": "T2",
+      "name": "weather-map",
+      "title": "Weather map",
+      "agent": "glm",
+      "deps": ["T0"],
+      "branch": "vol/T2-weather-map",
+      "prompt": "docs/volumetric/prompts/T2.md",
+      "commit": "feat(vol): T2 weather map",
+      "owns": [
+        "src/lib/sky/volumetric/weather-map.ts",
+        "tests/unit/vol-weather-map.test.ts",
+        "docs/volumetric/handoffs/T2.md",
+        "docs/volumetric/TASKS.md#T2"
+      ],
+      "doneWhen": [
+        "generateWeatherMap is deterministic per seed; clustered coverage; cumulonimbus cells; forcedCell ≥ 0.95 at its centre, wrapped",
+        "mean coverage: cumulus at 0.38 within 0.30–0.46, stratus at 0.95 ≥ 0.9",
+        "offset moves with the wind (from 270 → +u); regenerates only when params change",
+        "tests/unit/vol-weather-map.test.ts covers all of the above"
+      ],
+      "status": "todo"
+    },
+    {
+      "id": "T3",
+      "name": "controls",
+      "title": "Lab controls and URL state",
+      "agent": "glm",
+      "deps": ["T0"],
+      "branch": "vol/T3-controls",
+      "prompt": "docs/volumetric/prompts/T3.md",
+      "commit": "feat(vol): T3 lab controls",
+      "owns": [
+        "src/app/lab/clouds/controls/**",
+        "src/lib/sky/volumetric/lab-state.ts",
+        "tests/unit/vol-lab-state.test.ts",
+        "docs/volumetric/handoffs/T3.md",
+        "docs/volumetric/TASKS.md#T3"
+      ],
+      "doneWhen": [
+        "parseLabState / serialiseLabState round-trip; defaults = state A; invalid values clamp",
+        "the panel covers every LabState field, presets A–C and the frame-time readout (onFrameTime)",
+        "every change calls renderer.setState and history.replaceState",
+        "keyboard accessible, every control labelled, tokens only",
+        ".shots/volumetric-lab/T3-controls.png at 1440×900"
+      ],
+      "status": "todo"
+    },
+    {
+      "id": "T4",
+      "name": "march",
+      "title": "Ray-marching core: march, density, lighting",
+      "agent": "claude",
+      "deps": ["T0"],
+      "branch": "vol/T4-march",
+      "prompt": "docs/volumetric/prompts/T4.md",
+      "commit": "feat(vol): T4 march, density, lighting",
+      "owns": [
+        "src/components/sky/volumetric/march.glsl.ts",
+        "src/components/sky/volumetric/density.glsl.ts",
+        "src/components/sky/volumetric/lighting.glsl.ts",
+        "docs/volumetric/handoffs/T4.md",
+        "docs/volumetric/TASKS.md#T4"
+      ],
+      "doneWhen": [
+        "state A shows lit tops, darker bases, clouds shrinking to the horizon, no banding (VOL_TEMP_NOISE until T1/T2 merge)",
+        "the contract functions per types.ts; tests/unit/vol-assembly.test.ts green",
+        ".shots/volumetric-lab/T4-*.png at 1440×900, looked at"
+      ],
+      "status": "todo"
+    },
+    {
+      "id": "T5",
+      "name": "background",
+      "title": "Sun, moon and stars behind the clouds",
+      "agent": "claude",
+      "deps": ["T0", "T4"],
+      "branch": "vol/T5-background",
+      "prompt": "docs/volumetric/prompts/T5.md",
+      "commit": "feat(vol): T5 background behind clouds",
+      "owns": [
+        "src/components/sky/volumetric/background.glsl.ts",
+        "src/lib/sky/volumetric/sun-cell.ts",
+        "tests/unit/vol-sun-cell.test.ts",
+        "tests/e2e/lab-cloud-at-sun.spec.ts",
+        "docs/volumetric/handoffs/T5.md",
+        "docs/volumetric/TASKS.md#T5"
+      ],
+      "doneWhen": [
+        "the sun (limb darkening, 3-radius bloom), the moon (phase, terminator, earthshine, glow) and the stars match the home page's look",
+        "the gradient is dithered (no 8-bit banding)",
+        "cloudAtSun=1 drops the disc centre's brightness ≥ 85% (tests/e2e/lab-cloud-at-sun.spec.ts)",
+        ".shots/volumetric-lab/T5-*.png: B with and without cloudAtSun, and 20:30 with the moon"
+      ],
+      "status": "todo"
+    },
+    {
+      "id": "T6",
+      "name": "probes",
+      "title": "Lab screenshots and GPU probe",
+      "agent": "glm",
+      "deps": ["T0", "T3"],
+      "branch": "vol/T6-probes",
+      "prompt": "docs/volumetric/prompts/T6.md",
+      "commit": "feat(vol): T6 lab probes",
+      "owns": [
+        "scripts/probe/lab-*.mts",
+        "package.json#scripts",
+        "docs/volumetric/BRIEF.md#Tools",
+        "docs/volumetric/handoffs/T6.md",
+        "docs/volumetric/TASKS.md#T6"
+      ],
+      "doneWhen": [
+        "pnpm lab:shots captures A, B, C × 1440×900 / 375×812 × high/medium/low + two frames of A 10 s apart, and a contact sheet",
+        "pnpm lab:gpu prints and writes the GPU ms table (1920×1080 DPR 2, 375×812 DPR 3)",
+        "both ran once against the dev server; BRIEF.md has a Tools section appended"
+      ],
+      "status": "todo"
+    },
+    {
+      "id": "M1",
+      "name": "review",
+      "title": "Review the merged stage-1 work",
+      "agent": "claude",
+      "deps": ["T1", "T2", "T3", "T4", "T5", "T6"],
+      "branch": "vol/M1-review",
+      "prompt": "docs/volumetric/prompts/M1.md",
+      "commit": "chore(vol): M1 review",
+      "owns": [
+        "src/components/sky/volumetric/**",
+        "src/lib/sky/volumetric/**",
+        "src/app/lab/**",
+        "tests/unit/vol-*.test.ts",
+        "tests/e2e/lab-*.spec.ts",
+        "scripts/probe/lab-*.mts",
+        "src/lib/sky/palette.ts",
+        "docs/volumetric/**",
+        "docs/DECISIONS.md",
+        "docs/PROGRESS.md"
+      ],
+      "doneWhen": [
+        "T1–T6 checked against types.ts and BRIEF.md; small fixes made; bigger ones listed as follow-ups with an owner",
+        "sound Requests for M1 applied, the rest rejected with a reason; decisions carried into docs/DECISIONS.md",
+        "VOL_TEMP_NOISE removed; pnpm lab:shots and pnpm lab:gpu run; the contact sheet looked at",
+        "status needs-human if a follow-up blocks T7"
+      ],
+      "status": "todo"
+    },
+    {
+      "id": "T7",
+      "name": "perf",
+      "title": "Performance: reprojection, upsample, tiers",
+      "agent": "claude",
+      "deps": ["M1"],
+      "branch": "vol/T7-perf",
+      "prompt": "docs/volumetric/prompts/T7.md",
+      "commit": "perf(vol): T7 reprojection, upsample, tiers",
+      "owns": [
+        "src/components/sky/volumetric/targets.ts",
+        "src/components/sky/volumetric/reproject.glsl.ts",
+        "src/components/sky/volumetric/tiers.ts",
+        "tests/unit/vol-tiers.test.ts",
+        "docs/volumetric/handoffs/T7.md",
+        "docs/volumetric/TASKS.md#T7"
+      ],
+      "doneWhen": [
+        "RGBA16F cloud target at the tier scale; 2×2 checkerboard reprojection (α 0.25, neighbourhood clamp); ≤ 15 Hz re-march; bilateral upsample",
+        "automatic tiers with the 20 ms / 3 s step-down, logged",
+        "pnpm lab:gpu: high ≤ 2.5 ms at 1920×1080 DPR 2, low ≤ 3 ms at 375×812 DPR 3; before/after table in the hand-off",
+        "two frames 10 s apart show no ghosting or smear"
+      ],
+      "status": "todo"
+    },
+    {
+      "id": "T8",
+      "name": "tuning",
+      "title": "Visual tuning, then stop for the owner's review",
+      "agent": "claude",
+      "deps": ["T7"],
+      "branch": "vol/T8-tuning",
+      "prompt": "docs/volumetric/prompts/T8.md",
+      "commit": "feat(vol): T8 lab tuning",
+      "owns": [
+        "src/components/sky/volumetric/density.glsl.ts",
+        "src/components/sky/volumetric/lighting.glsl.ts",
+        "src/components/sky/volumetric/march.glsl.ts",
+        "src/components/sky/volumetric/background.glsl.ts",
+        "src/components/sky/volumetric/common.glsl.ts",
+        "src/lib/sky/volumetric/weather-map.ts",
+        "docs/volumetric/handoffs/T8.md",
+        "docs/volumetric/TASKS.md#T8",
+        "docs/DECISIONS.md",
+        "docs/PROGRESS.md"
+      ],
+      "doneWhen": [
+        "two review rounds against the BRIEF checklist (PASS/FAIL per item, with shot paths) in the hand-off",
+        "only constants and shaping functions changed; pnpm lab:gpu budgets still hold",
+        "the hand-off lists the 3 lab URLs, the contact sheet, the GPU table and what still doesn't look real",
+        "status needs-human; nothing integrated into the home page"
+      ],
+      "status": "todo"
+    }
+  ]
+}
