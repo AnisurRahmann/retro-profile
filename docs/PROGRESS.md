@@ -185,6 +185,23 @@ Two things the first build got wrong and the tests and zooms caught, both fixed 
 
 The first build had the depth drift's sign inverted and matched the brief's wording: the brief's own evidence frames (0 s and 10 s at 40 km/h from the north) showed the clouds rising toward the viewer. Fixed before this log; the frames above are from the fixed build. Idle renderer 30.2 kB gzip of 31.0.
 
+#### W3 rain — `feat(weather): W3 …`
+
+| Done when | Result | Evidence |
+| --- | --- | --- |
+| Slant θ = atan((km/h ÷ 3.6) ÷ 7.5), max 35°, signed by the east–west wind: 0 → 0°, 15 → 29.05°, 30 → 35° | PASS | `tests/unit/sky-rain.test.ts` |
+| Three depths, 50 / 35 / 15%: lengths 6–10 / 12–20 / 26–44 px, widths 1 / 1 / 1.5, alphas .10–.16 / .18–.28 / .28–.40, speeds 600–800 / 900–1200 / 1400–1900 px/s | PASS | unit test; `w3/rain-1500-1440x900.png` and `-375x812.png`, `w3/heavy-rain-1500-…` |
+| Density per 100,000 px²: drizzle 8, rain 22, heavy-rain 48, thunder 40 | PASS | unit test; `w3/drizzle-1500-…`, `w3/rain-1500-…`, `w3/heavy-rain-1500-…` (both sizes; `sheet-w3-desktop.png`, `sheet-w3-phone.png`) |
+| Rain lighting: warm #FFD9A0 at 0.5 near lamps at night | PASS | `w3/lamp-rain-2130-1440x900.png` (3× zoom: warm streaks above the lamp head), `w3/rain-2130-{1440x900,375x812}.png` |
+| × 2.5 alpha in a lightning flash | PASS in code (`particles.ts`: alpha × (1 + 1.5 · flash)); shown in W4's rain | — |
+| Heavy rain: veil L1 60% / L2 35%, rain curtains, sky 10% darker | PASS | `w3/heavy-rain-1500-1440x900.png`, `-375x812.png` (DECISIONS #137) |
+| Splashes: rain 30/s, heavy-rain 70/s per 1,000 px; skipped on a phone under 30 fps | PASS | `w3/heavy-rain-splash-1440x900.png`, `w3/rain-splash-1440x900.png` (4× zoom of the river); the rule is in `SkyRenderer.tsx` (mean frame time) and not forced on screen |
+| No sun disc in rain | PASS | `manifest.json`: `sun.deck` true for rain, heavy-rain and thunder |
+| Lights on with sky luminance, not the clock | PASS | `w3/heavy-rain-1300-lights-1440x900.png`: lit windows and lamps at 13:00 under a storm (DECISIONS #136) |
+| Heavy-rain 15:00, wind 30 from 200° | Slants **left**, 13.4° from vertical | `w3/heavy-rain-1500-1440x900.png`: a wind from 200° blows toward 20°, which has an eastward component, and east is screen-left (the viewer faces south) |
+
+typecheck, lint and 271 unit tests (20 files) pass. Idle renderer 31.1 kB gzip: the budget goes to 32 kB for it (DECISIONS #138).
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.

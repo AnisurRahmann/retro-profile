@@ -101,6 +101,7 @@ describe("the moon", () => {
           fog: 0,
           rainDensity: 0,
           rainSlant: 0,
+          flash: 0,
           moon: { x: 0.76, y: 0.31, up: true, fraction: 1, waxing: true },
           moonVisible: 1,
           moonR: 12,

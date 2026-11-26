@@ -231,5 +231,12 @@ vec2 e=(css-vec2(uSunX*vp.x,css.y<=uHorizonB?uHorizonY:1.45*vp.y))/vec2(.9*vp.x,
 float g=exp(-dot(e,e)*2.2);
 over(acc,uHorizon*1.331,uGlow*.75*g);
 }
-o=acc.a>0.?vec4(toGamma(acc.rgb/acc.a)*acc.a,acc.a):vec4(0.);
+// Rain (uRainDark: 0.3 drizzle … 1 heavy rain): curtains of heavier rain drifting across the sky with the wind,
+// and the whole sky 10% darker under the heaviest, the gradient behind this layer included.
+if(uRainDark>.001){
+vec2 cu=vec2(css.x/(.9*vp.x)*3.5-uTime*.06*uWindv.x,css.y/vp.y*.5);
+float ct=smoothstep(.4,.8,fbm2(cu,0.));
+over(acc,uHorizon*.5,uRainDark*.3*ct);
+o=vec4(toGamma((acc.rgb+(1.-acc.a)*base)*(1.-.1*uRainDark)),1.);
+}else o=acc.a>0.?vec4(toGamma(acc.rgb/acc.a)*acc.a,acc.a):vec4(0.);
 }`;

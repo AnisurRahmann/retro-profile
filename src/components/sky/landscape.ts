@@ -75,6 +75,9 @@ export type Lighting = {
   moonX: number;
 };
 
+/** Heavy rain: how far the far hills (0.6) and the tea hills (0.35) fade into the sky's colour (W3). */
+export const VEIL = { L1: 0.6, L2: 0.35 } as const;
+
 /**
  * @param lift transparent headroom above the band (px).
  * @param fade the scenes' ground runs on below the band and fades into the sky over this many px (GROUND_FADE).
@@ -219,6 +222,15 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
     g.globalCompositeOperation = "source-over";
   };
 
+  /** Heavy rain veils the far hills and the tea hills: the sky's own colour over them (VEIL), after each strip. */
+  const veilOver = (layer: LayerId, k: number) => {
+    if (k <= 0.003) return;
+    ctx.globalAlpha = VEIL[layer as keyof typeof VEIL] * k;
+    ctx.fillStyle = css(oklabToRgb(light.horizon));
+    ctx.fillRect(0, -lift, w, H + lift);
+    ctx.globalAlpha = 1;
+  };
+
   const renderStrip = (layer: LayerId, offsetPx: number) => {
     if (!world) return;
     const st = strips[layer];
@@ -309,11 +321,12 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
     /**
      * Draw the band. `between(g, layer, offset)` runs after each layer (night lights, fireflies, the rickshaw,
      * reflections) with the context in CSS px, origin at the band's top-left; a world-unit point x on that layer
-     * is at screen x · s − offset.
+     * is at screen x · s − offset. `veil` (0..1) is the heavy rain's veil over the far hills and the tea hills.
      */
     draw(
       walk: number,
       between: (g: CanvasRenderingContext2D, layer: LayerId | "river", offset: number) => void,
+      veil = 0,
     ) {
       if (!world) return;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -341,6 +354,7 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.drawImage(st.c, Math.round((st.x0 - o) * dpr), Math.round(lift * dpr));
         ctx.setTransform(dpr, 0, 0, dpr, 0, lift * dpr);
+        if (layer === "L1" || layer === "L2") veilOver(layer, veil);
         if (layer === "L2") {
           // The Surma: a band across the whole width, in front of the tea hills and behind the town's bank.
           ctx.fillStyle = river;

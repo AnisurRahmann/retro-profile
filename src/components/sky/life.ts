@@ -18,6 +18,7 @@ import { hexToRgb, type RGB } from "@/lib/sky/color";
 import type { LayerId } from "@/lib/sky/landscape/anchors";
 import { TV_HZ, windowLit, windowSchedule } from "@/lib/sky/landscape/lights";
 import { RIVER } from "@/lib/sky/landscape/shapes";
+import { SPLASH } from "@/lib/sky/rain";
 import {
   gateAt,
   PLANE_BODY,
@@ -68,6 +69,8 @@ export type LifeFrame = {
   wind: { kmh: number; side: -1 | 1 };
   /** The plane's length on screen, px (plane.ts planePx). */
   planePx: number;
+  /** Rain: its slant (radians), its streaks per 100,000 px², and the splashes a second per 1,000 px of water (0: none). */
+  rain: { slant: number; density: number; splashes: number };
 };
 
 export function createLife(textRgb: RGB) {
@@ -313,6 +316,39 @@ export function createLife(textRgb: RGB) {
             g.fillRect(Math.round(x - len / 2), Math.round(y), len, 1);
           }
         }
+        // Rain on the water: SPLASH_RATE marks a second per 1,000 px, each a ring that widens and fades over
+        // SPLASH.life. Read from the clock (no state), three birth ticks back.
+        if (f.moving && f.rain.splashes > 0) {
+          const tickS = 1 / 12;
+          const per = ((f.rain.splashes * f.w) / 1000) * tickS;
+          const whole = Math.floor(per);
+          const now = Math.floor(f.t / tickS);
+          g.strokeStyle = textCss;
+          g.lineWidth = 1;
+          for (let back = 2; back >= 0; back--) {
+            const born = now - back;
+            for (let k = 0; k <= whole; k++) {
+              if (k >= whole && hash(k + 31, born) >= per - whole) continue;
+              const age = f.t - (born + hash(k + 13, born)) * tickS;
+              if (age < 0 || age > SPLASH.life) continue;
+              const u = age / SPLASH.life;
+              const r = SPLASH.r0 + (SPLASH.r1 - SPLASH.r0) * u;
+              g.globalAlpha = SPLASH.alpha * (1 - u) * (1 - u);
+              g.beginPath();
+              g.ellipse(
+                hash(k, born) * f.w,
+                (RIVER[0] + 3 + hash(k + 7, born) * (RIVER[1] - RIVER[0] - 6)) * s,
+                r,
+                r * 0.32,
+                0,
+                0,
+                Math.PI * 2,
+              );
+              g.stroke();
+            }
+          }
+          g.globalAlpha = 1;
+        }
         // Sun / moon shimmer column.
         for (const b of f.glints) {
           if (b.k <= 0.01) continue;
@@ -415,6 +451,22 @@ export function createLife(textRgb: RGB) {
           g.drawImage(glow, x - R, y - R, 2 * R, 2 * R);
           g.fillStyle = warmCss;
           g.fillRect(Math.round(x - 1), Math.round(y - 0.5), 2, 1.5);
+          // Rain in the lamp's light: a few short streaks above its head, warm, at 0.5.
+          if (f.rain.density > 0) {
+            const tick = f.moving ? Math.floor(f.t * 10) : 0;
+            const slope = Math.tan(f.rain.slant);
+            g.strokeStyle = warmCss;
+            g.lineWidth = 1;
+            for (let k = 0; k < 5; k++) {
+              const rx = x + (hash(l.i * 5 + k, tick) - 0.5) * 36;
+              const ry = y - 8 - hash(l.i * 5 + k + 50, tick) * 44;
+              g.globalAlpha = 0.5 * f.lamps * (0.4 + 0.6 * hash(l.i * 5 + k + 90, tick));
+              g.beginPath();
+              g.moveTo(rx, ry);
+              g.lineTo(rx - 12 * slope, ry - 12);
+              g.stroke();
+            }
+          }
         }
         g.globalAlpha = 1;
       }

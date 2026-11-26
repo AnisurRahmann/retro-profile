@@ -4,6 +4,7 @@
  */
 import { hexToRgb } from "@/lib/sky/color";
 import { STAR_COOL, STAR_WARM } from "@/lib/sky/palette";
+import { RAIN_LAYER, RAIN_LAYERS, RAIN_MAX, layerCounts } from "@/lib/sky/rain";
 
 export { mulberry32 } from "@/lib/sky/random";
 import { mulberry32 } from "@/lib/sky/random";
@@ -19,6 +20,8 @@ export type ParticleState = {
   fog: number;
   rainDensity: number;
   rainSlant: number;
+  /** A lightning flash 0..1: the streaks' alpha × (1 + 1.5 · flash), so × 2.5 in a stroke. */
+  flash: number;
   moon: { x: number; y: number; up: boolean; fraction: number; waxing: boolean };
   moonVisible: number;
   /** Moon disc radius, CSS px. */
@@ -56,11 +59,13 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
     sWarm = new Uint8Array(0);
   let px = 0,
     py = 0;
-  // Rain pool.
-  const RAIN_MAX = 40;
+  // Rain: three depths (src/lib/sky/rain.ts) in one pool. rU holds three seeded draws (length, alpha, speed) per
+  // streak; which depth a streak is, and so what those draws mean, follows the count (layerCounts).
   let nRain = 0;
+  let nDrawn = -1;
   let rX = new Float32Array(0),
     rY = new Float32Array(0),
+    rU = new Float32Array(0),
     rL = new Float32Array(0),
     rA = new Float32Array(0),
     rV = new Float32Array(0);
@@ -108,6 +113,7 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
     const cap = Math.ceil((RAIN_MAX * w * h) / 100_000);
     rX = new Float32Array(cap);
     rY = new Float32Array(cap);
+    rU = new Float32Array(cap * 3);
     rL = new Float32Array(cap);
     rA = new Float32Array(cap);
     rV = new Float32Array(cap);
@@ -115,10 +121,11 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
     for (let i = 0; i < cap; i++) {
       rX[i] = rainRng() * w * 1.2 - 0.1 * w;
       rY[i] = rainRng() * h;
-      rL[i] = 10 + rainRng() * 12;
-      rA[i] = 0.18 + rainRng() * 0.17;
-      rV[i] = 900 + rainRng() * 400;
+      rU[i * 3] = rainRng();
+      rU[i * 3 + 1] = rainRng();
+      rU[i * 3 + 2] = rainRng();
     }
+    nDrawn = -1;
   };
 
   return {
@@ -149,6 +156,19 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
     /** Advance rain by dt seconds (0 under reduced motion). */
     step(dt: number, s: ParticleState) {
       nRain = Math.min(rX.length, Math.round((s.rainDensity * w * h) / 100_000));
+      if (nRain !== nDrawn) {
+        const n = layerCounts(nRain);
+        let i = 0;
+        for (const id of RAIN_LAYERS) {
+          const spec = RAIN_LAYER[id];
+          for (let k = 0; k < n[id]; k++, i++) {
+            rL[i] = spec.len[0] + rU[i * 3]! * (spec.len[1] - spec.len[0]);
+            rA[i] = spec.alpha[0] + rU[i * 3 + 1]! * (spec.alpha[1] - spec.alpha[0]);
+            rV[i] = spec.speed[0] + rU[i * 3 + 2]! * (spec.speed[1] - spec.speed[0]);
+          }
+        }
+        nDrawn = nRain;
+      }
       if (!dt || !nRain) return;
       const slope = Math.tan(s.rainSlant);
       for (let i = 0; i < nRain; i++) {
@@ -248,27 +268,36 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
         ctx.stroke();
       }
 
-      // Rain: 1 px streaks in --text, alpha × 0.4 behind the hero text.
+      // Rain: three depths in --text, alpha × 0.4 behind the hero text and × 2.5 in a lightning stroke.
       if (nRain) {
         const slope = Math.tan(s.rainSlant);
         ctx.strokeStyle = text;
-        ctx.lineWidth = 1;
         ctx.lineCap = "butt";
-        for (const inCol of [false, true]) {
-          for (const bucket of [0.2, 0.27, 0.34]) {
-            ctx.globalAlpha = bucket * (inCol ? 0.4 : 1);
-            ctx.beginPath();
-            for (let i = 0; i < nRain; i++) {
-              const ra = rA[i]!;
-              if (Math.abs(ra - bucket) > 0.035) continue;
-              const x = rX[i]!;
-              const y = rY[i]!;
-              if (under(x, y) > 0.5 ? !inCol : inCol) continue;
-              ctx.moveTo(x, y);
-              ctx.lineTo(x - rL[i]! * slope, y - rL[i]!);
+        const n = layerCounts(nRain);
+        const flash = 1 + 1.5 * s.flash;
+        let i0 = 0;
+        for (const id of RAIN_LAYERS) {
+          const spec = RAIN_LAYER[id];
+          const i1 = i0 + n[id];
+          const mid = (spec.alpha[0] + spec.alpha[1]) / 2;
+          ctx.lineWidth = spec.width;
+          for (const half of [0, 1]) {
+            const a = spec.alpha[0] + (spec.alpha[1] - spec.alpha[0]) * (0.25 + 0.5 * half);
+            for (const inCol of [false, true]) {
+              ctx.globalAlpha = a * (inCol ? 0.4 : 1) * flash;
+              ctx.beginPath();
+              for (let i = i0; i < i1; i++) {
+                if (Number(rA[i]! > mid) !== half) continue;
+                const x = rX[i]!;
+                const y = rY[i]!;
+                if (under(x, y) > 0.5 ? !inCol : inCol) continue;
+                ctx.moveTo(x, y);
+                ctx.lineTo(x - rL[i]! * slope, y - rL[i]!);
+              }
+              ctx.stroke();
             }
-            ctx.stroke();
           }
+          i0 = i1;
         }
       }
       ctx.globalAlpha = 1;

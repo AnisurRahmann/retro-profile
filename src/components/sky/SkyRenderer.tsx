@@ -7,6 +7,7 @@ import { hexToRgb, oklabToRgb, rgbToOklab, toGamma, toLinear, type Lab } from "@
 import { smoothstep } from "@/lib/sky/gradient";
 import { skyModel, type SkyModel } from "@/lib/sky/model";
 import { EVO_PERIOD, EVOLUTION, SHEETS, cloudPlan, depthK, gust, planeWind, type SheetId } from "@/lib/sky/clouds";
+import { LAMPS_AT, SPLASH_RATE } from "@/lib/sky/rain";
 import { effectiveWeather, SKY_DEBUG, skyStore, skyTime, WX_DEFAULTS } from "@/lib/sky/store";
 import { dayOfYear, dhakaParts } from "@/lib/sky/time";
 import { sunColor } from "@/lib/sky/gradient";
@@ -275,6 +276,11 @@ function start(
   /** The wind's direction on the cloud planes: cirrus stretch along it. */
   let windDir: [number, number] = [1, 0];
   let lastClouds = -Infinity;
+  /** The mid sky's relative luminance (linear): what the lamps and windows go by. */
+  let midLuma = 0;
+  /** The lightning envelope of the frame (the rain brightens in it) and the mean frame time (splashes on phones). */
+  let flashNow = 0;
+  let emaDt = 1 / 60;
   let geom = geomNow();
   let model = skyModel(skyTime(), effectiveWeather(skyStore.get()), geom);
   let target = targetsOf(model);
@@ -382,6 +388,7 @@ function start(
     fog: n("uFog"),
     rainDensity: model.rainDensity,
     rainSlant: model.rainSlant,
+    flash: flashNow,
     moon: { ...model.moon, x: (cur.uMoonPos as number[])[0]!, y: (cur.uMoonPos as number[])[1]! },
     moonVisible:
       n("uMoonUp") *
@@ -504,6 +511,10 @@ function start(
         lightning = strikeAt >= 0 ? lightningEnvelope(t - strikeAt) : 0;
       }
     } else if (still && model.thunder && forceBolt) lightning = 1;
+    flashNow = lightning;
+    if (dt > 0 && dt < 0.5) emaDt += (dt - emaDt) * 0.05;
+    const mid = v2("uMid");
+    midLuma = 0.2126 * mid[0]! + 0.7152 * mid[1]! + 0.0722 * mid[2]!;
     const hzCloud = cloudHz();
     // The wind carries each sheet along: across, and away in log depth. The offsets are never wrapped: the rotated
     // octaves, the warp and the Worley cells share no period, so a wrap would jump the field (DECISIONS #127), and
@@ -666,12 +677,19 @@ function start(
           minutes: mins,
           seed: dayOfYear(at),
           dark: smooth01(2, -5, alt),
-          lamps: smooth01(0.5, -1.5, alt),
+          // The lights follow the sky's luminance, not the clock: on in a dark storm at noon too (rain.ts LAMPS_AT).
+          lamps: smooth01(LAMPS_AT.off, LAMPS_AT.on, midLuma),
           glints,
           l3: b.land.colorOf("L3"),
           tones: b.land.tones,
           wind: { kmh: model.windKmh, side: model.wind[0] < 0 ? -1 : 1 },
           planePx: planePx(view.vw),
+          rain: {
+            slant: model.rainSlant,
+            density: model.rainDensity,
+            // No splashes on a phone that is already under 30 fps.
+            splashes: view.vw < COLUMN_BREAK && emaDt > 1 / 30 ? 0 : (SPLASH_RATE[model.condition] ?? 0),
+          },
         };
         b.frame = f;
         const walk = walkOf(b);
@@ -704,11 +722,16 @@ function start(
           }
           if (arrival.update(near, away, life.ready(t) && b.frame !== null)) startTakeoff(t, b, o3);
         }
-        b.land.draw(walk, (g, layer, o) => {
-          life!.between(g, layer, o, f);
-          if (ll && !still && ambient && (layer === "L2" || layer === "L4"))
-            ambient.land(g, layer, o, ll);
-        });
+        b.land.draw(
+          walk,
+          (g, layer, o) => {
+            life!.between(g, layer, o, f);
+            if (ll && !still && ambient && (layer === "L2" || layer === "L4"))
+              ambient.land(g, layer, o, ll);
+          },
+          // The heavy-rain veil: in over the last fifth of the rain's darkening, so only heavy rain and thunder have it.
+          smooth01(0.8, 1, n("uRainDark")),
+        );
         if (!("ready" in b.canvas.dataset)) b.canvas.dataset.ready = "";
       }
       if (TEST && w2.__sky) {

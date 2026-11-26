@@ -66,6 +66,25 @@ const TASKS: Record<string, Shot[]> = {
     ...both("golden-1645-partly", q("16:45", "partly")),
     ...both("night-0200-partly", q("02:00", "partly")),
   ],
+  w3: [
+    ...both("drizzle-1500", q("15:00", "drizzle", "wind=10&from=90")),
+    ...both("rain-1500", q("15:00", "rain", "wind=20&from=200")),
+    ...both("heavy-rain-1500", q("15:00", "heavy-rain", "wind=30&from=200")),
+    // Night: the lamps are on and the rain shows in their light.
+    ...both("rain-2130", q("21:30", "rain", "wind=15&from=200")),
+    // Noon under a storm is as dark as a clear sunset: the lights are on in the afternoon.
+    both("heavy-rain-1300-lights", q("13:00", "heavy-rain", "wind=30&from=200"), { scroll: "shipped" })[0]!,
+    // The splash marks on the water: the river beside the cards in the fixed band at 1440×900 (about y 805–850).
+    {
+      name: "heavy-rain-splash-1440x900",
+      q: q("15:00", "heavy-rain", "wind=30&from=200"),
+      size: "desk",
+      crop: [1100, 770, 340, 110],
+      zoom: 4,
+    },
+    { name: "rain-splash-1440x900", q: q("15:00", "rain", "wind=20&from=200"), size: "desk", crop: [1100, 770, 340, 110], zoom: 4 },
+    { name: "lamp-rain-2130-1440x900", q: q("21:30", "rain", "wind=15&from=200"), size: "desk", crop: [0, 770, 340, 110], zoom: 3 },
+  ],
   w2: [
     ...both("wind15-from270", q("11:00", "partly", "wind=15&from=270"), { frames: 3, gap: 5, wait: 3000 }),
     ...both("wind40-from0", q("11:00", "partly", "wind=40&from=0"), { frames: 3, gap: 5, wait: 3000 }),
