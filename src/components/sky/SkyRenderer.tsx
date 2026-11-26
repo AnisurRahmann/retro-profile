@@ -27,7 +27,7 @@ import { startBacking, type BackingRunner } from "./backing-runner";
 import { ATMOSPHERE_SCALE, createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createSun, drawArc, type SunState } from "./bodies";
 import { CLOUD_REFRESH_S, createCloudField, type SheetState } from "./cloud-field";
-import { createLandscape, GLOW_HORIZON, LIFT, type Landscape } from "./landscape";
+import { createLandscape, GLOW_HORIZON, LIFT, NO_FX, type Landscape } from "./landscape";
 import { createLife, TAKEOFF_S, type Life, type LifeFrame } from "./life";
 import { createAmbient, type Ambient } from "./ambient";
 import {
@@ -281,6 +281,8 @@ function start(
   /** The lightning envelope of the frame (the rain brightens in it) and the mean frame time (splashes on phones). */
   let flashNow = 0;
   let emaDt = 1 / 60;
+  /** The ground fog's drift in wind-seconds: held in a still frame (reduced motion). */
+  let fogT = 0;
   let geom = geomNow();
   let model = skyModel(skyTime(), effectiveWeather(skyStore.get()), geom);
   let target = targetsOf(model);
@@ -643,6 +645,8 @@ function start(
     const boltUp = strike?.kind === "cg" && boltPaths.length > 0;
     flashNow = lightning;
     if (dt > 0 && dt < 0.5) emaDt += (dt - emaDt) * 0.05;
+    if (dt > 0 && dt < 0.5 && !still)
+      fogT += dt * (model.windKmh / 15) * (model.wind[0] < 0 ? -1 : 1);
     const mid = v2("uMid");
     midLuma = 0.2126 * mid[0]! + 0.7152 * mid[1]! + 0.0722 * mid[2]!;
     const hzCloud = cloudHz();
@@ -862,9 +866,9 @@ function start(
             if (ll && !still && ambient && (layer === "L2" || layer === "L4"))
               ambient.land(g, layer, o, ll);
           },
-          // The heavy-rain veil: in over the last fifth of the rain's darkening, so only heavy rain and thunder have it.
-          smooth01(0.8, 1, n("uRainDark")),
-          lightning,
+          // The heavy-rain veil is in over the last fifth of the rain's darkening, so only heavy rain and thunder
+          // have it; the rim is the bolt under way; fog fades the land by distance and lies on the ground.
+          { ...NO_FX, veil: smooth01(0.8, 1, n("uRainDark")), rim: lightning, fog: n("uFog"), fogT },
         );
         if (!("ready" in b.canvas.dataset)) b.canvas.dataset.ready = "";
       }

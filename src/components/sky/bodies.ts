@@ -159,13 +159,17 @@ export function createSun(dpr: () => number) {
         key = k;
       }
       const c = 1 - Math.exp(-s.tau);
-      const discA = s.deck ? 0 : Math.exp(-1.8 * s.tau) * (1 - 0.5 * s.fog) * s.dim;
+      // In fog (not in common haze: that keeps its dim disc and corona) the sun is pale, at most 0.6, and rayless:
+      // no corona, no crepuscular rays, a diffuse patch only.
+      const foggy = s.fog >= 0.9;
+      const clear = Math.exp(-1.8 * s.tau) * (1 - 0.5 * s.fog) * s.dim;
+      const discA = s.deck ? 0 : foggy ? Math.min(0.6, clear) : clear;
       const breath = 1 + 0.04 * Math.sin((t * Math.PI * 2) / 9);
       const bScale = (1 + 0.6 * c) * (1 + 0.3 * s.fog) * breath;
       const prev = ctx.globalCompositeOperation;
       ctx.globalCompositeOperation = "lighter";
       // Crepuscular rays.
-      if (!s.deck && s.glow > 0.25 && s.cover > 0.2 && s.cover < 0.7 && wedge) {
+      if (!s.deck && !foggy && s.glow > 0.25 && s.cover > 0.2 && s.cover < 0.7 && wedge) {
         const rng = mulberry32(day * 977);
         const n = 6 + Math.floor(rng() * 5);
         for (let i = 0; i < n; i++) {
@@ -185,13 +189,15 @@ export function createSun(dpr: () => number) {
       if (bloom) {
         // Thin cloud spreads the glow. Under a deck only a diffuse bright patch is left where the sun is: 22% of the
         // viewport wide, at SUN_PATCH.alpha · exp(−τ / SUN_PATCH.thin).
-        const B = s.deck ? SUN_PATCH.radius * ctx.canvas.clientWidth : 20 * s.r * bScale;
-        ctx.globalAlpha = s.deck
-          ? ((SUN_PATCH.alpha * Math.exp(-s.tau / SUN_PATCH.thin)) / BLOOM_PEAK) * s.dim
-          : Math.min(1, s.dim * (1 - 0.75 * c));
+        const B = s.deck || foggy ? SUN_PATCH.radius * ctx.canvas.clientWidth : 20 * s.r * bScale;
+        ctx.globalAlpha = foggy
+          ? (SUN_PATCH.alpha / BLOOM_PEAK) * s.dim
+          : s.deck
+            ? ((SUN_PATCH.alpha * Math.exp(-s.tau / SUN_PATCH.thin)) / BLOOM_PEAK) * s.dim
+            : Math.min(1, s.dim * (1 - 0.75 * c));
         ctx.drawImage(bloom, s.x - B, s.y - B, 2 * B, 2 * B);
       }
-      if (corona && !s.deck) {
+      if (corona && !s.deck && !foggy) {
         const C = 3.4 * s.r * breath;
         ctx.globalAlpha = 0.06 * discA;
         ctx.save();

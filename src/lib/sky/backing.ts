@@ -219,8 +219,9 @@ export function skyAt(
     const base = storm ? 1 - 0.5 * smoothstep(0.55, 0.2, y) : 1;
     best = brighter(best, cloudOver(hRgb, scale(cloudLit(m), base), clouds, cloudLight(m)));
   }
-  // Fog: base desaturated 60%, × 1.19, at alpha fog · 0.55 · smoothstep(.35, 1, p), strongest at the horizon.
-  const fy = m.fog * smoothstep(0.35, 1, p) * 0.55;
+  // Fog: base desaturated 60%, × 1.19, at alpha fog · smoothstep(.35, 1, p) · (0.55, rising to 0.85 where the land
+  // begins: about 85% down the viewport with the fixed band).
+  const fy = m.fog * smoothstep(0.35, 1, p) * (0.55 + 0.3 * smoothstep(0.45, 1, Math.min(1, y / 0.85)));
   if (fy > 0) {
     const l = luma(base);
     best = brighter(
@@ -326,15 +327,19 @@ export function sunOver(bg: RGB, s: SunDisc, d: number, vw: number): RGB {
       a = 1 - (1 - a) * (1 - ak * profile(d / (k * radius)));
     return a;
   };
-  if (s.deck) {
+  if (s.deck || s.fog >= 0.9) {
     // No disc: a diffuse bright patch, the bloom sprite's shape out to SUN_PATCH.radius of the viewport width,
     // at SUN_PATCH.alpha × exp(−τ / SUN_PATCH.thin) in its centre.
-    const a = (SUN_PATCH.alpha * Math.exp(-s.tau / SUN_PATCH.thin)) * (bloom(SUN_PATCH.radius * vw / 20) / BLOOM_PEAK) * fade;
+    // In fog the patch is whole (no cloud to thin it).
+    const a = ((s.fog >= 0.9 ? SUN_PATCH.alpha : SUN_PATCH.alpha * Math.exp(-s.tau / SUN_PATCH.thin)) * (bloom(SUN_PATCH.radius * vw / 20) / BLOOM_PEAK)) * fade;
     return a > 0.0005 ? over(bg, col, a) : bg;
   }
   const c = 1 - Math.exp(-s.tau);
   let out = over(bg, col, Math.min(1, bloom(s.r * (1 + 0.6 * c)) * (1 - 0.75 * c) * fade));
-  if (d < s.r) out = over(out, col, Math.exp(-1.8 * s.tau) * (1 - 0.5 * s.fog) * fade);
+  if (d < s.r) {
+    const disc = Math.exp(-1.8 * s.tau) * (1 - 0.5 * s.fog);
+    out = over(out, col, (s.fog >= 0.9 ? Math.min(0.6, disc) : disc) * fade);
+  }
   return out;
 }
 

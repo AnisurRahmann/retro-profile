@@ -224,9 +224,11 @@ float d=smoothstep(uTh.x-${FL(SOFT.high / 2)},uTh.x+${FL(SOFT.high / 2)},fbm${HI
 if(d>0.)over(acc,(mix(shd,lit,clamp(.3+.7*ph,0.,1.))*(.35+.65*exp(-d*${FL(SHEET.high.thick)}*2.2))),d*${FL(SHEET.high.alpha)}*haze);
 }
 }
+// Fog: the sky desaturated 60% and lifted, 55% of it, rising to 85% where the land begins (uCloudHz: the far
+// hills' skyline), so the foggy land and the sky above it meet in the same colour.
 if(uFog>.001){
 vec3 f=mix(vec3(luma(base)),base,.4)*1.19;
-over(acc,f,uFog*.55*smoothstep(.35,1.,p));
+over(acc,f,uFog*mix(.55,.85,smoothstep(.45,1.,clamp(css.y/max(uCloudHz,1.),0.,1.)))*smoothstep(.35,1.,p));
 }
 float mg=uMoonIllum*uMoonUp*uNight*(1.-.7*uCloudCover);
 if(mg>.001){

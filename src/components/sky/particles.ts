@@ -196,7 +196,7 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
       hooks.back?.(ctx);
 
       // Stars.
-      const vis = s.night * (1 - s.cloudCover * 0.9) * (1 - s.fog * 0.8);
+      const vis = s.night * (1 - s.cloudCover * 0.9) * (1 - s.fog);
       if (vis > 0.01) {
         const rot = skyRotation(nowMs);
         for (let i = 0; i < nStars; i++) {
@@ -223,6 +223,9 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
         const R = s.moonR;
         const cx = s.moon.x * w;
         const cy = s.moon.y * h;
+        // In fog the moon is pale and blurred, never sharp.
+        const pale = 1 - 0.6 * s.fog;
+        ctx.filter = s.fog > 0.01 ? `blur(${(2.5 * s.fog).toFixed(2)}px)` : "none";
         ctx.globalAlpha = 0.06 * s.moonVisible * s.moonDim;
         ctx.fillStyle = text;
         ctx.beginPath();
@@ -233,13 +236,14 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
           ctx.save();
           ctx.translate(cx, cy);
           if (!s.moon.waxing) ctx.scale(-1, 1); // waxing: lit limb toward the setting sun (west, right)
-          ctx.globalAlpha = 0.92 * s.moonVisible * s.moonDim;
+          ctx.globalAlpha = 0.92 * s.moonVisible * s.moonDim * pale;
           ctx.beginPath();
           ctx.arc(0, 0, R, -Math.PI / 2, Math.PI / 2, false);
           ctx.ellipse(0, 0, R * Math.abs(1 - 2 * f), R, 0, Math.PI / 2, -Math.PI / 2, f <= 0.5);
           ctx.fill();
           ctx.restore();
         }
+        ctx.filter = "none";
       }
 
       hooks.front?.(ctx);

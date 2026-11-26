@@ -49,8 +49,9 @@ type Shot = {
   zoom?: number;
   /** Dump window.__sky.lightningLog next to the shot. */
   log?: boolean;
-  /** With `frames`: measure how far the cloud moved between the first and the last frame (W2's calibration). */
-  drift?: { band: [number, number]; axis: "x" | "y"; max: number };
+  /** With `frames`: measure how far the cloud (or the ground fog) moved between the first and the last frame, over
+   *  `band` (px along the axis) and, if given, `x` across (to leave the page's own still content out). */
+  drift?: { band: [number, number]; axis: "x" | "y"; max: number; x?: [number, number] };
 };
 
 const D = "2026-11-26";
@@ -65,6 +66,21 @@ const TASKS: Record<string, Shot[]> = {
     ...both("overcast-1300", q("13:00", "overcast")),
     ...both("golden-1645-partly", q("16:45", "partly")),
     ...both("night-0200-partly", q("02:00", "partly")),
+  ],
+  w6: [
+    ...both("fog-0700", q("07:00", "fog", "wind=10&from=90")),
+    ...both("fog-2200", q("22:00", "fog", "wind=10&from=90")),
+    // The ground fog drifts: two frames 10 s apart (the nearest band moves about 33 px at 10 km/h), and a zoom of the
+    // bands. Measured over the open land to the right of the cards, above the river's reflections.
+    {
+      name: "fog-drift-1440x900",
+      q: q("07:00", "fog", "wind=10&from=90"),
+      size: "desk",
+      frames: 2,
+      gap: 10,
+      drift: { band: [800, 890], x: [1110, 1440], axis: "x", max: 80 },
+    },
+    { name: "fog-bands-1440x900", q: q("07:00", "fog", "wind=10&from=90"), size: "desk", crop: [1100, 700, 340, 180], zoom: 3 },
   ],
   w5: [
     // Between strikes: the dev-only `lightning=off` keeps the scheduler quiet.
@@ -205,7 +221,9 @@ async function take(browser: Browser, out: string, s: Shot) {
   if (s.drift && files.length > 1) {
     const d = await drift(browser, files[0]!, files.at(-1)!, s.drift, v.dpr);
     moved = Math.round(d.px * 100) / 100;
-    console.log(`  ${s.name}: cloud moved ${moved} px in ${(s.gap ?? 5) * (files.length - 1)} s along ${s.drift.axis} (correlation ${d.r.toFixed(3)})`);
+    console.log(
+      `  ${s.name}: cloud moved ${moved} px in ${(s.gap ?? 5) * (files.length - 1)} s along ${s.drift.axis} (correlation ${d.r.toFixed(3)}; the band's pixels changed by ${(d.delta * 100).toFixed(2)}% on average)`,
+    );
   }
   if (problems.length) console.log(`  ! ${s.name}: ${problems.slice(0, 6).join(" | ")}`);
   await ctx.close();
@@ -213,53 +231,64 @@ async function take(browser: Browser, out: string, s: Shot) {
 }
 
 /**
- * How far the cloud moved between two shots, in CSS px: the shift along an axis that best correlates a band of the
- * first frame with the last (brute force, the band downsampled 2×). Positive is leftward (x) or upward (y).
+ * How far the cloud (or the ground fog) moved between two shots, in CSS px: the shift along an axis that best
+ * correlates a band of the first frame with the last (brute force, the band downsampled 2×). Positive is leftward
+ * (x) or upward (y). `x` limits the band across, to leave the page's own still content out.
  */
-async function drift(browser: Browser, first: string, last: string, d: { band: [number, number]; axis: "x" | "y"; max: number }, scale: number) {
+async function drift(
+  browser: Browser,
+  first: string,
+  last: string,
+  d: { band: [number, number]; axis: "x" | "y"; max: number; x?: [number, number] },
+  scale: number,
+) {
   const page = await browser.newPage();
+  const unit = 2 * scale; // One sample of the band, in CSS px
+  const sample = (v: number) => Math.round(v / unit);
   const band = async (file: string) => {
     await page.setContent(`<img id="i" src="data:image/png;base64,${fs.readFileSync(file).toString("base64")}">`);
     // No inner helpers: tsx's transform gives them a name the page doesn't have.
     return page.evaluate(
-      async ({ y0, y1, axis }) => {
+      async ({ u, y0, y1, x0, x1, axis }) => {
         const img = document.getElementById("i") as HTMLImageElement;
         await img.decode();
         const c = document.createElement("canvas");
-        c.width = Math.round(img.naturalWidth / 4);
-        c.height = Math.round(img.naturalHeight / 4);
+        c.width = Math.round(img.naturalWidth / u);
+        c.height = Math.round(img.naturalHeight / u);
         const g = c.getContext("2d", { willReadFrequently: true })!;
         g.drawImage(img, 0, 0, c.width, c.height);
         const d = g.getImageData(0, 0, c.width, c.height).data;
+        const W = c.width;
+        const H = c.height;
         const rows: number[][] = [];
-        if (axis === "x")
-          for (let y = y0; y < y1; y++) {
-            const row: number[] = [];
-            for (let x = 0; x < c.width; x++) {
-              const i = (y * c.width + x) * 4;
-              row.push(0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!);
-            }
-            rows.push(row);
+        const xa = Math.max(0, x0);
+        const xb = Math.min(axis === "x" ? W : H, x1);
+        for (let v = Math.max(0, y0); v < Math.min(axis === "x" ? H : W, y1); v++) {
+          const row: number[] = [];
+          for (let k = xa; k < xb; k++) {
+            const i = (axis === "x" ? v * W + k : k * W + v) * 4;
+            row.push(0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!);
           }
-        else
-          for (let x = y0; x < y1; x++) {
-            const row: number[] = [];
-            for (let y = 0; y < c.height; y++) {
-              const i = (y * c.width + x) * 4;
-              row.push(0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!);
-            }
-            rows.push(row);
-          }
+          rows.push(row);
+        }
         return rows;
       },
-      { y0: Math.round(d.band[0] / scale / 4), y1: Math.round(d.band[1] / scale / 4), axis: d.axis },
+      { u: unit, y0: sample(d.band[0]), y1: sample(d.band[1]), x0: sample(d.x?.[0] ?? 0), x1: sample(d.x?.[1] ?? 1e5), axis: d.axis },
     );
   };
   const a = await band(first);
   const b = await band(last);
   await page.close();
+  // How much the band changed at all (a soft drift over a detailed ground has no single shift to find).
+  let delta = 0;
+  let pixels = 0;
+  for (let r = 0; r < a.length; r++)
+    for (let i = 0; i < a[r]!.length; i++) {
+      delta += Math.abs(a[r]![i]! - b[r]![i]!);
+      pixels++;
+    }
   let best = { s: 0, r: -Infinity };
-  const max = Math.round(d.max / scale / 4);
+  const max = sample(d.max);
   for (let s = 0; s <= max; s++) {
     let dot = 0;
     let aa = 0;
@@ -268,6 +297,7 @@ async function drift(browser: Browser, first: string, last: string, d: { band: [
       const ra = a[r]!;
       const rb = b[r]!;
       const n = ra.length - s;
+      if (n < 8) continue;
       let ma = 0;
       let mb = 0;
       for (let i = 0; i < n; i++) {
@@ -287,8 +317,7 @@ async function drift(browser: Browser, first: string, last: string, d: { band: [
     const r = dot / Math.sqrt(aa * bb);
     if (r > best.r) best = { s, r };
   }
-  // One sample of the band is 4 device px: 4 / scale CSS px.
-  return { px: best.s * (4 / scale), r: best.r };
+  return { px: best.s * unit, r: best.r, delta: delta / Math.max(1, pixels) / 255 };
 }
 
 /** One sheet from shots: an HTML grid, screenshotted. */

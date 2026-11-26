@@ -231,6 +231,18 @@ Three things the evidence caught before this log, all fixed: bolts came in pairs
 | Dusk horizon glow dimmed 50% | PASS | `w5/thunder-1830-1440x900.png`, `thunder-1830-375x812.png` |
 | Thunder 15:00 and 18:30 at both sizes, between strikes | PASS (`lightning=off`) | `sheet-w5-desktop.png`, `sheet-w5-phone.png` |
 
+#### W6 fog with depth — `feat(weather): W6 …`
+
+| Done when | Result | Evidence |
+| --- | --- | --- |
+| Distance fog: L1 85%, L2 60%, L3 30%, L4 8% toward the fog colour | PASS (DECISIONS #149) | `w6/fog-0700-1440x900.png`, `fog-2200-1440x900.png`, `fog-bands-1440x900.png` (3× zoom: the hills faintest, the bridge and the boat nearest), `-375x812` |
+| Three ground-fog bands, 30 / 60 / 110 px, alpha .18–.32, noise stretched 12:1, at least 2 px/s | PASS per the brief; subtle on screen (DECISIONS #151): the bands drift at 2.2 / 3.4 / 5 px/s (unit test), and two frames 10 s apart differ by 0.25% of a pixel on average over the open land | `w6/fog-drift-1440x900-{0,1}.png`; `tests/unit/sky-fog.test.ts` |
+| Pale rayless sun, alpha ≤ 0.6 | PASS | the sun in `w6/fog-0700-1440x900.png` and `-375x812.png`; the alpha is capped in `bodies.ts` and in the backing model |
+| Stars hidden, moon pale and blurred | PASS: stars' alpha × (1 − fog) | `w6/fog-2200-{1440x900,375x812}.png`: no stars (the dotted arc is the time strip's path). The moon is below the horizon at 22:00 on this date, so the blur is in code (`particles.ts`) and not in a shot |
+| Fog 07:00 and 22:00 at both sizes, and two frames 10 s apart | PASS | `sheet-w6-desktop.png`, `sheet-w6-phone.png`, `w6/fog-drift-1440x900-{0,1}.png` |
+| Reduced motion | PASS: the ground fog's drift is held in a still frame | `SkyRenderer.tsx` `draw()` |
+| Gate | PASS: typecheck, lint, 282 tests, build; the idle renderer measures 34.5 kB gzip, so the budget is raised 34 → 35 kB (DECISIONS #152); up-front unchanged at 10.7 kB | `pnpm check:bundle` |
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.
