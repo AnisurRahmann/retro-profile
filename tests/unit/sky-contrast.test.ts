@@ -155,9 +155,8 @@ describe("per-element backing", () => {
 
   it("picks none on a cloudless night, a halo for a small deficit, and a chip for graphite low over dusk", () => {
     expect(decide(skyAt(model(-30, "evening", "clear"), 0.5, 0), GRAPHITE, 14).mode).toBe("none");
-    // Weather v6: a moonlit cloud is brighter than the night sky (measured rgb(55,63,78) under a 93% moon), so
-    // graphite over one needs backing. Before v6 night clouds were darker than the sky and this was "none". With the
-    // moon down a cloud is darker still, and takes none.
+    // A moonlit flat cloud's rim and cap are brighter than the night sky, so graphite over one needs backing. With
+    // the moon down a night cloud is darker than the sky, and takes none.
     const moonUp = model(-30, "evening", "clear", { fraction: 0.93, altitudeDeg: 40 });
     expect(decide(skyAt(moonUp, 0.5, 0.5), GRAPHITE, 14).mode).toBe("chip");
     expect(decide(skyAt(model(-30, "evening", "clear"), 0.5, 0.5), GRAPHITE, 14).mode).toBe("none");

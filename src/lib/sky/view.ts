@@ -105,12 +105,6 @@ export function startView(): () => void {
   };
 }
 
-/** What the renderer knows that the guard can use: cloud opacity over a viewport rect (null until it runs). */
-export const runtime: { cloudsIn: ((x0: number, y0: number, x1: number, y1: number) => number) | null } = { cloudsIn: null };
-
-/** Tell geometry listeners to recompute (the renderer's cloud field became available). */
-export const notifyGeometry = () => geometry.forEach((l) => l());
-
 /** The arc's geometry from the live layout (the stage at scroll 0; a stage-sized horizon on pages without one). */
 export const geomNow = (v: View = view): ArcGeom =>
   arcGeom(

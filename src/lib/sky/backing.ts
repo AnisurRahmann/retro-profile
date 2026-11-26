@@ -12,10 +12,15 @@
  * chip, and never wears one while a scrub or the time-lapse runs (v5.1 T10).
  *
  * The background is estimated from the renderer's CPU-side model, never sampled from pixels at runtime: the
- * gradient colour at the element's height, the brightest cloud the 64×36 cloud mirror puts over its box, the
- * horizon glow, fog, the sun's disc and blooms (or its diffuse patch under a deck) and the moon's disc and glow when
- * they reach the box, and the city glow when the box overlaps the landscape at night. Lightning is left out (a
- * transient on the cloud layer, not a state anyone reads against).
+ * gradient colour at the element's height, the horizon glow, fog, the brightest flat cloud that can pass behind
+ * the box (src/lib/sky/flat-clouds.ts: the spans its layers and rows occupy, their lightest tone, mixed toward the
+ * sky as the layer is, at the alpha the text clearing leaves it), the sun's disc and blooms (or its diffuse patch
+ * under a deck) and the moon's disc and glow when they reach the box, and the city glow when the box overlaps the
+ * landscape at night. Lightning is left out (a transient, not a state anyone reads against).
+ *
+ * Text clearing (clearingFor): a cloud passing behind loose text is drawn thinner (src/components/sky/
+ * flat-cloud-layer.ts), keeping as much of its alpha as the text can take without a chip: the factor is solved here,
+ * so a cloud behind the header or the hero leaves it a halo at most.
  *
  * Pure: the DOM side is src/components/sky/backing-runner.ts. The gate is the Playwright pixel test
  * (tests/e2e/sky-backing.spec.ts), which measures what the browser actually painted.
@@ -34,7 +39,8 @@ import {
 } from "./color";
 import { sunColor } from "./gradient";
 import type { SkyModel } from "./model";
-import { CITY_GLOW, CITY_ON_CLOUD, CLOUD_LIT, MOONLIGHT } from "./palette";
+import { CITY_GLOW } from "./palette";
+import { brightest, cloudTones } from "./flat-clouds";
 import { groundColor, riverColor, sunLight } from "./landscape/colors";
 import { RIVER } from "./landscape/shapes";
 import { gradientLab, gradientRgb, HORIZON_AWAY, skyParam, type Horizon } from "./horizon";
@@ -202,7 +208,12 @@ export function decide(bg: RGB, text: RGB, fontPx: number, dpr = 2, o: Style = {
 
 // ── The background model ─────────────────────────────────────────────────────────────────────────────────────
 
-type SkyInput = Pick<SkyModel, "colors" | "glow" | "cloudCover" | "fog" | "astro"> & { condition?: SkyModel["condition"] };
+type SkyInput = Pick<SkyModel, "colors" | "glow" | "cloudCover" | "fog" | "astro"> & {
+  condition?: SkyModel["condition"];
+  moon?: Pick<SkyModel["moon"], "up" | "fraction">;
+};
+/** A flat cloud that can be behind a point: its lightest tone (OKLab), how far it mixes toward the sky, its alpha. */
+export type CloudAt = { lab: Lab; mix: number; a: number };
 
 const lin = (c: RGB): RGB => c.map(toLinear) as RGB;
 const gam = (c: RGB): RGB => c.map((v) => toGamma(Math.min(1, Math.max(0, v)))) as RGB;
@@ -228,15 +239,19 @@ export function gradientAt(m: Pick<SkyModel, "colors">, y: number, hz: Horizon =
   return gradientLab(m.colors, y, hz, HORIZON_AWAY);
 }
 
+/** The lightest tone of this sky's flat clouds (puffs or the weather's deck). */
+export const cloudTone = (m: SkyInput): Lab =>
+  brightest(cloudTones(m.astro.elevation, m.condition ?? "partly", m.moon ?? { up: (m.astro.moon?.altitudeDeg ?? -1) > 0, fraction: m.astro.moon?.fraction ?? 0 }));
+
 /**
- * The brightest the sky layers can be at height y: the gradient, with the horizon glow, the brightest cloud
- * (cloudOver, at the cloud presence over the box) and the fog composited exactly as the shader does (linear-light
- * colours at their maximum alpha, then composited in sRGB by the browser).
+ * The brightest the sky layers can be at height y: the gradient, with the horizon glow and the fog composited
+ * exactly as the shader does (linear-light colours at their maximum alpha, then composited in sRGB by the browser),
+ * and over them the flat clouds that can be there (a number: this sky's lightest cloud at that alpha).
  */
 export function skyAt(
   m: SkyInput,
   y: number,
-  clouds = cloudPresence(m.cloudCover),
+  clouds: number | CloudAt[] = cloudPresence(m.cloudCover),
   hz: Horizon = FLAT,
 ): RGB {
   const hRgb = gradientRgb(m.colors, y, hz, HORIZON_AWAY);
@@ -251,10 +266,6 @@ export function skyAt(
   // A storm dims the dusk glow by half, and its cloud base over the top of the viewport is half as lit.
   const g = Math.min(1, m.glow) * (storm ? 0.5 : 1) * 0.75 * Math.exp(-(((gy - y) / 0.42) ** 2) * 2.2);
   if (g > 0) best = brighter(best, over(hRgb, gam(scale(H, 1.331)), g));
-  if (clouds > 0) {
-    const base = storm ? 1 - 0.5 * smoothstep(0.55, 0.2, y) : 1;
-    best = brighter(best, cloudOver(hRgb, scale(cloudLit(m), base), clouds, cloudLight(m)));
-  }
   // Fog: base desaturated 60%, × 1.19, at alpha fog · smoothstep(.35, 1, p) · (0.55, rising to 0.85 where the land
   // begins: about 85% down the viewport with the fixed band).
   const fy = m.fog * smoothstep(0.35, 1, p) * (0.55 + 0.3 * smoothstep(0.45, 1, Math.min(1, y / 0.85)));
@@ -265,51 +276,16 @@ export function skyAt(
       over(hRgb, gam(scale(base.map((v) => l + (v - l) * 0.4) as RGB, 1.19)), fy),
     );
   }
+  // The flat clouds are in front of all of it (their own layer), each mixed toward the gradient as its layer is.
+  const list = typeof clouds === "number" ? (clouds > 0 ? [{ lab: cloudTone(m), mix: 0, a: clouds }] : []) : clouds;
+  const atm = best;
+  const sky = gradientLab(m.colors, y, hz, HORIZON_AWAY);
+  for (const c of list) {
+    if (c.a <= 0) continue;
+    const lab = c.mix > 0 ? (c.lab.map((v, i) => v + (sky[i]! - v) * c.mix) as Lab) : c.lab;
+    best = brighter(best, over(atm, oklabToRgb(lab), c.a));
+  }
   return best;
-}
-
-const mixRgb = (p: RGB, q: RGB, t: number): RGB => p.map((v, i) => v + (q[i]! - v) * t) as RGB;
-
-/**
- * The lit colour of the clouds under this sky, as the shader has it: daylight's while the sun is above 2°, fading
- * out of them to the horizon colour × 1.2 by 6° under (a cloud after sunset is lit by the sky, not the sun), and at
- * night moonlight and the town's glow (the shader's `city`, at its most: a low deck's near the horizon). Golden hour (the horizon colour × 1.52) only while it is
- * still daylight. The brightest of these is counted, whatever the clouds do with it.
- */
-function cloudLit(m: SkyInput): RGB {
-  const e = m.astro.elevation;
-  const twilight = smoothstep(-6, -2, e);
-  const H = lin(oklabToRgb(m.colors.horizon));
-  const moon = scale(lin(hexToRgb(MOONLIGHT)), 0.35 + 0.65 * (m.astro.moon?.fraction ?? 1));
-  const city = scale(CITY_ON_CLOUD, 0.07);
-  const night = moon.map((v, i) => v + city[i]!) as RGB;
-  let lit = brighter(mixRgb(scale(H, 1.2), lin(hexToRgb(CLOUD_LIT)), twilight), night);
-  if (m.glow * twilight > 0) lit = brighter(lit, scale(H, 1.521));
-  return lit;
-}
-
-/**
- * How much of its lit colour a cloud can show. The shader's shade() is Lambert on the cloud's normal plus the
- * Henyey–Greenstein phase (g 0.65) toward the light, both × the light's strength (SkyRenderer's light(): the sun's
- * while it has any, else the moon's, else a quarter on a moonless night), and by moonlight only the edge that faces
- * the moon. Counted at its most: a normal facing the light, and the phase 45° from it (closer than that is the sun's
- * or the moon's own neighbourhood, which the disc and its glow cover).
- */
-function cloudLight(m: SkyInput): number {
-  const e = m.astro.elevation;
-  const sun = smoothstep(-6, -1.5, e);
-  const moon = m.astro.moon;
-  const strength = Math.max(sun, moon && moon.altitudeDeg > 0 ? 0.35 + 0.65 * moon.fraction : 0.25 * (1 - sun));
-  return strength * (0.7 - 0.42 * smoothstep(-6, -14, e) + 0.6 * 0.12);
-}
-
-/**
- * A cloud sheet over the sky at presence `p` (its density × alpha, 0..1), at most `k` lit: lit × k ×
- * (0.35 + 0.65·exp(−τ·2.2)), τ = density × thickness, at the LOW sheet's thickness and alpha (clouds.ts SHEET.low:
- * a thin edge lets more light through than a thick core, so brightness per unit of presence peaks at its edge).
- */
-export function cloudOver(hRgb: RGB, lit: RGB, p: number, k = 1): RGB {
-  return over(hRgb, gam(scale(lit, k * (0.35 + 0.65 * Math.exp(-((2.2 * 1.6) / 0.95) * p)))), p);
 }
 
 /** The sun as the particle layer draws it (bodies.ts): disc radius, the cloud's optical depth in front of it, and
@@ -400,12 +376,17 @@ export function cityGlowOver(bg: RGB, g: CityGlow, y: number): RGB {
   return t > 0 ? over(bg, GLOW_RGB, Math.min(1, g.alpha * t * GLOW_MARGIN)) : bg;
 }
 
+export type CloudSpan = { x0: number; x1: number; y0: number; y1: number; lab: Lab; mix: number };
+
 export type Scene = {
   m: SkyInput;
   vw: number;
   vh: number;
-  /** Cloud presence over a viewport rect (the renderer's cloud mirror), or undefined before it runs. */
-  cloudsIn?: (b: Box) => number;
+  /**
+   * The flat clouds (src/lib/sky/flat-clouds.ts): where each layer or row can put a cloud (viewport px; puffs drift
+   * across the whole width), its lightest tone and mix, and the layer's alpha. Absent: judged from the cover alone.
+   */
+  clouds?: { spans: CloudSpan[]; alpha: number };
   sun: SunDisc | null;
   moon: MoonDisc | null;
   /** City glows behind landscape bands on screen (viewport px). */
@@ -432,30 +413,56 @@ function landAt(s: Scene, y: number): RGB | null {
   return null;
 }
 
-/** Horizontal margin (px) for cloud lookups: about a minute of drift at the minimum speed. */
-export const CLOUD_MARGIN = 300;
+/** The clouds that can be behind a box (and the sample height y in it), at the clearing factor f. */
+function cloudsFor(s: Scene, b: Box, y: number, f: number): number | CloudAt[] {
+  if (!s.clouds) return cloudPresence(s.m.cloudCover) * f;
+  const a = s.clouds.alpha * f;
+  return s.clouds.spans
+    .filter((k) => y >= k.y0 && y <= k.y1 && b.x1 >= k.x0 && b.x0 <= k.x1)
+    .map((k) => ({ lab: k.lab, mix: k.mix, a }));
+}
 
-/** The brightest background the sky can put behind a box (viewport px). */
-export function backgroundFor(s: Scene, b: Box): RGB {
-  const clouds = s.cloudsIn
-    ? Math.max(
-        0,
-        s.cloudsIn({ x0: b.x0 - CLOUD_MARGIN, y0: b.y0, x1: b.x1 + CLOUD_MARGIN, y1: b.y1 }),
-      )
-    : undefined;
+/** Does any cloud span reach the box? */
+export const cloudsReach = (s: Scene, b: Box) =>
+  !s.clouds || s.clouds.spans.some((k) => b.y1 >= k.y0 && b.y0 <= k.y1 && b.x1 >= k.x0 && b.x0 <= k.x1);
+
+/** The brightest background the sky can put behind a box (viewport px), the clouds at f of their alpha. */
+export function backgroundFor(s: Scene, b: Box, f = 1): RGB {
   let best: RGB = [0, 0, 0];
   const n = Math.max(2, Math.min(6, Math.ceil((b.y1 - b.y0) / 24)));
   const hz = s.horizon ? { h: s.horizon.h / s.vh, b: s.horizon.b / s.vh } : FLAT;
   for (let i = 0; i <= n; i++) {
     const y = b.y0 + ((b.y1 - b.y0) * i) / n;
     const land = landAt(s, y);
-    let c = land ?? skyAt(s.m, y / s.vh, clouds ?? cloudPresence(s.m.cloudCover), hz);
+    let c = land ?? skyAt(s.m, y / s.vh, cloudsFor(s, b, y, f), hz);
     if (!land) for (const g of s.glows) c = cityGlowOver(c, g, y);
     best = brighter(best, c);
   }
   if (s.moon) best = moonOver(best, s.moon, distTo(b, s.moon.x, s.moon.y));
   if (s.sun) best = sunOver(best, s.sun, distTo(b, s.sun.x, s.sun.y), s.vw);
   return best;
+}
+
+/**
+ * How much of its alpha a cloud keeps behind this text: the most that still lets the text go without a chip (a
+ * halo at most), solved on this model to 0.01; all of it where no cloud reaches the box. When even no cloud at all
+ * leaves a chip, the clouds aren't what needs it: CLEAR_FLOOR, so they read as passing behind.
+ */
+export const CLEAR_FLOOR = 0.3;
+export function clearingFor(s: Scene, b: Box, text: RGB, fontPx: number, dpr = 2, o: Style = {}): number {
+  if (!cloudsReach(s, b)) return 1;
+  const style = { ...o, scrubbing: false };
+  const ok = (f: number) => decide(backgroundFor(s, b, f), text, fontPx, dpr, style).mode !== "chip";
+  if (ok(1)) return 1;
+  if (!ok(0)) return CLEAR_FLOOR;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 7; i++) {
+    const mid = (lo + hi) / 2;
+    if (ok(mid)) lo = mid;
+    else hi = mid;
+  }
+  return Math.floor(lo * 100) / 100;
 }
 
 /** Parse a computed CSS colour: rgb()/rgba() or color(srgb …). */

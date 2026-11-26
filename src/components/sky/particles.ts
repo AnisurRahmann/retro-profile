@@ -43,8 +43,15 @@ export type ParticleState = {
   moonDim: number;
 };
 
-/** Extra drawing between layers: `back` before the stars (the arc), `front` after the moon (sun, birds, planes). */
-export type DrawHooks = { back?: (ctx: CanvasRenderingContext2D) => void; front?: (ctx: CanvasRenderingContext2D) => void };
+/**
+ * Extra drawing between layers: `afterStars` right after the stars (the clouds cut out of them), `back` after that
+ * (the arc), `front` after the moon (sun, birds, planes).
+ */
+export type DrawHooks = {
+  afterStars?: (ctx: CanvasRenderingContext2D) => void;
+  back?: (ctx: CanvasRenderingContext2D) => void;
+  front?: (ctx: CanvasRenderingContext2D) => void;
+};
 
 const css = (rgb: [number, number, number], a = 1) =>
   `rgba(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)},${a})`;
@@ -213,7 +220,6 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
       ctx.clearRect(0, 0, w, h);
       const under = (x: number, y: number) =>
         hero && x > hero.x0 - 6 && x < hero.x1 + 6 && y > hero.y0 - 6 && y < hero.y1 + 6 ? 1 : 0;
-      hooks.back?.(ctx);
 
       // Stars.
       const vis = s.night * (1 - s.cloudCover * 0.9) * (1 - s.fog) * (1 - s.deck);
@@ -235,7 +241,9 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
             ctx.fill();
           }
         }
+        hooks.afterStars?.(ctx);
       }
+      hooks.back?.(ctx);
 
       // Moon: lit disc + terminator ellipse; earthshine on the dark limb. Its soft glow is the shader's
       // (sky-shader.ts); there is no ring around it (the 22° halo was removed: it read as a UI circle, v5.1 T2).

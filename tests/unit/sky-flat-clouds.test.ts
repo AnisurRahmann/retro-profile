@@ -1,6 +1,7 @@
 /**
  * The flat cloud model (src/lib/sky/flat-clouds.ts): coverage per condition, determinism, a constant count while
- * the clouds drift off one side and back on the other, the wind, the breath and the tones.
+ * the clouds drift off one side and back on the other, the wind, the breath, the tones, and the text clearing the
+ * backing model solves (src/lib/sky/backing.ts clearingFor).
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -20,6 +21,7 @@ import {
   sdCloud,
   type LayerId,
 } from "@/lib/sky/flat-clouds";
+import { backgroundFor, clearingFor, decide, ON_SKY, TEXT, type Scene } from "@/lib/sky/backing";
 import { hexToLab, oklabToRgb } from "@/lib/sky/color";
 import { FLAT_CLOUD_GOLDEN, FLAT_CLOUD_RIM } from "@/lib/sky/palette";
 import { WX_DEFAULTS } from "@/lib/sky/store";
@@ -239,5 +241,43 @@ describe("tones", () => {
     expect(f.body[0]).toBeCloseTo(t.body[0] + 0.25);
     expect(f.cap[0]).toBeGreaterThan(t.cap[0] + 0.25);
     expect(f.base).toEqual(t.base);
+  });
+});
+
+describe("text clearing (backing.ts clearingFor)", () => {
+  const sky = (spans: Scene["clouds"]): Scene => ({
+    m: {
+      colors: { zenith: hexToLab("#10264A"), mid: hexToLab("#1C3D70"), horizon: hexToLab("#2E5A92") },
+      glow: 0,
+      cloudCover: 0.45,
+      fog: 0,
+      astro: { elevation: 40 } as never,
+      condition: "partly",
+    },
+    vw: 1440,
+    vh: 900,
+    sun: null,
+    moon: null,
+    glows: [],
+    clouds: spans,
+  });
+  const box = { x0: 440, y0: 418, x1: 991, y1: 438 };
+  const lab = hexToLab("#EDF1F8");
+
+  it("leaves a cloud whole where none can reach the text", () => {
+    expect(clearingFor(sky({ alpha: 1, spans: [] }), box, ON_SKY, 14, 1)).toBe(1);
+    expect(clearingFor(sky({ alpha: 1, spans: [{ x0: -1e9, x1: 1e9, y0: 0, y1: 300, lab, mix: 0 }] }), box, ON_SKY, 14, 1)).toBe(1);
+  });
+
+  it("thins a bright cloud behind the text just enough that it needs no chip", () => {
+    const s = sky({ alpha: 1, spans: [{ x0: -1e9, x1: 1e9, y0: 300, y1: 600, lab, mix: 0 }] });
+    expect(decide(backgroundFor(s, box, 1), ON_SKY, 14, 1, { hero: true }).mode).toBe("chip");
+    const f = clearingFor(s, box, ON_SKY, 14, 1, { hero: true });
+    expect(f).toBeGreaterThan(0);
+    expect(f).toBeLessThan(0.5);
+    expect(decide(backgroundFor(s, box, f), ON_SKY, 14, 1, { hero: true }).mode).not.toBe("chip");
+    expect(decide(backgroundFor(s, box, f + 0.05), ON_SKY, 14, 1, { hero: true }).mode).toBe("chip");
+    // Large text takes more cloud.
+    expect(clearingFor(s, { x0: 440, y0: 338, x1: 540, y1: 378 }, TEXT, 36, 1, { weight: 500, hero: true })).toBeGreaterThan(f);
   });
 });

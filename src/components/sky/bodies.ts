@@ -4,11 +4,12 @@
  * Sun: a limb-darkened disc (edge at 82%) coloured by altitude (palette SUN_HIGH ≥ 30°, SUN_MID at 10°, SUN_LOW at 0°,
  * OKLab), three stacked blooms (3×, 8×, 20× the radius at 0.35, 0.12, 0.05, tinted toward the horizon colour
  * near sunrise and sunset), 24 corona rays turning once per 180 s at 0.06, and a 9 s breathing (bloom × 1 ± 0.04).
- * Cloud in front is the optical depth τ of the cloud sheets at the sun (the CPU cloud field): the disc is
- * exp(−1.8 τ) of itself, thin cloud spreads the bloom (Weather v6). Under a deck (overcast, rain, thunder) there is
- * no disc, no corona and no rays: only a diffuse bright patch where the sun is.
+ * Cloud in front is an optical depth τ from the flat clouds' exact geometry at the sun (flat-cloud-layer.ts coverAt:
+ * the disc is 0.08 of itself inside a near or mid cloud, linear across its edge, a far cloud half that): the disc is
+ * exp(−1.8 τ) of itself, thin cloud spreads the bloom. Under a deck (overcast, rain, thunder) there is no disc, no
+ * corona and no rays: only a diffuse bright patch where the sun is.
  * Crepuscular rays at golden hour with 0.2 < cover < 0.7: 6–10 faint wedges fanning upward, each as strong as
- * the gap in the cloud field along it (≤ 0.05).
+ * the gap in the clouds along it (≤ 0.05).
  * Everything is pre-rendered into sprites (rebuilt when the colour moves), so a frame is a handful of drawImage
  * calls and no allocation.
  */

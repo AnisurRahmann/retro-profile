@@ -1,5 +1,3 @@
-import { hexToRgb, toLinear, type RGB } from "./color";
-
 /**
  * Sky keyframes, indexed by sun elevation (degrees). The only hex colours outside globals.css (see CLAUDE.md).
  * Retune only with tests/unit/sky-contrast.test.ts green: every value must keep the column text readable.
@@ -29,13 +27,6 @@ export const SUN_LOW = "#FF9B4A";
 export const WINDOW_LIT = "#FFD9A0";
 /** Night light pollution over the city: warm sodium, at the horizon behind the landscape (sunset → sunrise). */
 export const CITY_GLOW = "#E8A15A";
-/** The town's lights on a cloud (the shader's city, and what the backing model counts): CITY_GLOW 40% of the way to
- *  its own grey, in linear light. The amber alone read as rust on a night sky (W7). */
-export const CITY_ON_CLOUD: RGB = (() => {
-  const lin = hexToRgb(CITY_GLOW).map(toLinear);
-  const grey = 0.2126 * lin[0]! + 0.7152 * lin[1]! + 0.0722 * lin[2]!;
-  return lin.map((v) => v + (grey - v) * 0.4) as RGB;
-})();
 /** Cool white TV light in a few windows, flickering gently. */
 export const TV_LIT = "#CFDDFF";
 /**
@@ -55,21 +46,6 @@ export const LIGHTNING_MID = "#C9D6FF";
 export const LIGHTNING_CORE = "#F5F8FF";
 export const LIGHTNING_RIM = "#DDE6FF";
 
-/**
- * Clouds (Weather v6, sky-shader.ts): where a cloud faces the light and where it is in shadow, by the state of the sky.
- * backing.ts reads the same colours to judge text over them.
- */
-export const CLOUD_LIT = "#F4F1EA";
-export const CLOUD_SHADOW = "#5D6880";
-/** Golden hour: the undersides of the clouds and their tops. */
-export const CLOUD_UNDER_GOLD = "#FF9A5A";
-export const CLOUD_TOP_GOLD = "#7A86A8";
-/** Night: moonlight on the clouds, and the shadow between them. */
-export const MOONLIGHT = "#9FB0CC";
-export const NIGHT_SHADOW = "#0B101C";
-/** Rain and thunder: a nimbostratus deck. */
-export const CLOUD_LIT_RAIN = "#8D96A8";
-export const CLOUD_SHADOW_RAIN = "#232837";
 /**
  * Flat clouds (src/lib/sky/flat-clouds.ts, drawn by src/components/sky/flat-cloud-layer.ts): three flat tones per
  * cloud, like the paper-cut landscape. BODY is the silhouette, CAP the crisp crescent on its lit side, BASE the flat

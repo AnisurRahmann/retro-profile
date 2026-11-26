@@ -11,6 +11,7 @@
  */
 import {
   backgroundFor,
+  clearingFor,
   decide,
   parseCssColor,
   TEXT,
@@ -22,7 +23,7 @@ import {
 } from "@/lib/sky/backing";
 import { luminance, type RGB } from "@/lib/sky/color";
 import { skyStore } from "@/lib/sky/store";
-import { onViewGeometry, onViewScroll, runtime, view } from "@/lib/sky/view";
+import { onViewGeometry, onViewScroll, view } from "@/lib/sky/view";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
 const SCROLL_MS = 125;
@@ -32,14 +33,19 @@ const UPDATE_MS = 100;
 const HERO_TEXT = new Set(["name", "status", "one-liner", "label"]);
 
 type Info = { rgb: RGB; px: number; weight: number };
-export type BackingReport = { id: string; mode: string; a: number; contrast: number; bg: string };
+export type BackingReport = { id: string; mode: string; a: number; contrast: number; bg: string; clear: number };
 
-export function startBacking(scene: () => Omit<Scene, "vw" | "vh" | "cloudsIn">) {
+/** A loose text's clearing zone in document px, and how much alpha a cloud keeps behind it (backing.ts clearingFor). */
+export type ClearZone = { x0: number; y0: number; x1: number; y1: number; f: number };
+
+export function startBacking(scene: () => Omit<Scene, "vw" | "vh">, onZones?: (z: ClearZone[]) => void) {
   const els = new Set<HTMLElement>();
   const inView = new Set<HTMLElement>();
   const info = new WeakMap<HTMLElement, Info>();
   const last = new WeakMap<HTMLElement, string>();
   const report = new Map<HTMLElement, BackingReport>();
+  const zones = new Map<HTMLElement, ClearZone>();
+  let zoneKey = "";
   let dead = false;
 
   /**
@@ -82,28 +88,32 @@ export function startBacking(scene: () => Omit<Scene, "vw" | "vh" | "cloudsIn">)
 
   const run = (targets: Iterable<HTMLElement>) => {
     if (dead) return;
-    const cloudsIn = runtime.cloudsIn;
-    const s: Scene = {
-      ...scene(),
-      vw: view.vw,
-      vh: view.vh,
-      cloudsIn: cloudsIn ? (b: Box) => cloudsIn(b.x0, b.y0, b.x1, b.y1) : undefined,
-    };
+    const s: Scene = { ...scene(), vw: view.vw, vh: view.vh };
+    const dpr = window.devicePixelRatio || 1;
     for (const el of targets) {
       const r = el.getBoundingClientRect();
       if (r.width < 1 || r.height < 1) continue;
-      const box = { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom };
-      const bg = backgroundFor(s, box);
+      const box: Box = { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom };
       const { rgb, px, weight } = infoOf(el);
-      const d = decide(bg, rgb, px, window.devicePixelRatio || 1, {
-        weight,
-        hero: HERO_TEXT.has(el.dataset.onSky ?? ""),
-        scrubbing: skyStore.get().scrubbing,
-      } satisfies Style);
+      const style = { weight, hero: HERO_TEXT.has(el.dataset.onSky ?? ""), scrubbing: skyStore.get().scrubbing } satisfies Style;
+      // How far the clouds behind it are thinned, then the backing over what is left of them.
+      const f = clearingFor(s, box, rgb, px, dpr, style);
+      zones.set(el, { x0: r.left, y0: r.top + view.y, x1: r.right, y1: r.bottom + view.y, f });
+      const bg = backgroundFor(s, box, f);
+      const d = decide(bg, rgb, px, dpr, style);
       write(el, d);
       if (TEST) {
         const hex = `#${bg.map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("")}`;
-        report.set(el, { id: el.dataset.onSky || el.tagName.toLowerCase(), mode: d.mode, a: d.a, contrast: Math.round(d.contrast * 100) / 100, bg: hex });
+        report.set(el, { id: el.dataset.onSky || el.tagName.toLowerCase(), mode: d.mode, a: d.a, contrast: Math.round(d.contrast * 100) / 100, bg: hex, clear: f });
+      }
+    }
+    if (onZones) {
+      for (const el of zones.keys()) if (!el.isConnected) zones.delete(el);
+      const list = [...zones.values()];
+      const key = list.map((z) => `${Math.round(z.x0)},${Math.round(z.y0)},${Math.round(z.x1)},${Math.round(z.y1)},${z.f}`).join(";");
+      if (key !== zoneKey) {
+        zoneKey = key;
+        onZones(list);
       }
     }
     if (TEST) {

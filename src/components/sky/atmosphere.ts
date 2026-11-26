@@ -1,5 +1,4 @@
 /** WebGL2 atmosphere layer. Returns null when WebGL2 or the shader is unavailable (the CSS gradient stays). */
-import { NOISE_SIZE, cellData, noiseData } from "@/lib/sky/clouds";
 import { FRAG, VERT } from "./sky-shader";
 
 /** Uniform values by GLSL name: numbers → float, [x, y] → vec2, [r, g, b] → vec3, [x, y, z, w] → vec4. */
@@ -59,31 +58,13 @@ export async function createAtmosphere(canvas: HTMLCanvasElement, isDead: () => 
     gl.useProgram(prog);
     loc.clear();
     gl.bindVertexArray(gl.createVertexArray());
-    // The noise textures (src/lib/sky/clouds.ts): four value-noise lattices, and the Worley cells. Seeded, so the
-    // cloud field is the same on every load; one filtered fetch per lookup instead of four hashes.
-    for (const [unit, name, data] of [
-      [0, "uNoise", noiseData()],
-      [1, "uCells", cellData()],
-    ] as const) {
-      gl.activeTexture(gl.TEXTURE0 + unit);
-      gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
-      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, NOISE_SIZE, NOISE_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
-      for (const [k, v] of [
-        [gl.TEXTURE_MIN_FILTER, gl.LINEAR],
-        [gl.TEXTURE_MAG_FILTER, gl.LINEAR],
-        [gl.TEXTURE_WRAP_S, gl.REPEAT],
-        [gl.TEXTURE_WRAP_T, gl.REPEAT],
-      ]) gl.texParameteri(gl.TEXTURE_2D, k!, v!);
-      gl.uniform1i(gl.getUniformLocation(prog, name), unit);
-    }
     return true;
   };
   if (!(await build())) return null;
 
   const resize = () => {
     // Backing store at 0.4 × DPR (brief: 0.5, lowered to meet the 2 ms GPU budget; DECISIONS #83). Everything in
-    // this layer is soft and upscales cleanly.
+    // this layer is soft and upscales cleanly (the clouds are on their own layer, at full resolution).
     scale = (qScale > 0 && qScale <= 2 ? qScale : ATMOSPHERE_SCALE) * (devicePixelRatio || 1);
     canvas.width = Math.max(1, Math.round(canvas.clientWidth * scale));
     canvas.height = Math.max(1, Math.round(canvas.clientHeight * scale));

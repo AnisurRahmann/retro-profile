@@ -169,15 +169,22 @@ html[data-sky-scrub] .sky-gradient {
 .sky-atmosphere {
   z-index: -3;
 }
+/* The flat clouds (src/components/sky/flat-cloud-layer.ts): over the atmosphere (same z, later in the document), under
+   the particles. */
+.sky-clouds {
+  z-index: -3;
+}
 .sky-particles {
   z-index: -2;
 }
 .sky-atmosphere,
+.sky-clouds,
 .sky-particles {
   opacity: 0;
   transition: opacity 600ms ease;
 }
 .sky-atmosphere[data-ready],
+.sky-clouds[data-ready],
 .sky-particles[data-ready],
 .sky-landscape[data-ready] {
   opacity: 1;
