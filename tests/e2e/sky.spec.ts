@@ -499,7 +499,9 @@ for (const size of [
     await page.evaluate(() => window.scrollTo(0, 0));
     await bottom(page);
     await page.waitForTimeout(5000);
-    expect((await sky(page))!.plane!.flights).toBe(first + 1);
+    const again = (await sky(page))!.plane!.flights;
+    console.info(`[t5 ${size.width}] flights after the first arrival at the bottom: ${first}; after coming back: ${again}`);
+    expect(again).toBe(first + 1);
     await ctx.close();
   });
 }
