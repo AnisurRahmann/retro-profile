@@ -27,8 +27,8 @@
  * (g 0.65) toward the light: the silver lining on cloud edges near the sun. Beer–Lambert darkens thick cores.
  * The colours are palette CLOUD_* (the only hex in the sky): by day a lit top on a blue-grey base; at golden
  * hour the horizon colour +15% L, undersides warm, tops blue-grey; after sunset the daylight fades out of them over
- * 2–6° (uTwilight) to the sky's own colours; at night dark shapes with moonlit edges and the city's glow on the LOW
- * sheet's undersides; in rain a grey deck. src/components/sky/cloud-field.ts mirrors
+ * 2–6° (uTwilight) to the sky's own colours; at night dark shapes with moonlit edges and the town's lights as a
+ * faint even glow on the LOW sheet's undersides (more under a low deck); in rain a grey deck. src/components/sky/cloud-field.ts mirrors
  * it on the CPU: the sun's and moon's occlusion, and the cloud the backing model counts.
  * Fog: desaturated sky lifted +6% L, alpha uFog × 0.55, strongest toward the horizon. Moon glow: radial halo,
  * illumination × up × night × (1 − 0.7 cover). Horizon glow: ellipse on the horizon line under the sun. Lightning
@@ -52,7 +52,7 @@ import {
   type SheetId,
 } from "@/lib/sky/clouds";
 import {
-  CITY_GLOW,
+  CITY_ON_CLOUD,
   CLOUD_LIT,
   CLOUD_LIT_RAIN,
   CLOUD_SHADOW,
@@ -119,7 +119,7 @@ vec2 vn2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return texture(uNois
 // Worley: the vector from a point to the centre of its cell.
 vec2 cellv(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return texture(uCells,(i+f+.5)/${NOISE_SIZE}.).rg*2.5-1.25;}
 const mat2 R=mat2(1.6,1.2,-1.2,1.6),RC=mat2(.8,.6,-.6,.8);
-const vec3 TOP=${gl(CLOUD_TOP_GOLD)},UNDER=${gl(CLOUD_UNDER_GOLD)},CITY=${gl(CITY_GLOW)};
+const vec3 TOP=${gl(CLOUD_TOP_GOLD)},UNDER=${gl(CLOUD_UNDER_GOLD)},CITY=vec3(${CITY_ON_CLOUD.map((v) => v.toFixed(3)).join(",")});
 // The sky gradient (one parameter, 0 zenith … 1 horizon), compositing and the sRGB transfer.
 float skyP(float y,float A){if(y<=uHorizonY)return uHorizonY>0.?max(y,0.)/uHorizonY:1.;if(y<=uHorizonB)return mix(1.,min(1.,uHorizonB/A),(y-uHorizonY)/max(uHorizonB-uHorizonY,1e-3));return clamp(y/A,0.,1.);}
 vec3 sky(float y){return y<.55?mix(uZenith,uMid,y/.55):mix(uMid,uHorizon,(y-.55)/.45);}
@@ -131,10 +131,11 @@ vec3 l;float ph;
 // Henyey–Greenstein (g 0.65) on the angle between the view and the light: 1 in the light's direction.
 float phase(float c){float x=1.4225-1.3*c;return .0429/(x*sqrt(x));}
 // A cloud's colour: lit where it faces the light and where the light comes through it toward us; thick cores dark.
-// By moonlight only the edges that face the moon are lit.
-vec3 shade(float dens,vec2 n,float thick,vec3 lit,vec3 shd){
+// By moonlight only the edges that face the moon are lit. city: the town's lights on a low cloud's underside, added
+// to its lit and its shaded sides alike (every underside is lit from below: an even glow, not a shade).
+vec3 shade(float dens,vec2 n,float thick,vec3 lit,vec3 shd,vec3 city){
 float k=clamp(max(dot(n,l.xy),0.)*uLight.w*mix(.7,.28,uNight)+ph*.6,0.,1.);
-return mix(shd,lit,k)*(.35+.65*exp(-dens*thick*2.2));
+return (mix(shd,lit,k)+city)*(.35+.65*exp(-dens*thick*2.2));
 }
 // Golden hour: undersides glow, tops go blue-grey.
 vec3 gold(vec3 lit,float under,float top){float g=uGolden*uTwilight;if(g<=0.)return lit;return mix(lit,mix(mix(uHorizon*1.521,TOP,.6*top),UNDER,.6*under),g);}
@@ -194,6 +195,9 @@ shd=mix(shd,${gl(CLOUD_SHADOW_RAIN)},uRainDark);lit=mix(lit,${gl(CLOUD_LIT_RAIN)
 // eased, takes half the light out of it.
 float base=smoothstep(.55*vp.y,.2*vp.y,css.y)*uStorm;
 shd*=1.-.3*base;lit*=1.-.5*base;
+// The town's lights at night on the LOW sheet's undersides: faint under cumulus, more under a low deck (uStyle.z),
+// and warm toward the horizon over the town, neutral overhead.
+vec3 city=CITY*uNight*mix(.02,.05,uStyle.z)*mix(.5,1.4,css.y/vp.y);
 float haze=smoothstep(0.,${FL(HAZE)},v)*(1.-.6*uFog);
 if(uLo.w>.001){
 ${plane("low", "uLo")}
@@ -201,18 +205,18 @@ float under,top;
 vec4 c=lowCloud(q,fp,uLo.z,uTh.z,under,top);
 // A stratus deck is opaque to STRATUS.opaque: no blue sky through its thin patches.
 float op=mix(c.x,max(c.x,${FL(STRATUS.opaque)}),uStyle.z);
-if(op>0.)over(acc,(shade(c.x,c.yz,${FL(SHEET.low.thick)},gold(lit+CITY*.35*under*uNight,under,top),shd)),op*${FL(SHEET.low.alpha)}*haze);
+if(op>0.)over(acc,(shade(c.x,c.yz,${FL(SHEET.low.thick)},gold(lit,under,top),shd,city)),op*${FL(SHEET.low.alpha)}*haze);
 }
 if(uSc.w>.001){
 ${plane("scud", "uSc")}
 float d=smoothstep(uTh.w-${FL(SOFT.scud / 2)},uTh.w+${FL(SOFT.scud / 2)},fbm2(q,fp));
-if(d>0.)over(acc,(shade(d,vec2(0.),${FL(SHEET.scud.thick)},gold(lit,0.,0.),shd)),d*${FL(SHEET.scud.alpha)}*haze);
+if(d>0.)over(acc,(shade(d,vec2(0.),${FL(SHEET.scud.thick)},gold(lit,0.,0.),shd,city)),d*${FL(SHEET.scud.alpha)}*haze);
 }
 if(uMi.w>.001){
 ${plane("mid", "uMi")}
 vec2 n;
 float d=midCloud(q,fp,uTh.y,n);
-if(d>0.)over(acc,(shade(d,n,${FL(SHEET.mid.thick)},gold(lit,max(n.y*2.5,0.),max(-n.y*2.5,0.)),shd)),d*${FL(SHEET.mid.alpha)}*haze);
+if(d>0.)over(acc,(shade(d,n,${FL(SHEET.mid.thick)},gold(lit,max(n.y*2.5,0.),max(-n.y*2.5,0.)),shd,vec3(0.))),d*${FL(SHEET.mid.alpha)}*haze);
 }
 if(uHi.w>.001){
 ${plane("high", "uHi")}

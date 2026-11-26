@@ -30,7 +30,7 @@ import {
 } from "./color";
 import { sunColor } from "./gradient";
 import type { SkyModel } from "./model";
-import { CITY_GLOW, CLOUD_LIT, MOONLIGHT } from "./palette";
+import { CITY_GLOW, CITY_ON_CLOUD, CLOUD_LIT, MOONLIGHT } from "./palette";
 import { groundColor, riverColor, sunLight } from "./landscape/colors";
 import { RIVER } from "./landscape/shapes";
 import { gradientLab, gradientRgb, HORIZON_AWAY, skyParam, type Horizon } from "./horizon";
@@ -237,7 +237,7 @@ const mixRgb = (p: RGB, q: RGB, t: number): RGB => p.map((v, i) => v + (q[i]! - 
 /**
  * The lit colour of the clouds under this sky, as the shader has it: daylight's while the sun is above 2°, fading
  * out of them to the horizon colour × 1.2 by 6° under (a cloud after sunset is lit by the sky, not the sun), and at
- * night the brighter of moonlight and the city's glow. Golden hour (the horizon colour × 1.52) only while it is
+ * night moonlight and the town's glow (the shader's `city`, at its most: a low deck's near the horizon). Golden hour (the horizon colour × 1.52) only while it is
  * still daylight. The brightest of these is counted, whatever the clouds do with it.
  */
 function cloudLit(m: SkyInput): RGB {
@@ -245,7 +245,8 @@ function cloudLit(m: SkyInput): RGB {
   const twilight = smoothstep(-6, -2, e);
   const H = lin(oklabToRgb(m.colors.horizon));
   const moon = scale(lin(hexToRgb(MOONLIGHT)), 0.35 + 0.65 * (m.astro.moon?.fraction ?? 1));
-  const night = brighter(moon, scale(lin(hexToRgb(CITY_GLOW)), 0.35));
+  const city = scale(CITY_ON_CLOUD, 0.07);
+  const night = moon.map((v, i) => v + city[i]!) as RGB;
   let lit = brighter(mixRgb(scale(H, 1.2), lin(hexToRgb(CLOUD_LIT)), twilight), night);
   if (m.glow * twilight > 0) lit = brighter(lit, scale(H, 1.521));
   return lit;

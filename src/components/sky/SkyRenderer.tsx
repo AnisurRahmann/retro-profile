@@ -481,6 +481,7 @@ function start(
   const particleState = (): ParticleState => ({
     night: n("uNight"),
     cloudCover: n("uCloudCover"),
+    deck: (cur.uStyle as number[])[2]!,
     fog: n("uFog"),
     rainDensity: model.rainDensity,
     rainSlant: model.rainSlant,

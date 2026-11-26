@@ -236,26 +236,6 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
   };
 
   /**
-   * Heavy rain veils the far hills and the tea hills (the sky's own colour, VEIL); fog fades every layer by its
-   * distance (the fog's colour, FOG_AT). Drawn over each strip, after it.
-   */
-  const veilOver = (layer: LayerId, fx: LayerFx) => {
-    const fog = (FOG_AT[layer as keyof typeof FOG_AT] ?? 0) * fx.fog;
-    const rain = (VEIL[layer as keyof typeof VEIL] ?? 0) * fx.veil * (1 - fog);
-    if (fog > 0.003) {
-      ctx.globalAlpha = fog;
-      ctx.fillStyle = fogCss;
-      ctx.fillRect(0, -lift, w, H + lift);
-    }
-    if (rain > 0.003) {
-      ctx.globalAlpha = rain;
-      ctx.fillStyle = css(oklabToRgb(light.horizon));
-      ctx.fillRect(0, -lift, w, H + lift);
-    }
-    ctx.globalAlpha = 1;
-  };
-
-  /**
    * The land fades toward the foggy sky at the horizon. The shader's fog colour is the horizon colour 60% of the
    * way to its own grey, × 1.19, in linear light, composited at 0.85 over the sky, the share the shader's fog has
    * reached where the land begins: the same here, so the far hills end where the sky above them does instead of
@@ -328,6 +308,12 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
     ctx.globalAlpha = 1;
   };
 
+  /** The sky's veil and fog over the strips (draw()'s fx), in steps of 0.05: one that eases in re-renders them at
+   *  most twenty times. A step is at most 0.025 of fog or veil out, 0.02 of alpha on the far hills. */
+  let fxVeil = 0,
+    fxFog = 0;
+  const stripKey = () => `${lightKey}|${fxVeil}|${fxFog}`;
+
   const renderStrip = (layer: LayerId, offsetPx: number) => {
     if (!world) return;
     const st = strips[layer];
@@ -370,8 +356,29 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
     } else solid(g, layer, x0, x1, body, layer === "L4" ? css(ground) : body);
     if (layer === "L2") teaRows(g, x0, x1);
     cuts(g, layer, x0, x1);
+    // Heavy rain veils the far hills and the tea hills (the sky's own colour, VEIL); fog fades every layer by its
+    // distance (the fog's colour, FOG_AT). Over the layer's own pixels only (source-atop): the headroom above the
+    // hills is the sky's, with the shader's own fog and haze in it.
+    const fogV = (FOG_AT[layer] ?? 0) * fxFog;
+    const rainV = (VEIL[layer as keyof typeof VEIL] ?? 0) * fxVeil * (1 - fogV);
+    if (fogV > 0.003 || rainV > 0.003) {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.globalCompositeOperation = "source-atop";
+      if (fogV > 0.003) {
+        g.globalAlpha = fogV;
+        g.fillStyle = fogCss;
+        g.fillRect(0, 0, st.c.width, st.c.height);
+      }
+      if (rainV > 0.003) {
+        g.globalAlpha = rainV;
+        g.fillStyle = css(oklabToRgb(light.horizon));
+        g.fillRect(0, 0, st.c.width, st.c.height);
+      }
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = "source-over";
+    }
     st.x0 = x0Px;
-    st.key = lightKey;
+    st.key = stripKey();
   };
 
   return {
@@ -434,6 +441,8 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
       fx: LayerFx = NO_FX,
     ) {
       if (!world) return;
+      fxVeil = Math.round(fx.veil * 20) / 20;
+      fxFog = Math.round(fx.fog * 20) / 20;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (light.glow > 0.003) {
@@ -454,12 +463,10 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
       for (const layer of LAYERS) {
         const o = walk * PARALLAX[layer];
         const st = strips[layer];
-        if (!(o >= st.x0 + 8 && o + w <= st.x0 + w + 2 * PAD - 8) || st.key !== lightKey)
-          renderStrip(layer, o);
+        if (!(o >= st.x0 + 8 && o + w <= st.x0 + w + 2 * PAD - 8) || st.key !== stripKey()) renderStrip(layer, o);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.drawImage(st.c, Math.round((st.x0 - o) * dpr), Math.round(lift * dpr));
         ctx.setTransform(dpr, 0, 0, dpr, 0, lift * dpr);
-        if (fx.veil > 0.003 || fx.fog > 0.003) veilOver(layer, fx);
         if (fx.rim > 0.01) {
           boltRim(st, o, fx.rim);
           ctx.setTransform(dpr, 0, 0, dpr, 0, lift * dpr);

@@ -4,17 +4,23 @@
  * Usage (BASE= to point elsewhere):
  *   npx tsx scripts/weather-v6-shots.ts w1 … w6   a task's Evidence list → .shots/v6/<task>/
  *   npx tsx scripts/weather-v6-shots.ts matrix    W7: every condition × 4 times × 2 sizes → .shots/v6/matrix/ and contact sheets
+ *   npx tsx scripts/weather-v6-shots.ts matrix --sheets   the sheets again, from the shots on disk
  *   npx tsx scripts/weather-v6-shots.ts --gpu      GPU ms/frame per condition at the two gate sizes, steady state → .shots/v6/gpu.json
  * Each run also writes what the page reported (window.__sky) next to the shots, in manifest.json.
  */
 import fs from "node:fs";
 import { chromium, type Browser, type Page } from "@playwright/test";
+import { RAIN_DENSITY } from "../src/lib/sky/rain";
+import { CONDITIONS } from "../src/lib/sky/weather";
 
 const BASE = process.env.BASE ?? "http://localhost:3105";
 const ROOT = ".shots/v6";
 const args = process.argv.slice(2);
 const only = args.filter((a) => !a.startsWith("--"));
 const GPU = args.includes("--gpu");
+const MATRIX = only.includes("matrix");
+/** With `matrix`: only rebuild the sheets from the shots on disk. */
+const SHEETS = args.includes("--sheets");
 
 type Size = "desk" | "phone";
 const SIZES: Record<Size, { width: number; height: number; dpr: number }> = {
@@ -55,7 +61,8 @@ type Shot = {
 };
 
 const D = "2026-11-26";
-const q = (time: string, wx: string, rest = "") => `sky=${D}T${time}&wx=${wx}${rest ? `&${rest}` : ""}`;
+const qd = (date: string, time: string, wx: string, rest = "") => `sky=${date}T${time}&wx=${wx}${rest ? `&${rest}` : ""}`;
+const q = (time: string, wx: string, rest = "") => qd(D, time, wx, rest);
 const both = (name: string, query: string, extra: Partial<Shot> = {}): Shot[] =>
   (["desk", "phone"] as Size[]).map((size) => ({ name: `${name}-${size === "desk" ? "1440x900" : "375x812"}`, q: query, size, ...extra }));
 
@@ -144,6 +151,37 @@ const TASKS: Record<string, Shot[]> = {
     },
   ],
 };
+
+/** W7's matrix: every condition at four times of a November day, and the rain conditions again on a July afternoon. */
+const JULY = "2026-07-15";
+const JULY_TIME = "15:00";
+const MATRIX_TIMES = ["06:30", "11:00", "16:45", "22:00"];
+/** A typical wind per condition, as in the tasks' evidence; thunder between strikes (the dev-only `lightning=off`). */
+const MATRIX_WIND: Record<string, string> = {
+  clear: "wind=8&from=270",
+  partly: "wind=15&from=270",
+  overcast: "wind=12&from=180",
+  fog: "wind=10&from=90",
+  drizzle: "wind=10&from=90",
+  rain: "wind=20&from=200",
+  "heavy-rain": "wind=30&from=200",
+  thunder: "wind=45&from=315&lightning=off",
+};
+const MATRIX_COLS = [...MATRIX_TIMES, `${JULY_TIME}  ${JULY}`, "22:00, a bolt"];
+const sizeName = (size: Size) => (size === "desk" ? "1440x900" : "375x812");
+const stamp = (date: string, time: string) => (date === D ? "" : `${date.slice(5).replace("-", "")}-`) + time.replace(":", "");
+const matrixShots = (size: Size): Shot[] =>
+  CONDITIONS.flatMap((cond) => {
+    const s = sizeName(size);
+    const rest = MATRIX_WIND[cond]!;
+    return [
+      ...MATRIX_TIMES.map((time): Shot => ({ name: `${cond}-${stamp(D, time)}-${s}`, q: q(time, cond, rest), size })),
+      // The rain conditions again in the monsoon: a July afternoon.
+      ...(cond in RAIN_DENSITY ? [{ name: `${cond}-${stamp(JULY, JULY_TIME)}-${s}`, q: qd(JULY, JULY_TIME, cond, rest), size }] : []),
+      // A thunderstorm with its lightning on: a forced bolt at its return stroke.
+      ...(cond === "thunder" ? [{ name: `${cond}-2200-bolt-${s}`, q: q("22:00", cond, "wind=45&from=315"), size, strike: "cg" as const, at: 120 }] : []),
+    ];
+  });
 
 /** What the renderer reports in dev and test builds (window.__sky). */
 type Sky = {
@@ -320,6 +358,37 @@ async function drift(
   return { px: best.s * unit, r: best.r, delta: delta / Math.max(1, pixels) / 255 };
 }
 
+/**
+ * A labelled grid of shots: the matrix's contact sheets (a row per condition, a column per time) and the larger
+ * sheets the review is read from. An empty cell is skipped.
+ */
+async function grid(
+  browser: Browser,
+  file: string,
+  title: string,
+  cols: string[],
+  rows: [string, (string | null)[]][],
+  cell: { w: number; h: number },
+) {
+  const label = 92;
+  const page = await browser.newPage({ viewport: { width: label + cols.length * (cell.w + 6) + 12, height: 600 } });
+  const head = cols.map((c) => `<div class="h">${c}</div>`).join("");
+  const body = rows
+    // Every row holds a label and one cell a column, so a short row never lets the next one start in its place.
+    .map(
+      ([r, files]) =>
+        `<div class="r">${r}</div>${Array.from({ length: cols.length }, (_, i) => files[i]).map((f) => (f ? `<img src="data:image/png;base64,${fs.readFileSync(f).toString("base64")}">` : "<span></span>")).join("")}`,
+    )
+    .join("");
+  await page.setContent(
+    `<style>body{margin:0;background:#1b1b1b;padding:6px;font:12px monospace;color:#ddd;display:grid;grid-template-columns:${label}px repeat(${cols.length},${cell.w}px);gap:6px;align-items:start}h1{grid-column:1/-1;margin:0 0 4px;font-size:14px}.h{padding-bottom:2px}.r{padding-top:4px;line-height:1.3}img{width:${cell.w}px;height:${cell.h}px;display:block}</style><h1>${title}</h1><span></span>${head}${body}`,
+  );
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: file, fullPage: true });
+  await page.close();
+  console.log(file);
+}
+
 /** One sheet from shots: an HTML grid, screenshotted. */
 async function sheet(browser: Browser, out: string, title: string, files: string[], cols: number, width: number) {
   const page = await browser.newPage({ viewport: { width: cols * width + (cols + 1) * 6, height: 400 } });
@@ -373,9 +442,32 @@ if (GPU) {
     }
   fs.mkdirSync(ROOT, { recursive: true });
   fs.writeFileSync(`${ROOT}/gpu.json`, JSON.stringify(rows, null, 1));
+} else if (MATRIX) {
+  const out = `${ROOT}/matrix`;
+  fs.mkdirSync(out, { recursive: true });
+  const manifest: unknown[] = [];
+  for (const size of ["desk", "phone"] as Size[]) {
+    const shots = matrixShots(size);
+    if (!SHEETS) for (const s of shots) manifest.push(await take(browser, out, s));
+    const rows: [string, string[]][] = CONDITIONS.map((cond) => [cond, shots.filter((s) => s.q.split("&").includes(`wx=${cond}`)).map((s) => `${out}/${s.name}.png`)]);
+    const when = `${D}, ${MATRIX_TIMES.join(", ")}; the rain again on ${JULY} at ${JULY_TIME}; the last cell a bolt`;
+    // The contact sheet, one per size.
+    await grid(browser, `${out}/sheet-matrix-${size}.png`, `Weather v6 matrix, ${size === "desk" ? "1440×900" : "375×812"}: ${when}`, MATRIX_COLS, rows, size === "desk" ? { w: 480, h: 300 } : { w: 200, h: 433 });
+    // Larger ones to read the review from: the desktop's a condition at a time (two across, in order), the phone's two.
+    if (size === "desk")
+      for (const [cond, files] of rows) {
+        const pairs: [string, string[]][] = [];
+        for (let i = 0; i < files.length; i += 2) pairs.push([i ? "" : cond, files.slice(i, i + 2)]);
+        await grid(browser, `${out}/review-desk-${cond}.png`, `${cond}: ${when}`, ["", ""], pairs, { w: 760, h: 475 });
+      }
+    else
+      for (let i = 0; i < rows.length; i += 2)
+        await grid(browser, `${out}/review-phone-${rows[i]![0]}-${rows[i + 1]![0]}.png`, `375×812: ${rows[i]![0]}, ${rows[i + 1]![0]}`, MATRIX_COLS, [rows[i]!, rows[i + 1]!], { w: 280, h: 606 });
+  }
+  if (manifest.length) fs.writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 1));
 } else {
-  const tasks = only.length ? only : ["w1"];
-  for (const task of tasks) {
+  const tasks = only.filter((t) => t !== "matrix");
+  for (const task of tasks.length ? tasks : ["w1"]) {
     const shots = TASKS[task];
     if (!shots) throw new Error(`no evidence list for "${task}"`);
     const out = `${ROOT}/${task}`;

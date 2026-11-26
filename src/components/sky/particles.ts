@@ -17,6 +17,8 @@ export const skyRotation = (ms: number) => (((ms / 3.6e6) * SIDEREAL_DEG_PER_H) 
 export type ParticleState = {
   night: number;
   cloudCover: number;
+  /** 1 under a stratus deck (overcast, rain): no stars through it. */
+  deck: number;
   fog: number;
   rainDensity: number;
   rainSlant: number;
@@ -196,7 +198,7 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
       hooks.back?.(ctx);
 
       // Stars.
-      const vis = s.night * (1 - s.cloudCover * 0.9) * (1 - s.fog);
+      const vis = s.night * (1 - s.cloudCover * 0.9) * (1 - s.fog) * (1 - s.deck);
       if (vis > 0.01) {
         const rot = skyRotation(nowMs);
         for (let i = 0; i < nStars; i++) {

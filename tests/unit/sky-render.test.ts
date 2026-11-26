@@ -70,6 +70,8 @@ describe("the moon", () => {
     });
     const canvas = { getContext: () => ctx, clientWidth: 375, clientHeight: 812, width: 0, height: 0 };
     vi.stubGlobal("window", { devicePixelRatio: 2 });
+    let stars = 0;
+    let decked = 0;
     try {
       const pts = createParticles(canvas as unknown as HTMLCanvasElement, [0.9, 0.92, 0.95])!;
       pts.resize(330);
@@ -80,6 +82,7 @@ describe("the moon", () => {
         {
           night: 1,
           cloudCover: 0.04,
+          deck: 0,
           fog: 0,
           rainDensity: 0,
           rainSlant: 0,
@@ -93,10 +96,39 @@ describe("the moon", () => {
         {},
         null,
       );
+      // Under a stratus deck no star is drawn: only the moon's fills are left (a small star is a fillRect).
+      const fills = (deck: number) => {
+        const from = calls.length;
+        pts.draw(
+          1,
+          Date.UTC(2026, 10, 25, 21, 30),
+          {
+            night: 1,
+            cloudCover: 0.97,
+            deck,
+            fog: 0,
+            rainDensity: 0,
+            rainSlant: 0,
+            flash: 0,
+            moon: { x: 0.76, y: 0.31, up: true, fraction: 1, waxing: true },
+            moonVisible: 1,
+            moonR: 12,
+            moonDim: 1,
+          },
+          true,
+          {},
+          null,
+        );
+        return calls.slice(from).filter((c) => c === "fill" || c === "fillRect").length;
+      };
+      stars = fills(0);
+      decked = fills(1);
     } finally {
       vi.unstubAllGlobals();
     }
     expect(calls).toContain("fill");
+    expect(stars).toBeGreaterThan(50);
+    expect(decked).toBeLessThan(stars / 10);
     // A 22° halo was two stroked circles around the disc. Nothing strokes here.
     expect(calls).not.toContain("stroke");
     expect("drawHalo" in bodies).toBe(false);
