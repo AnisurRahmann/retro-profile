@@ -58,16 +58,32 @@ export const CELLS_PER_UNIT = { low: 2.5, mid: 2 } as const;
 export const SLOPE = 4;
 
 /**
- * Scene units a LOW feature drifts per second at 1 km/h: 0.0011 · max(wind, 6) is 60–120 px in 10 s in the upper
- * third of a 1440×900 viewport at 15 km/h (W2's calibration).
+ * Scene units a LOW feature drifts per second at 1 km/h. 0.0014 · max(wind, 6) moves one 65–106 px in 10 s in the
+ * upper third of a 1440×900 viewport at 15 km/h (W2's calibration: 60–120 px, unit test and measured on screen).
  */
-export const PLANE_SPEED = 0.0011;
+export const PLANE_SPEED = 0.0014;
 /**
  * How fast a receding or approaching cloud crosses the sheet in log depth, against the same wind across it. On
  * screen a receding cloud's speed is this × k × the wind's, where a cloud drifting across moves at ∝ v: they match
  * at about half the height of the sky.
  */
 export const DEPTH_RATE = 0.5;
+
+/** Gusts: the wind swells and drops by ±`amplitude` around its speed, at `hz`. */
+export const GUST = { amplitude: 0.2, hz: 0.07 } as const;
+/** The wind's speed at time t (seconds), as a factor of its own: 1 ± 0.2 at 0.07 Hz. */
+export const gust = (t: number) => 1 + GUST.amplitude * Math.sin(2 * Math.PI * GUST.hz * t);
+
+/**
+ * Evolution: how fast a sheet's shapes change, as its warp field drifting (per second). LOW is the brief's third
+ * noise dimension at 0.02/s; HIGH's cirrus thins and gathers at 0.008/s. MID and SCUD only drift.
+ */
+export const EVOLUTION = { low: 0.02, mid: 0, high: 0.008, scud: 0 } as const;
+/**
+ * A sheet's evolution wraps at this many units without a jump: every warp input moves at a whole number of lattices
+ * per wrap (256 × 10, 6, 7 and 10 for LOW's 1, 0.6, 0.7 and 1). 36 hours of LOW at a time.
+ */
+export const EVO_PERIOD = 2560;
 
 /** Coverage of each sheet at the cloud cover typical of a condition; a real cover scales it (cloudPlan). */
 const COVER_AT: Record<Condition, Record<SheetId, number>> = {
@@ -131,13 +147,15 @@ export const lod = (fp: number, octave = 0) => Math.min(1, Math.max(0, 1.5 - 2.5
 
 /**
  * Wind (km/h, from its bearing) as a drift of a sheet's noise, scene units per second: it blows toward
- * fromDeg + 180°, east to screen-left, south into the scene. From the north the clouds recede; from the south they
- * come on. `k` is depthK for the layout: depth is read in logs.
+ * fromDeg + 180°, east to screen-left. Into the scene, the log of the distance: the offset is added to a pixel's
+ * depth, so an offset that grows brings a cloud nearer and one that shrinks carries it away. From the north the
+ * clouds recede (toward the horizon, smaller); from the south they come on. `k` is depthK for the layout.
+ * A gust scales the km/h (gust).
  */
 export function planeWind(kmh: number, fromDeg: number, sheet: SheetId, k = 0.6): [number, number] {
   const s = SHEET[sheet].speed * PLANE_SPEED * Math.max(kmh, 6);
   const to = ((fromDeg + 180) * Math.PI) / 180;
-  return [-Math.sin(to) * s, -Math.cos(to) * s * k * DEPTH_RATE];
+  return [-Math.sin(to) * s, Math.cos(to) * s * k * DEPTH_RATE];
 }
 
 // ── The noise textures ─────────────────────────────────────────────────────────────────────────────────────────

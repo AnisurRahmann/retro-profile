@@ -6,7 +6,7 @@ import { onSky } from "@/lib/signal-bus";
 import { hexToRgb, oklabToRgb, rgbToOklab, toGamma, toLinear, type Lab } from "@/lib/sky/color";
 import { smoothstep } from "@/lib/sky/gradient";
 import { skyModel, type SkyModel } from "@/lib/sky/model";
-import { SHEETS, cloudPlan, depthK, planeWind, type SheetId } from "@/lib/sky/clouds";
+import { EVO_PERIOD, EVOLUTION, SHEETS, cloudPlan, depthK, gust, planeWind, type SheetId } from "@/lib/sky/clouds";
 import { effectiveWeather, SKY_DEBUG, skyStore, skyTime, WX_DEFAULTS } from "@/lib/sky/store";
 import { dayOfYear, dhakaParts } from "@/lib/sky/time";
 import { sunColor } from "@/lib/sky/gradient";
@@ -507,16 +507,20 @@ function start(
     const hzCloud = cloudHz();
     // The wind carries each sheet along: across, and away in log depth. The offsets are never wrapped: the rotated
     // octaves, the warp and the Worley cells share no period, so a wrap would jump the field (DECISIONS #127), and
-    // a float holds a sheet's place to a texel for days.
+    // a float holds a sheet's place to a texel for days. The wind gusts (±20% at 0.07 Hz) and LOW and HIGH evolve.
     const depth = depthK(view.vw, hzCloud);
+    const swell = gust(t);
     const wl = planeWind(model.windKmh, model.windFromDeg, "low", depth);
     const wl2 = Math.hypot(wl[0], wl[1]);
     windDir = wl2 > 1e-9 ? [wl[0]! / wl2, wl[1]! / wl2] : [1, 0];
     if (!still)
       for (const id of SHEETS) {
-        const w = planeWind(model.windKmh, model.windFromDeg, id, depth);
-        sheet[id].x += w[0] * dt;
-        sheet[id].z += w[1] * dt;
+        const w = planeWind(model.windKmh * swell, model.windFromDeg, id, depth);
+        const s = sheet[id];
+        s.x += w[0] * dt;
+        s.z += w[1] * dt;
+        s.evo %= EVO_PERIOD;
+        s.evo += EVOLUTION[id] * dt;
       }
     if (still || t - lastClouds >= CLOUD_REFRESH_S) refreshClouds(t);
     updateHorizon(still);

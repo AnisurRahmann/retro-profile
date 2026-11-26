@@ -13,7 +13,8 @@
  * A sheet's depth is read in logs (clouds.ts planePoint), so a cloud keeps its proportions at every distance and
  * shrinks with v. The footprint (fp, the noise under one atmosphere pixel) is the same along both axes, and small:
  * octaves finer than it are not sampled. Every sheet fades over the last 4% above the horizon.
- * - HIGH: cirrus, fbm stretched 5:1 along the wind (uWindv). Thin: lit most where it is near the light. Alpha ≤ 0.35.
+ * - HIGH: cirrus, fbm stretched 5:1 along the wind (uWindv), on a slowly drifting warp (its evolution). Thin: lit
+ *   most where it is near the light. Alpha ≤ 0.35.
  * - MID: altocumulus. A low-frequency mask picks the patches; Worley cells, each shaded as a dome, fill them.
  *   Alpha ≤ 0.6.
  * - LOW: cumulus. fbm on a domain warped twice, times a Worley "billow" (1 − F1) for puffy edges; a stratus deck
@@ -209,7 +210,9 @@ if(d>0.)over(acc,flash(shade(d,n,${FL(SHEET.mid.thick)},gold(lit,max(n.y*2.5,0.)
 if(uHi.w>.001){
 ${plane("high", "uHi")}
 vec2 w=uWindv.xy,ac=vec2(-w.y,w.x);
+// Stretched along the wind, and warped where its warp field has got to: the cirrus thins and gathers over minutes.
 vec2 s2=vec2(dot(w,q)/${FL(SHEET.high.stretch)},dot(ac,q));
+s2+=.35*(vn2(s2*.3+vec2(5.1,11.3)+uHi.z*vec2(1.,.7))-.5);
 float d=smoothstep(uTh.x-${FL(SOFT.high / 2)},uTh.x+${FL(SOFT.high / 2)},fbm${HIGH_OCTAVES}(s2,fp));
 if(d>0.)over(acc,flash(mix(shd,lit,clamp(.3+.7*ph,0.,1.))*(.35+.65*exp(-d*${FL(SHEET.high.thick)}*2.2))),d*${FL(SHEET.high.alpha)}*haze);
 }

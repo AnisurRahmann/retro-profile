@@ -170,6 +170,21 @@ Two things the first build got wrong and the tests and zooms caught, both fixed 
 - **Idle bundle 30.1 kB gzip against a 26.0 kB budget.** The budget is raised to 31 kB and the gate kept (DECISIONS #128). The base branch was already over (26.1 kB). Open for veto.
 - **The pixel-contrast gate (`tests/e2e/sky-backing.spec.ts`, run on a W1 test build) fails 6 rows, none of them unreadable text.** Five are the desktop footer icons at the "closer" scroll (2.29–4.11:1): the same five fail on the base commit cd5feaf (its log: `.scratch/e2e-backing-base.log`), since T6 put them over open sky. The gate takes a filled icon as its glyph and measures the sky outside the icon's 1px-inset chip; on the chip the icon is about 5.9:1. The sixth is the phone's `receipts-note` at "closer" (3.23:1 in that run, 5.07:1 in a re-run): the chip's interior is 5.2:1, and the gate caught the chip's antialiased top edge blended with a v6 cumulus top beside it (rgb 101,103,107), where v5.1's sky there was dark navy. Fixing either means the backing's CSS or the gate, both outside this brief; left for a decision (DECISIONS #129).
 
+#### W2 cloud motion — `feat(weather): W2 …`
+
+| Done when | Result | Evidence |
+| --- | --- | --- |
+| Wind blows toward from + 180°: east–west to screen x, north–south into the depth | PASS | unit test; `w2/wind15-from270-1440x900-{0,1,2}.png` (3 frames 5 s apart: the same clouds travel left) and `-375x812-…` |
+| Wind 40 from 0° (north) | PASS as **receding** (DECISIONS #130): the same clouds sink toward the horizon and get smaller | `w2/wind40-from0-1440x900-{0,1,2}.png`, `-375x812-…`; the opposite wind for contrast: `w2/wind40-from180-…` (they come on) |
+| Speeds LOW 1, MID 0.6, HIGH 0.3, SCUD 1.6; never still in calm air | PASS | unit test |
+| Evolution: LOW 0.02/s, HIGH 0.008/s | PASS, as a drifting warp field (DECISIONS #131) | unit test |
+| Gusts ±20% at 0.07 Hz | PASS | unit test (min 0.80, max 1.20, mean 1.00) |
+| Calibration: a LOW feature in the upper third of 1440×900 at 15 km/h moves 60–120 px in 10 s | PASS: **measured 100 px in 10 s** (the band y 60–300 of two frames 10 s apart, correlated against 240 candidate shifts: 0.87) | `w2/cal-wind15-1440x900-{0,1}.png`; phone `w2/cal-wind15-375x812-{0,1}.png`: 16 px |
+| Reduced motion | PASS: a still frame integrates no drift, swell or evolution | `SkyRenderer.tsx` `draw()`: the sheets move only when a frame is not still |
+| Atmosphere pass within budget | PASS | `gpu.json` (1920×1080 DPR 2 / 375×812 DPR 3): desktop worst median thunder 18:30 1.30 ms and partly 1.26 (largest single sample 1.58), clear 1.21, the rest 0.64–1.18; phone worst thunder 18:30 0.86 ms, the rest 0.24–0.77 |
+
+The first build had the depth drift's sign inverted and matched the brief's wording: the brief's own evidence frames (0 s and 10 s at 40 km/h from the north) showed the clouds rising toward the viewer. Fixed before this log; the frames above are from the fixed build. Idle renderer 30.2 kB gzip of 31.0.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.

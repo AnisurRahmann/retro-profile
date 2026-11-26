@@ -71,7 +71,7 @@ const TASKS: Record<string, Shot[]> = {
     ...both("wind40-from0", q("11:00", "partly", "wind=40&from=0"), { frames: 3, gap: 5, wait: 3000 }),
     ...both("wind40-from180", q("11:00", "partly", "wind=40&from=180"), { frames: 3, gap: 5, wait: 3000 }),
     // Calibration: a LOW feature in the upper third of 1440×900 at 15 km/h moves 60–120 px in 10 s. The band is
-    // clear of the page (the header ends at 60px), so only sky is correlated.
+    // clear of the page (desktop: below the header; phone: between the status chip and "Shipped"), so only sky is correlated.
     {
       name: "cal-wind15-1440x900",
       q: q("11:00", "partly", "wind=15&from=270"),
@@ -88,7 +88,7 @@ const TASKS: Record<string, Shot[]> = {
       frames: 2,
       gap: 10,
       wait: 3000,
-      drift: { band: [96, 176], axis: "x", max: 90 },
+      drift: { band: [268, 338], axis: "x", max: 60 },
     },
   ],
 };
@@ -175,29 +175,38 @@ async function drift(browser: Browser, first: string, last: string, d: { band: [
   const page = await browser.newPage();
   const band = async (file: string) => {
     await page.setContent(`<img id="i" src="data:image/png;base64,${fs.readFileSync(file).toString("base64")}">`);
+    // No inner helpers: tsx's transform gives them a name the page doesn't have.
     return page.evaluate(
-      ({ y0, y1, axis }) =>
-        new Promise<number[][]>((done) => {
-          const img = document.getElementById("i") as HTMLImageElement;
-          const read = () => {
-            const c = document.createElement("canvas");
-            c.width = Math.round(img.naturalWidth / 4);
-            c.height = Math.round(img.naturalHeight / 4);
-            const g = c.getContext("2d", { willReadFrequently: true })!;
-            g.drawImage(img, 0, 0, c.width, c.height);
-            const d = g.getImageData(0, 0, c.width, c.height).data;
-            const at = (x: number, y: number) => {
+      async ({ y0, y1, axis }) => {
+        const img = document.getElementById("i") as HTMLImageElement;
+        await img.decode();
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.naturalWidth / 4);
+        c.height = Math.round(img.naturalHeight / 4);
+        const g = c.getContext("2d", { willReadFrequently: true })!;
+        g.drawImage(img, 0, 0, c.width, c.height);
+        const d = g.getImageData(0, 0, c.width, c.height).data;
+        const rows: number[][] = [];
+        if (axis === "x")
+          for (let y = y0; y < y1; y++) {
+            const row: number[] = [];
+            for (let x = 0; x < c.width; x++) {
               const i = (y * c.width + x) * 4;
-              return 0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!;
-            };
-            const rows: number[][] = [];
-            if (axis === "x") for (let y = y0; y < y1; y++) rows.push(Array.from({ length: c.width }, (_, x) => at(x, y)));
-            else for (let x = y0; x < y1; x++) rows.push(Array.from({ length: c.height }, (_, y) => at(x, y)));
-            done(rows);
-          };
-          if (img.complete) read();
-          else img.onload = read;
-        }),
+              row.push(0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!);
+            }
+            rows.push(row);
+          }
+        else
+          for (let x = y0; x < y1; x++) {
+            const row: number[] = [];
+            for (let y = 0; y < c.height; y++) {
+              const i = (y * c.width + x) * 4;
+              row.push(0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!);
+            }
+            rows.push(row);
+          }
+        return rows;
+      },
       { y0: Math.round(d.band[0] / scale / 4), y1: Math.round(d.band[1] / scale / 4), axis: d.axis },
     );
   };
@@ -233,7 +242,8 @@ async function drift(browser: Browser, first: string, last: string, d: { band: [
     const r = dot / Math.sqrt(aa * bb);
     if (r > best.r) best = { s, r };
   }
-  return { px: (best.s * 4 * scale) / scale, r: best.r };
+  // One sample of the band is 4 device px: 4 / scale CSS px.
+  return { px: best.s * (4 / scale), r: best.r };
 }
 
 /** One sheet from shots: an HTML grid, screenshotted. */

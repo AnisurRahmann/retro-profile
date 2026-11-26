@@ -172,7 +172,12 @@ export function createCloudField() {
     if (s === "mid") return sm(th - e, th + e, mid(qx, qy, fp));
     if (s === "high") {
       const [wx, wz] = c.wind;
-      return sm(th - e, th + e, fbm((wx * qx + wz * qy) / SHEET.high.stretch, -wz * qx + wx * qy, fp, 3));
+      const sx = (wx * qx + wz * qy) / SHEET.high.stretch;
+      const sy = -wz * qx + wx * qy;
+      // Its warp (the shader's too): the cirrus evolves.
+      const ox = sx * 0.3 + 5.1 + st.evo;
+      const oy = sy * 0.3 + 11.3 + st.evo * 0.7;
+      return sm(th - e, th + e, fbm(sx + 0.35 * (tap(noiseTex, ox, oy, 0) - 0.5), sy + 0.35 * (tap(noiseTex, ox, oy, 1) - 0.5), fp, 3));
     }
     return sm(th - e, th + e, fbm(qx, qy, fp, 2));
   };

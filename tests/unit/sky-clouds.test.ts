@@ -3,6 +3,8 @@ import { createCloudField } from "@/components/sky/cloud-field";
 import {
   CELLS_PER_UNIT,
   EDGE,
+  EVOLUTION,
+  EVO_PERIOD,
   FOCAL,
   NOISE_SIZE,
   PLANE_SPEED,
@@ -13,6 +15,7 @@ import {
   cellData,
   cloudPlan,
   depthK,
+  gust,
   lod,
   noiseData,
   planePoint,
@@ -77,6 +80,18 @@ describe("cloud sheets in perspective", () => {
 describe("wind on the cloud planes", () => {
   const k = depthK(VW, HZ);
 
+  it("moves a LOW cloud in the upper third of 1440×900 60–120 px in 10 s at 15 km/h (W2's calibration)", () => {
+    // One noise unit is 0.9·vw / (z·freq) CSS px across at height y; a side wind shifts the sheet by its speed.
+    for (const y of [0, 100, 200, 300]) {
+      const { x: perUnit } = planePoint(720, y, "low", VW, HZ);
+      const z = SHEET.low.h / Math.max((HZ - y) / HZ, V_MIN);
+      const px = Math.abs(planeWind(15, 270, "low", k)[0]) * 10 * ((0.9 * VW) / (z * SHEET.low.freq));
+      expect(px, `y=${y}`).toBeGreaterThanOrEqual(60);
+      expect(px, `y=${y}`).toBeLessThanOrEqual(120);
+      expect(perUnit).toBe(0); // straight up the middle: only the scale matters here
+    }
+  });
+
   it("blows away from where it comes from: a west wind to screen-left, an east wind to screen-right", () => {
     expect(planeWind(15, 270, "low", k)[0]).toBeLessThan(0); // the viewer faces south, so east is left
     expect(planeWind(15, 270, "low", k)[1]).toBeCloseTo(0, 12);
@@ -87,10 +102,21 @@ describe("wind on the cloud planes", () => {
     const north = planeWind(15, 0, "low", k);
     const south = planeWind(15, 180, "low", k);
     expect(north[0]).toBeCloseTo(0, 12);
-    expect(north[1]).toBeGreaterThan(0); // depth is read away from the viewer
+    // The offset is added to a pixel's depth, so one that shrinks carries a cloud away toward the horizon.
+    expect(north[1]).toBeLessThan(0);
     expect(south[0]).toBeCloseTo(0, 12);
-    expect(south[1]).toBeLessThan(0);
+    expect(south[1]).toBeGreaterThan(0);
     expect(north[1]).toBeCloseTo(-south[1], 12);
+    // On screen: the same feature is at a depth that shrinks under a north wind, so it sinks and gets smaller.
+    const hz = 780;
+    const at = (z: number) => {
+      const { s } = planePoint(720, 300, "low", VW, hz);
+      // The depth the pixel at y=300 reads once the sheet has moved by z: find the row that reads s at t=0.
+      for (let y = 60; y < hz - 1; y++) if (planePoint(720, y + 1, "low", VW, hz).s + z >= s) return y;
+      return hz;
+    };
+    expect(at(north[1] * 60)).toBeGreaterThan(300);
+    expect(at(south[1] * 60)).toBeLessThan(300);
   });
 
   it("moves the sheets at their own speeds: LOW 1, MID 0.6, HIGH 0.3, SCUD 1.6", () => {
@@ -100,17 +126,51 @@ describe("wind on the cloud planes", () => {
       expect(x).toBeCloseTo(-base * SHEET[sheet].speed, 12);
     }
     // The offset is integrated on the CPU, never wrapped: the rotated octaves, the warp and the Worley cells share
-    // no period, so a wrap would jump the field. The fastest sheet (SCUD at 40 km/h) plays for 40 hours before a
+    // no period, so a wrap would jump the field. The fastest sheet (SCUD at 40 km/h) plays for a day before a
     // float32 stops placing it to a texel of the 256-wide noise; LOW and HIGH for days.
     const scud = Math.abs(planeWind(40, 270, "scud", k)[0]) * SHEET.scud.freq;
-    expect(2 ** 15 / scud).toBeGreaterThan(40 * 3600);
+    expect(2 ** 15 / scud).toBeGreaterThan(24 * 3600);
     const low = Math.abs(planeWind(40, 270, "low", k)[0]) * SHEET.low.freq;
-    expect(2 ** 15 / low).toBeGreaterThan(4 * 24 * 3600);
+    expect(2 ** 15 / low).toBeGreaterThan(2 * 24 * 3600);
   });
 
   it("never stops in calm air (a 6 km/h floor) and grows with the wind", () => {
     expect(planeWind(0, 270, "low", k)[0]).toBe(planeWind(6, 270, "low", k)[0]);
     expect(planeWind(30, 270, "low", k)[0]).toBeCloseTo(2 * planeWind(15, 270, "low", k)[0], 12);
+  });
+});
+
+describe("gusts and evolution", () => {
+  it("swells the wind by ±20% at 0.07 Hz around its own speed", () => {
+    expect(gust(0)).toBe(1);
+    let min = Infinity;
+    let max = -Infinity;
+    let sum = 0;
+    const n = 20_000;
+    for (let i = 0; i < n; i++) {
+      const g = gust((i / n) * 100);
+      min = Math.min(min, g);
+      max = Math.max(max, g);
+      sum += g;
+    }
+    expect(min).toBeCloseTo(0.8, 5);
+    expect(max).toBeCloseTo(1.2, 5);
+    expect(sum / n).toBeCloseTo(1, 4);
+    // One swell every 1 / 0.07 s.
+    expect(gust(1 / (2 * 0.07))).toBeCloseTo(1, 10);
+    expect(gust(1 / (4 * 0.07))).toBeCloseTo(1.2, 10);
+    expect(gust(3 / (4 * 0.07))).toBeCloseTo(0.8, 10);
+  });
+
+  it("evolves LOW at 0.02/s and HIGH at 0.008/s; MID and SCUD only drift", () => {
+    expect(EVOLUTION).toEqual({ low: 0.02, mid: 0, high: 0.008, scud: 0 });
+    // A wrap is a whole number of noise lattices on every warp input, so it never jumps the field.
+    for (const k of [1, 0.6, 0.7]) expect(Number.isInteger((EVO_PERIOD * k) / 256)).toBe(true);
+  });
+
+  it("keeps a still frame still (reduced motion): no drift, no swell, no evolution is integrated", () => {
+    // SkyRenderer integrates sheets, gust and evolution only when a frame is not still; the gust itself starts at 1.
+    expect([gust(0), EVOLUTION.low > 0, EVOLUTION.high > 0]).toEqual([1, true, true]);
   });
 });
 
