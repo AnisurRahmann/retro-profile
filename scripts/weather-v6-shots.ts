@@ -4,7 +4,7 @@
  * Usage (BASE= to point elsewhere):
  *   npx tsx scripts/weather-v6-shots.ts w1 … w6   a task's Evidence list → .shots/v6/<task>/
  *   npx tsx scripts/weather-v6-shots.ts matrix    W7: every condition × 4 times × 2 sizes → .shots/v6/matrix/ and contact sheets
- *   npx tsx scripts/weather-v6-shots.ts gpu       GPU ms/frame per condition at the two gate sizes → .shots/v6/gpu.json
+ *   npx tsx scripts/weather-v6-shots.ts --gpu      GPU ms/frame per condition at the two gate sizes, steady state → .shots/v6/gpu.json
  * Each run also writes what the page reported (window.__sky) next to the shots, in manifest.json.
  */
 import fs from "node:fs";
@@ -66,6 +66,16 @@ const TASKS: Record<string, Shot[]> = {
     ...both("golden-1645-partly", q("16:45", "partly")),
     ...both("night-0200-partly", q("02:00", "partly")),
   ],
+  w4: [
+    // A forced bolt at its return stroke (the leader takes 70–110 ms): the storm's clouds are in after 5 s.
+    ...both("bolt-2100", q("21:00", "thunder", "wind=45&from=315"), { strike: "cg", at: 120, log: true }),
+    ...both("sheet-flash-2100", q("21:00", "thunder", "wind=45&from=315"), { strike: "ic", at: 100, log: true }),
+    ...both("bolt-1530", q("15:30", "thunder", "wind=45&from=315"), { strike: "cg", at: 120, log: true }),
+    // Natural scheduling for a minute: the count and the log.
+    { name: "thunder-60s-1440x900", q: q("21:00", "thunder", "wind=45&from=315"), size: "desk", wait: 60_000, log: true },
+    // Reduced motion: no lightning at all, the hook included.
+    { name: "thunder-reduced-1440x900", q: q("21:00", "thunder", "wind=45&from=315"), size: "desk", strike: "cg", at: 120, reduced: true, log: true },
+  ],
   w3: [
     ...both("drizzle-1500", q("15:00", "drizzle", "wind=10&from=90")),
     ...both("rain-1500", q("15:00", "rain", "wind=20&from=200")),
@@ -113,7 +123,15 @@ const TASKS: Record<string, Shot[]> = {
 };
 
 /** What the renderer reports in dev and test builds (window.__sky). */
-type Sky = { frames?: number; condition?: string; sun?: unknown; moon?: unknown; strike?: (k: "cg" | "ic") => void; lightningLog?: unknown[] };
+type Sky = {
+  frames?: number;
+  condition?: string;
+  sun?: unknown;
+  moon?: unknown;
+  strike?: (k: "cg" | "ic") => void;
+  lightningLog?: unknown[];
+  lightningCount?: { cg: number; ic: number };
+};
 type W = Window & { __sky?: Sky };
 
 const scroll = (page: Page, to: Shot["scroll"]) =>
@@ -174,7 +192,8 @@ async function take(browser: Browser, out: string, s: Shot) {
     await snap(`${s.name}-${i}`);
   } else await snap(s.name);
   const sky = await page.evaluate((): Sky | null => (window as W).__sky ?? null);
-  if (s.log && Array.isArray(sky?.lightningLog)) console.log(JSON.stringify(sky.lightningLog));
+  if (s.log && Array.isArray(sky?.lightningLog))
+    console.log(`  ${s.name}: lightning ${JSON.stringify(sky.lightningCount ?? null)} log ${JSON.stringify(sky.lightningLog)}`);
   let moved: number | null = null;
   if (s.drift && files.length > 1) {
     const d = await drift(browser, files[0]!, files.at(-1)!, s.drift, v.dpr);
@@ -307,12 +326,14 @@ if (GPU) {
         if (hit) ms.push(Number(hit[1]));
       });
       await page.goto(`${BASE}/?${q(time, wx, rest)}`, { waitUntil: "networkidle" });
+      // The weather eases in over 4 s: the steady state is what the gate is about.
+      await page.waitForTimeout(6000);
       const t0 = Date.now();
-      while (ms.length < 4 && Date.now() - t0 < 45_000) await page.waitForTimeout(500);
+      while (ms.length < 6 && Date.now() - t0 < 60_000) await page.waitForTimeout(500);
       await ctx.close();
       rows.push({ condition: `${wx} ${time}${rest ? ` ${rest}` : ""}`, size: `${g.width}x${g.height} DPR ${g.dpr}`, ms });
       const sorted = [...ms].sort((a, b) => a - b);
-      console.log(`${wx.padEnd(11)} ${time}  ${size.padEnd(5)}  GPU ${ms.map((v) => v.toFixed(2)).join(" ")} ms  (median ${sorted[sorted.length >> 1]?.toFixed(2) ?? "-"})`);
+      console.log(`${wx.padEnd(11)} ${time}  ${size.padEnd(5)}  GPU ${ms.map((v) => v.toFixed(2)).join(" ")} ms  (median ${sorted[sorted.length >> 1]?.toFixed(2) ?? "-"}, max ${sorted.at(-1)?.toFixed(2) ?? "-"})`);
     }
   fs.mkdirSync(ROOT, { recursive: true });
   fs.writeFileSync(`${ROOT}/gpu.json`, JSON.stringify(rows, null, 1));

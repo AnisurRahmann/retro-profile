@@ -17,10 +17,11 @@
  *   most where it is near the light. Alpha ≤ 0.35.
  * - MID: altocumulus. A low-frequency mask picks the patches; Worley cells, each shaded as a dome, fill them.
  *   Alpha ≤ 0.6.
- * - LOW: cumulus. fbm on a domain warped twice, times a Worley "billow" (1 − F1) for puffy edges; a stratus deck
+ * - LOW: cumulus. Three octaves of fbm on a domain warped twice, times a Worley "billow" (1 − F1) for puffy edges; a stratus deck
  *   (overcast, drizzle: uStyle.z) takes 0.2 of the billow and is thick everywhere (clouds.ts STRATUS). Alpha ≤ 0.95. Its normal is the cell's (the vector to the centre
- *   of its Worley cell, which the cellular lookup already returns) over the fbm's own slope, so a distant cloud has
- *   a lit top and a shaded base too.
+ *   of its Worley cell, which the cellular lookup already returns) over the fbm's own slope toward the viewer (one
+ *   more sample of its first octave: the look depends on it; a screen-space slope was tried and flattened the
+ *   clouds), so a distant cloud has a lit top and a shaded base too.
  * - SCUD: small fast fragments under a rain deck.
  * Lighting: Lambert on the normal from the sun's (or the moon's) screen position, plus a Henyey–Greenstein phase
  * (g 0.65) toward the light: the silver lining on cloud edges near the sun. Beer–Lambert darkens thick cores.
@@ -31,7 +32,8 @@
  * it on the CPU: the sun's and moon's occlusion, and the cloud the backing model counts.
  * Fog: desaturated sky lifted +6% L, alpha uFog × 0.55, strongest toward the horizon. Moon glow: radial halo,
  * illumination × up × night × (1 − 0.7 cover). Horizon glow: ellipse on the horizon line under the sun. Lightning
- * (until W4): a lift of the cloud layer only. The horizon line is uHorizonY (CSS px): the viewport bottom on
+ * (W4): the whole sky +5% L for a bolt, +25% L over a soft disc for a sheet flash inside the cloud.
+ * Rain: the whole sky 10% darker under the heaviest, with curtains drifting on the wind. The horizon line is uHorizonY (CSS px): the viewport bottom on
  * desktop; in scene mode it tracks the visible ground, and under a scene the sky is back to the "away" sky (horizon
  * at 1.45 vh) by uHorizonB (src/lib/sky/horizon.ts). Nothing is damped anywhere: there is no column scrim. Loose
  * text gets per-element backing (src/lib/sky/backing.ts), which mirrors these layers.
@@ -61,8 +63,11 @@ import {
   NIGHT_SHADOW,
 } from "@/lib/sky/palette";
 
-/** Cirrus: fbm octaves. LOW is 4 (hand-inlined), MID a patch mask and its cells, SCUD 2: what the GPU budget pays for. */
-const HIGH_OCTAVES = 3;
+/**
+ * Cirrus: fbm octaves. LOW is 3 (hand-inlined), MID a patch mask and its cells, SCUD 2: what the GPU budget pays
+ * for (W4: LOW and HIGH each gave up an octave when the steady-state pass measured over 2 ms; DECISIONS #146).
+ */
+const HIGH_OCTAVES = 2;
 /** The softness of a cirrus and a SCUD edge, in noise. */
 const SOFT = { high: 0.25, scud: 0.15 } as const;
 
@@ -73,7 +78,7 @@ const FL = (v: number) => v.toFixed(2);
 
 /** `float fbmN(p, fp)`: N octaves of value noise, each rotated by R, twice as fine and half as strong, about their
  *  mean. An octave whose wavelength is under about two pixels of the footprint `fp` is not sampled at all. */
-function fbmFn(n: 2 | 3): string {
+function fbmFn(n: 2): string {
   let s = `float fbm${n}(vec2 p,float fp){float v=0.,k=1.5-2.5*fp,a=.5;`;
   for (let i = 0; i < n; i++)
     s += `if(k>0.)v+=a*(mix(.5,vn(p),min(k,1.))-.5);p=R*p;k-=${FL(2.5 * 2 ** (i + 1))}*fp;a*=.5;`;
@@ -82,10 +87,11 @@ function fbmFn(n: 2 | 3): string {
 
 /** The plane a pixel looks at on a sheet. Declares q (its noise coordinates, with the sheet's drift) and fp (the
  *  noise under one atmosphere pixel): call it in its own scope. vc, px and dk (depthK) come from main. */
+// ld (main) is log(1 / vc): z / h is 1 / v for every sheet, so the logarithm is taken once a pixel, not once a sheet.
 const plane = (s: SheetId, u: string) => {
   const { h, freq } = SHEET[s];
   return `float z=${FL(h)}/vc;
-vec2 q=(vec2((css.x-.5*vp.x)/(.9*vp.x)*z,${FL(h)}*dk*log(z/${FL(h)}))+${u}.xy)*${FL(freq)};
+vec2 q=(vec2((css.x-.5*vp.x)/(.9*vp.x)*z,${FL(h * freq)}*dk*ld)+${u}.xy)*${FL(freq)};
 float fp=px*z*${FL(freq)}/(.9*vp.x);`;
 };
 /** MID and LOW: their cells' footprint (kc: 1 keeps them, 0 is their mean). */
@@ -104,6 +110,7 @@ uniform float uHorizonY,uHorizonB,uCloudHz;
 uniform vec3 uZenith,uMid,uHorizon;
 uniform sampler2D uNoise,uCells;
 uniform vec4 uHi,uMi,uLo,uSc,uTh,uLight;
+uniform vec4 uSheet;
 uniform vec2 uWindv;
 uniform vec4 uStyle;
 out vec4 o;
@@ -120,7 +127,6 @@ float luma(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
 void over(inout vec4 acc,vec3 c,float a){acc.rgb+=c*a*(1.-acc.a);acc.a+=a*(1.-acc.a);}
 vec3 toGamma(vec3 c){return mix(c*12.92,1.055*pow(c,vec3(1./2.4))-.055,step(.0031308,c));}
 ${fbmFn(2)}
-${fbmFn(3)}
 vec3 l;float ph;
 // Henyey–Greenstein (g 0.65) on the angle between the view and the light: 1 in the light's direction.
 float phase(float c){float x=1.4225-1.3*c;return .0429/(x*sqrt(x));}
@@ -131,31 +137,28 @@ float k=clamp(max(dot(n,l.xy),0.)*uLight.w*mix(.7,.28,uNight)+ph*.6,0.,1.);
 return mix(shd,lit,k)*(.35+.65*exp(-dens*thick*2.2));
 }
 // Golden hour: undersides glow, tops go blue-grey.
-vec3 gold(vec3 lit,float under,float top){return mix(lit,mix(mix(uHorizon*1.521,TOP,.6*top),UNDER,.6*under),uGolden*uTwilight);}
-vec3 flash(vec3 c){if(uLightning<=0.)return c;float L=pow(max(luma(c),1e-5),1./3.);return c*pow((L+.12*uLightning)/L,3.);}
+vec3 gold(vec3 lit,float under,float top){float g=uGolden*uTwilight;if(g<=0.)return lit;return mix(lit,mix(mix(uHorizon*1.521,TOP,.6*top),UNDER,.6*under),g);}
 // LOW: its density and its normal; under and top: whether this is the underside or the top of its cloud.
 vec4 lowCloud(vec2 q,float fp,float evo,float th,out float under,out float top){
 vec2 w1=vn2(q*.5+vec2(1.7,9.2)+evo*vec2(1.,.6))-.5;
 vec2 w2=vn2((q+uStyle.y*w1)*.5+vec2(8.3,2.8)-evo*vec2(.7,1.))-.5;
 vec2 qw=q+uStyle.y*(w1+w2);
 float k=1.5-2.5*fp;
-// The first octave here, just up-screen and just to the right: the cloud's slope.
-float o0=mix(.5,vn(qw),clamp(k,0.,1.)),o1=mix(.5,vn(qw-vec2(0.,.12)),clamp(k,0.,1.)),o2=mix(.5,vn(qw+vec2(.12,0.)),clamp(k,0.,1.));
+// The first octave here and just up-screen: the cloud's slope toward the viewer (lit tops, shaded bases). Across,
+// its normal is its Worley cell's alone: a second slope sample cost a fetch a pixel for a side-shade the cells carry.
+float o0=mix(.5,vn(qw),clamp(k,0.,1.)),o1=mix(.5,vn(qw-vec2(0.,.12)),clamp(k,0.,1.));
 qw=R*qw;k-=5.*fp;
-float f=.5*o0+.21875;
+float f=.5*o0+.1875;
 if(k>0.)f+=.25*(mix(.5,vn(qw),min(k,1.))-.5);
 qw=R*qw;k-=10.*fp;
 if(k>0.)f+=.125*(mix(.5,vn(qw),min(k,1.))-.5);
-qw=R*qw;
-k-=20.*fp;
-if(k>0.)f+=.0625*(mix(.5,vn(qw),min(k,1.))-.5);
 float kc=${LOW_KC};
 vec2 c=kc>0.?cellv(RC*q*${FL(CELLS_PER_UNIT.low)})*kc:vec2(0.);
 float d=f*mix(1.,mix(.5,1.-length(c),kc),uStyle.x);
 // A stratus deck (uStyle.z) is thick everywhere: a thin patch is only brighter, not a rimmed hole, and its edge is soft.
 d=mix(d,${FL(STRATUS.floor)}+${FL(1 - STRATUS.floor)}*d,uStyle.z);
 under=max(smoothstep(.02,.12,o1-o0),c.y*2.5);top=max(smoothstep(.02,.12,o0-o1),-c.y*2.5);
-vec2 nrm=normalize(vec3(c*2.5+vec2(o0-o2,o1-o0)*${FL(SLOPE)},1.)).xy;
+vec2 nrm=normalize(vec3(c.x*2.5,c.y*2.5+(o1-o0)*${FL(SLOPE)},1.)).xy;
 // The ramp is centred on the threshold, so a coverage is the share of sky past the ramp's middle.
 float e=.5*mix(${FL(EDGE)},${FL(STRATUS.edge)},uStyle.z);
 return vec4(smoothstep(th-e,th+e,d),nrm,0.);
@@ -175,7 +178,7 @@ vec3 base=sky(p);
 vec4 acc=vec4(0.);
 float v=(uCloudHz-css.y)/uCloudHz;
 if(v>0.){
-float vc=max(v,${FL(V_MIN)}),px=1./uScale,dk=uCloudHz/(.9*vp.x);
+float vc=max(v,${FL(V_MIN)}),px=1./uScale,dk=uCloudHz/(.9*vp.x),ld=log(1./vc);
 // The light: the sun's or the moon's place on screen, 0.6 deep.
 vec2 lc=uLight.xy;
 l=normalize(vec3((lc-css)/vp.y,.6));
@@ -194,18 +197,18 @@ float under,top;
 vec4 c=lowCloud(q,fp,uLo.z,uTh.z,under,top);
 // A stratus deck is opaque to STRATUS.opaque: no blue sky through its thin patches.
 float op=mix(c.x,max(c.x,${FL(STRATUS.opaque)}),uStyle.z);
-if(op>0.)over(acc,flash(shade(c.x,c.yz,${FL(SHEET.low.thick)},gold(lit+CITY*.35*under*uNight,under,top),shd)),op*${FL(SHEET.low.alpha)}*haze);
+if(op>0.)over(acc,(shade(c.x,c.yz,${FL(SHEET.low.thick)},gold(lit+CITY*.35*under*uNight,under,top),shd)),op*${FL(SHEET.low.alpha)}*haze);
 }
 if(uSc.w>.001){
 ${plane("scud", "uSc")}
 float d=smoothstep(uTh.w-${FL(SOFT.scud / 2)},uTh.w+${FL(SOFT.scud / 2)},fbm2(q,fp));
-if(d>0.)over(acc,flash(shade(d,vec2(0.),${FL(SHEET.scud.thick)},gold(lit,0.,0.),shd)),d*${FL(SHEET.scud.alpha)}*haze);
+if(d>0.)over(acc,(shade(d,vec2(0.),${FL(SHEET.scud.thick)},gold(lit,0.,0.),shd)),d*${FL(SHEET.scud.alpha)}*haze);
 }
 if(uMi.w>.001){
 ${plane("mid", "uMi")}
 vec2 n;
 float d=midCloud(q,fp,uTh.y,n);
-if(d>0.)over(acc,flash(shade(d,n,${FL(SHEET.mid.thick)},gold(lit,max(n.y*2.5,0.),max(-n.y*2.5,0.)),shd)),d*${FL(SHEET.mid.alpha)}*haze);
+if(d>0.)over(acc,(shade(d,n,${FL(SHEET.mid.thick)},gold(lit,max(n.y*2.5,0.),max(-n.y*2.5,0.)),shd)),d*${FL(SHEET.mid.alpha)}*haze);
 }
 if(uHi.w>.001){
 ${plane("high", "uHi")}
@@ -214,7 +217,7 @@ vec2 w=uWindv.xy,ac=vec2(-w.y,w.x);
 vec2 s2=vec2(dot(w,q)/${FL(SHEET.high.stretch)},dot(ac,q));
 s2+=.35*(vn2(s2*.3+vec2(5.1,11.3)+uHi.z*vec2(1.,.7))-.5);
 float d=smoothstep(uTh.x-${FL(SOFT.high / 2)},uTh.x+${FL(SOFT.high / 2)},fbm${HIGH_OCTAVES}(s2,fp));
-if(d>0.)over(acc,flash(mix(shd,lit,clamp(.3+.7*ph,0.,1.))*(.35+.65*exp(-d*${FL(SHEET.high.thick)}*2.2))),d*${FL(SHEET.high.alpha)}*haze);
+if(d>0.)over(acc,(mix(shd,lit,clamp(.3+.7*ph,0.,1.))*(.35+.65*exp(-d*${FL(SHEET.high.thick)}*2.2))),d*${FL(SHEET.high.alpha)}*haze);
 }
 }
 if(uFog>.001){
@@ -231,12 +234,20 @@ vec2 e=(css-vec2(uSunX*vp.x,css.y<=uHorizonB?uHorizonY:1.45*vp.y))/vec2(.9*vp.x,
 float g=exp(-dot(e,e)*2.2);
 over(acc,uHorizon*1.331,uGlow*.75*g);
 }
-// Rain (uRainDark: 0.3 drizzle … 1 heavy rain): curtains of heavier rain drifting across the sky with the wind,
-// and the whole sky 10% darker under the heaviest, the gradient behind this layer included.
+// Rain (uRainDark: 0.3 drizzle … 1 heavy rain): curtains of heavier rain drifting across the sky with the wind.
 if(uRainDark>.001){
 vec2 cu=vec2(css.x/(.9*vp.x)*3.5-uTime*.06*uWindv.x,css.y/vp.y*.5);
-float ct=smoothstep(.4,.8,fbm2(cu,0.));
-over(acc,uHorizon*.5,uRainDark*.3*ct);
-o=vec4(toGamma((acc.rgb+(1.-acc.a)*base)*(1.-.1*uRainDark)),1.);
-}else o=acc.a>0.?vec4(toGamma(acc.rgb/acc.a)*acc.a,acc.a):vec4(0.);
+over(acc,uHorizon*.5,uRainDark*.3*smoothstep(.4,.8,fbm2(cu,0.)));
+}
+// The whole sky, the gradient behind this layer included: 10% darker under the heaviest rain; lightning lifts it
+// (OKLab L) by +5% for a bolt (uLightning) and +25% over a soft disc for a sheet flash in the cloud (uSheet).
+vec3 allc=(acc.rgb+(1.-acc.a)*base)*(1.-.1*uRainDark);
+// Only while something is striking: three powers on every pixel is not free.
+if(uLightning>0.||uSheet.w>0.){
+float L=pow(max(luma(allc),1e-5),1./3.);
+float lk=.05*uLightning;
+if(uSheet.w>0.)lk+=.25*uSheet.w*exp(-pow(length(css-uSheet.xy)/max(uSheet.z,1.),2.)*2.2);
+allc*=pow((L+lk)/L,3.);
+}
+o=vec4(toGamma(allc),1.);
 }`;

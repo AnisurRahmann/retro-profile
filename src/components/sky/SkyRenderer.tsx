@@ -8,6 +8,8 @@ import { smoothstep } from "@/lib/sky/gradient";
 import { skyModel, type SkyModel } from "@/lib/sky/model";
 import { EVO_PERIOD, EVOLUTION, SHEETS, cloudPlan, depthK, gust, planeWind, type SheetId } from "@/lib/sky/clouds";
 import { LAMPS_AT, SPLASH_RATE } from "@/lib/sky/rain";
+import { bolt, boltAlpha, createLightningScheduler, sheetAlpha, strikeEnd, type Kind, type Strike } from "@/lib/sky/lightning";
+import { LIGHTNING_CORE, LIGHTNING_HALO, LIGHTNING_MID } from "@/lib/sky/palette";
 import { effectiveWeather, SKY_DEBUG, skyStore, skyTime, WX_DEFAULTS } from "@/lib/sky/store";
 import { dayOfYear, dhakaParts } from "@/lib/sky/time";
 import { sunColor } from "@/lib/sky/gradient";
@@ -114,16 +116,6 @@ function approach(cur: Targets, to: Targets, k: number): void {
 
 const clone = (t: Targets): Targets => ({ ...t });
 
-/** Lightning: a strike every 18–45 s, double pulse 80 ms on, 60 ms off, 120 ms on. ≤ 2 flashes a second. */
-export function lightningEnvelope(sinceStrike: number): number {
-  const ms = sinceStrike * 1000;
-  if (ms < 0) return 0;
-  if (ms < 80) return 1;
-  if (ms < 140) return 0;
-  if (ms < 260) return 0.85;
-  return 0;
-}
-
 function readToken(name: string): [number, number, number] {
   return hexToRgb(
     getComputedStyle(document.documentElement).getPropertyValue(name).trim() || brand.text,
@@ -145,6 +137,10 @@ type Window2 = Window & {
     plane?: { state: string; flights: number };
     /** Test builds: hold the take-off at s seconds in (null lets go). */
     pinPlane?: (s: number | null) => void;
+    /** Dev and test builds (Weather v6): force a strike now, and the last 20 with the running count. */
+    strike?: (k: "cg" | "ic") => void;
+    lightningLog?: unknown[];
+    lightningCount?: { cg: number; ic: number };
     place?: string | null;
     land?: {
       mode: LandMode;
@@ -295,8 +291,6 @@ function start(
     fps = 0,
     fpsWindow = 0,
     fpsFrames = 0,
-    nextStrike = 0,
-    strikeAt = -1,
     nextMeteor = 0,
     astroTimer = 0,
     nightArc = 0,
@@ -307,7 +301,97 @@ function start(
   let dayPath: { x: number; y: number }[] = [];
   let nightPath: { x: number; y: number }[] = [];
 
-  const scheduleStrike = (t: number) => (nextStrike = t + 18 + rng() * 27);
+  /**
+   * Lightning (W4, src/lib/sky/lightning.ts): the scheduler, the strike under way, when the next of each kind
+   * falls, and one held back until a second has passed since the last began (a due time is computed before the
+   * strikes before it have). The bolt's paths are built once and stroked while it lasts.
+   */
+  const lightningLog: { t: number; kind: Kind; x: number }[] = [];
+  const lightningCount = { cg: 0, ic: 0 };
+  const scheduler = createLightningScheduler(rng);
+  let strike: Strike | null = null;
+  let nextL: Record<Kind, number> = { cg: Infinity, ic: Infinity };
+  let forced: Kind | null = null;
+  let stormOn = false;
+  let stageWas = true;
+  let boltPaths: Path2D[] = [];
+  let boltX = 0;
+  const boltPass = ([["halo", LIGHTNING_HALO, 10, 0.22], ["mid", LIGHTNING_MID, 4, 0.6], ["core", LIGHTNING_CORE, 1.6, 1]] as const).map(
+    ([, hex, width, alpha]) => {
+      const [r, g, b] = hexToRgb(hex).map((v) => Math.round(v * 255)) as [number, number, number];
+      return [`rgb(${r},${g},${b})`, width, alpha] as const;
+    },
+  );
+  const toPath = (pts: number[]) => {
+    const path = new Path2D();
+    path.moveTo(pts[0]!, pts[1]!);
+    for (let i = 2; i < pts.length; i += 2) path.lineTo(pts[i]!, pts[i + 1]!);
+    return path;
+  };
+  /**
+   * Where a bolt may fall: a column with nothing written over the sky beside it (a bolt wanders 12% of its
+   * height), or with room below what is written there (a phone's hero spans the width). Six tries; null if none,
+   * and the strike becomes a sheet flash. A forced one (the debug hook) gets sixty, so evidence can rely on it.
+   */
+  const placeBolt = (tries = 6) => {
+    const y1 = cloudHz();
+    const margin = 0.12 * y1;
+    const boxes = [...document.querySelectorAll("[data-on-sky], .card, .glass")]
+      .map((el) => el.getBoundingClientRect())
+      .filter((r) => r.bottom > 0 && r.top < y1 && r.width > 0 && r.height > 0);
+    for (let i = 0; i < tries; i++) {
+      const x = view.vw * (0.06 + rng() * 0.88);
+      let top = 0.12 * y1;
+      let clear = true;
+      for (const r of boxes) {
+        if (x < r.left - margin || x > r.right + margin) continue;
+        if (r.bottom > y1 - 70) {
+          clear = false;
+          break;
+        }
+        top = Math.max(top, r.bottom + 6);
+      }
+      if (clear) return { x, top };
+    }
+    return null;
+  };
+  /**
+   * A strike begins now: a CG where nothing is written over the sky, else a sheet flash inside the cloud. One that
+   * falls due inside a second of the last simply waits (it is tried again next frame): its next is dated from when
+   * it does begin.
+   */
+  const fire = (kind: Kind, nowMs: number, force = false) => {
+    if (!force && nowMs < scheduler.settle(nowMs)) return;
+    let k: Kind = kind;
+    let place: { x: number; top: number } | null = null;
+    if (kind === "cg") {
+      place = placeBolt(force ? 60 : 6);
+      if (!place) k = "ic";
+    }
+    strike = scheduler.begin(k, nowMs);
+    if (place) {
+      boltX = place.x;
+      boltPaths = bolt(rng, place.x, place.top, cloudHz()).map(toPath);
+    }
+    lightningCount[k]++;
+    nextL[kind] = scheduler.due(kind, nowMs, model.thunder, true);
+    lightningLog.push({ t: Math.round(nowMs / 100) / 10, kind: k, x: place ? Math.round(place.x) : -1 });
+    if (lightningLog.length > 20) lightningLog.shift();
+  };
+  /** The bolt, in three passes: a blue halo, a body, a white core. The branches are thinner and dimmer. */
+  const paintBolt = (ctx: CanvasRenderingContext2D, a: number) => {
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    boltPaths.forEach((path, i) => {
+      for (const [color, width, alpha] of boltPass) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width * (i ? 0.55 : 1);
+        ctx.globalAlpha = a * alpha * (i ? 0.7 : 1);
+        ctx.stroke(path);
+      }
+    });
+    ctx.globalAlpha = 1;
+  };
   const scheduleMeteor = (t: number) => (nextMeteor = t + 40 + rng() * 50);
 
   const recompute = () => {
@@ -322,6 +406,12 @@ function start(
         state: model.astro.state,
         elevation: model.astro.elevation,
         condition: model.condition,
+        lightningLog,
+        lightningCount,
+        // Dev and test builds: a strike on demand (the debug hook; nothing under reduced motion).
+        strike: (k: "cg" | "ic") => {
+          if (!reduce) forced = k;
+        },
       });
   };
 
@@ -499,18 +589,54 @@ function start(
   const cpu: number[] = [];
   const draw = (t: number, dt: number, still: boolean) => {
     const c0 = SKY_DEBUG ? performance.now() : 0;
+    // Under thunder: a bolt about every 9 s and a sheet flash every 5 s; under heavy rain, sheet flashes every
+    // 25 s. The first bolt comes 1.2–2.5 s after the first frame, and again within 1.5 s of the stage coming
+    // back, at most once in 20 s. Never in a still frame (reduced motion): nothing is scheduled or drawn.
+    const nowMs = t * 1000;
     let lightning = 0;
-    if (!still && model.thunder) {
-      if (forceBolt) lightning = 1;
-      else {
-        if (!nextStrike) scheduleStrike(t);
-        if (t >= nextStrike) {
-          strikeAt = t;
-          scheduleStrike(t);
-        }
-        lightning = strikeAt >= 0 ? lightningEnvelope(t - strikeAt) : 0;
+    const flashAt = [0, 0, 0, 0];
+    const onStage = view.y < view.vh * 0.5;
+    if (!still && !lost && (model.thunder || n("uRainDark") >= 1)) {
+      if (!stormOn) {
+        stormOn = true;
+        // The first bolt 1.2–2.5 s in; the first sheet flash never before its second has passed (never at the
+        // first frame), so nothing delays it.
+        const first = model.thunder ? (scheduler.intro(nowMs, true) ?? Infinity) : nowMs;
+        nextL = { cg: first, ic: scheduler.due("ic", first + 1400, model.thunder, true) };
       }
-    } else if (still && model.thunder && forceBolt) lightning = 1;
+      if (model.thunder && onStage && !stageWas) nextL.cg = Math.min(nextL.cg, scheduler.intro(nowMs, false) ?? Infinity);
+      stageWas = onStage;
+      if (forceBolt) forced = "cg";
+      if (forced) {
+        // The debug hook: now, whatever the guard (dev and test builds only).
+        const k = forced;
+        forced = null;
+        strike = null;
+        fire(k, nowMs, true);
+      }
+      if (nowMs >= nextL.ic) fire("ic", nowMs);
+      if (nowMs >= nextL.cg) fire("cg", nowMs);
+      if (strike) {
+        const ms = nowMs - strike.t0 * 1000;
+        const end = strikeEnd(strike);
+        if (strike.kind === "cg") {
+          lightning = boltAlpha(strike, ms);
+          if (ms > end) boltPaths = [];
+        } else if (ms < end) {
+          flashAt[0] = strike.x * view.vw;
+          flashAt[1] = strike.y * view.vh;
+          flashAt[2] = strike.r * view.vw;
+          flashAt[3] = sheetAlpha(strike, ms);
+        }
+        if (ms > end) strike = null;
+      }
+    } else {
+      strike = null;
+      stormOn = false;
+      boltPaths = [];
+      stageWas = onStage;
+    }
+    const boltUp = strike?.kind === "cg" && boltPaths.length > 0;
     flashNow = lightning;
     if (dt > 0 && dt < 0.5) emaDt += (dt - emaDt) * 0.05;
     const mid = v2("uMid");
@@ -544,6 +670,7 @@ function start(
       uHorizonB: hz.b,
       uTime: still ? 0 : t,
       uLightning: lightning,
+      uSheet: flashAt,
       uCloudHz: hzCloud,
       uTh: thresholds(cov),
       uHi: [sheet.high.x, sheet.high.z, sheet.high.evo, cov[0]!],
@@ -571,6 +698,7 @@ function start(
         {
           back: (ctx) => drawArc(ctx, dayPath, nightPath, text, nightArc),
           front: (ctx) => {
+            if (boltUp) paintBolt(ctx, lightning);
             sunLayer.draw(ctx, ss, still ? 0 : t, day, (a) => {
               const px = ss.x + Math.cos(a) * 180;
               const py = ss.y + Math.sin(a) * 180;
@@ -690,6 +818,7 @@ function start(
             // No splashes on a phone that is already under 30 fps.
             splashes: view.vw < COLUMN_BREAK && emaDt > 1 / 30 ? 0 : (SPLASH_RATE[model.condition] ?? 0),
           },
+          bolt: { x: boltX, k: lightning },
         };
         b.frame = f;
         const walk = walkOf(b);
@@ -731,6 +860,7 @@ function start(
           },
           // The heavy-rain veil: in over the last fifth of the rain's darkening, so only heavy rain and thunder have it.
           smooth01(0.8, 1, n("uRainDark")),
+          lightning,
         );
         if (!("ready" in b.canvas.dataset)) b.canvas.dataset.ready = "";
       }
@@ -787,7 +917,7 @@ function start(
     const busy =
       raining ||
       (pts?.meteorActive(t) ?? false) ||
-      (strikeAt >= 0 && t - strikeAt < 0.3) ||
+      strike !== null ||
       forceBolt ||
       s.scrubbing ||
       scrolling ||

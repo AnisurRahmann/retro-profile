@@ -40,6 +40,11 @@ export const LAND_L3 = "#171D2A";
 export const LAND_L4 = "#0C1018";
 /** Moonlight: the 1px rim along the top of the hills and the bridge while the moon is up (landscape.ts). */
 export const MOON_RIM = "#C9D4E8";
+/** Lightning: a bolt's halo, body and core, and the rim it puts on the landscape (Weather v6). */
+export const LIGHTNING_HALO = "#9FB4FF";
+export const LIGHTNING_MID = "#C9D6FF";
+export const LIGHTNING_CORE = "#F5F8FF";
+export const LIGHTNING_RIM = "#DDE6FF";
 
 /**
  * Clouds (Weather v6, sky-shader.ts): where a cloud faces the light and where it is in shadow, by the state of the sky.

@@ -111,15 +111,12 @@ export function createCloudField() {
     const w2y = tap(noiseTex, bx, by, 1) - 0.5;
     let x = qx + warp * (w1x + w2x);
     let y = qy + warp * (w1y + w2y);
-    // Four octaves about their mean, as the shader has them (it also samples the first one just up-screen and to
-    // the right, for the cloud's normal and its golden-hour undersides: colour only).
-    let f = 0.5 * mix(0.5, vn(x, y), lod(fp)) + 0.21875;
+    // Three octaves about their mean, as the shader has them.
+    let f = 0.5 * mix(0.5, vn(x, y), lod(fp)) + 0.1875;
     [x, y] = rot(x, y);
     f += 0.25 * (mix(0.5, vn(x, y), lod(fp, 1)) - 0.5);
     [x, y] = rot(x, y);
     f += 0.125 * (mix(0.5, vn(x, y), lod(fp, 2)) - 0.5);
-    [x, y] = rot(x, y);
-    f += 0.0625 * (mix(0.5, vn(x, y), lod(fp, 3)) - 0.5);
     const kc = clamp01(1.5 - 2.5 * CELLS_PER_UNIT.low * fp);
     const [cx, cy] = cellv(...rotC(qx * CELLS_PER_UNIT.low, qy * CELLS_PER_UNIT.low));
     const d = f * mix(1, mix(0.5, 1 - kc * Math.hypot(cx, cy), kc), billow);
@@ -146,7 +143,7 @@ export function createCloudField() {
         // Scattered, not on a lattice.
         const qx = ((i * 0.6180339887) % 1) * 64;
         const qy = ((i * 0.7548776662) % 1) * 64;
-        vals[i] = s === "low" ? low(qx, qy, 0, warp, billow, 0, stratus) : s === "mid" ? mid(qx, qy, 0) : fbm(qx, qy, 0, s === "high" ? 3 : 2);
+        vals[i] = s === "low" ? low(qx, qy, 0, warp, billow, 0, stratus) : s === "mid" ? mid(qx, qy, 0) : fbm(qx, qy, 0, 2);
       }
       vals.sort();
       sorted = vals;
@@ -177,7 +174,7 @@ export function createCloudField() {
       // Its warp (the shader's too): the cirrus evolves.
       const ox = sx * 0.3 + 5.1 + st.evo;
       const oy = sy * 0.3 + 11.3 + st.evo * 0.7;
-      return sm(th - e, th + e, fbm(sx + 0.35 * (tap(noiseTex, ox, oy, 0) - 0.5), sy + 0.35 * (tap(noiseTex, ox, oy, 1) - 0.5), fp, 3));
+      return sm(th - e, th + e, fbm(sx + 0.35 * (tap(noiseTex, ox, oy, 0) - 0.5), sy + 0.35 * (tap(noiseTex, ox, oy, 1) - 0.5), fp, 2));
     }
     return sm(th - e, th + e, fbm(qx, qy, fp, 2));
   };

@@ -31,7 +31,7 @@ import { PARALLAX, type LayerId } from "@/lib/sky/landscape/anchors";
 import { BANK_Y, RIVER } from "@/lib/sky/landscape/shapes";
 /** The 1px glint's line, band units: just above the near bank's lowest point (ridgeL4 ≥ 87.2). */
 const GLINT_Y = 87.4;
-import { CITY_GLOW, MOON_RIM } from "@/lib/sky/palette";
+import { CITY_GLOW, LIGHTNING_RIM, MOON_RIM } from "@/lib/sky/palette";
 import { ridgeL1, ridgeL2, ridgeL4, type Placed, type World } from "@/lib/sky/landscape/world";
 import type { Shape } from "@/lib/sky/landscape/shapes";
 
@@ -231,6 +231,33 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
     ctx.globalAlpha = 1;
   };
 
+  /**
+   * Lightning: a 1px rim of LIGHTNING_RIM along a layer's top edge. The strip minus itself a pixel lower is that
+   * edge; tinted and drawn back over the layer at `k` × 0.6. Only while a bolt is up.
+   */
+  const rimCanvas = document.createElement("canvas");
+  const boltRim = (st: { c: HTMLCanvasElement; x0: number }, o: number, k: number) => {
+    const oc = rimCanvas;
+    if (oc.width !== st.c.width || oc.height !== st.c.height) {
+      oc.width = st.c.width;
+      oc.height = st.c.height;
+    }
+    const og = oc.getContext("2d")!;
+    og.setTransform(1, 0, 0, 1, 0, 0);
+    og.globalCompositeOperation = "source-over";
+    og.clearRect(0, 0, oc.width, oc.height);
+    og.drawImage(st.c, 0, 0);
+    og.globalCompositeOperation = "destination-out";
+    og.drawImage(st.c, 0, dpr);
+    og.globalCompositeOperation = "source-in";
+    og.fillStyle = css(hexToRgb(LIGHTNING_RIM));
+    og.fillRect(0, 0, oc.width, oc.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 0.6 * k;
+    ctx.drawImage(oc, Math.round((st.x0 - o) * dpr), Math.round(lift * dpr));
+    ctx.globalAlpha = 1;
+  };
+
   const renderStrip = (layer: LayerId, offsetPx: number) => {
     if (!world) return;
     const st = strips[layer];
@@ -321,12 +348,14 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
     /**
      * Draw the band. `between(g, layer, offset)` runs after each layer (night lights, fireflies, the rickshaw,
      * reflections) with the context in CSS px, origin at the band's top-left; a world-unit point x on that layer
-     * is at screen x · s − offset. `veil` (0..1) is the heavy rain's veil over the far hills and the tea hills.
+     * is at screen x · s − offset. `veil` (0..1) is the heavy rain's veil over the far hills and the tea hills;
+     * `rim` (0..1) the lightning on every silhouette's top edge.
      */
     draw(
       walk: number,
       between: (g: CanvasRenderingContext2D, layer: LayerId | "river", offset: number) => void,
       veil = 0,
+      rim = 0,
     ) {
       if (!world) return;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -355,6 +384,10 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
         ctx.drawImage(st.c, Math.round((st.x0 - o) * dpr), Math.round(lift * dpr));
         ctx.setTransform(dpr, 0, 0, dpr, 0, lift * dpr);
         if (layer === "L1" || layer === "L2") veilOver(layer, veil);
+        if (rim > 0.01) {
+          boltRim(st, o, rim);
+          ctx.setTransform(dpr, 0, 0, dpr, 0, lift * dpr);
+        }
         if (layer === "L2") {
           // The Surma: a band across the whole width, in front of the tea hills and behind the town's bank.
           ctx.fillStyle = river;

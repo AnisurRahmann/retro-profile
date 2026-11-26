@@ -19,6 +19,7 @@ import type { LayerId } from "@/lib/sky/landscape/anchors";
 import { TV_HZ, windowLit, windowSchedule } from "@/lib/sky/landscape/lights";
 import { RIVER } from "@/lib/sky/landscape/shapes";
 import { SPLASH } from "@/lib/sky/rain";
+import { LIGHTNING_RIM } from "@/lib/sky/palette";
 import {
   gateAt,
   PLANE_BODY,
@@ -71,11 +72,14 @@ export type LifeFrame = {
   planePx: number;
   /** Rain: its slant (radians), its streaks per 100,000 px², and the splashes a second per 1,000 px of water (0: none). */
   rain: { slant: number; density: number; splashes: number };
+  /** Lightning: a bolt's screen x and its brightness (0: none): its light on the water. */
+  bolt: { x: number; k: number };
 };
 
 export function createLife(textRgb: RGB) {
   const warm = hexToRgb(WINDOW_LIT);
   const warmCss = rgba(warm, 1);
+  const boltCss = rgba(hexToRgb(LIGHTNING_RIM), 1);
   const textCss = rgba(textRgb, 1);
   const tvCss = rgba(hexToRgb(TV_LIT), 1);
   const body = new Path2D(PLANE_BODY);
@@ -346,6 +350,21 @@ export function createLife(textRgb: RGB) {
               );
               g.stroke();
             }
+          }
+          g.globalAlpha = 1;
+        }
+        // A bolt's light on the water: a broken column under it, shimmering.
+        if (f.bolt.k > 0.01) {
+          const tick = f.moving ? Math.floor(f.t * 24) : 0;
+          g.fillStyle = boltCss;
+          const y0 = (RIVER[0] + 2.6) * s;
+          const y1 = RIVER[1] * s - 1;
+          let row = 0;
+          for (let y = y0; y < y1; y += 2, row++) {
+            const depth = (y - y0) / Math.max(1, y1 - y0);
+            const half = 2.5 + 3 * hash(row, tick) + 2 * depth;
+            g.globalAlpha = 0.5 * f.bolt.k * (1 - 0.5 * depth) * (0.55 + 0.45 * hash(row + 7, tick));
+            g.fillRect(Math.round(f.bolt.x - half + (hash(row + 31, tick) - 0.5) * 4), Math.round(y), Math.ceil(2 * half), 1);
           }
           g.globalAlpha = 1;
         }

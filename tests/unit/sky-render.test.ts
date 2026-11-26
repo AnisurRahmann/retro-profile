@@ -1,29 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { lightningEnvelope } from "@/components/sky/SkyRenderer";
 import * as bodies from "@/components/sky/bodies";
 import { createParticles, mulberry32, skyRotation } from "@/components/sky/particles";
 import { bearingToX, fogAmount, skyModel, windVector } from "@/lib/sky/model";
 import { dhakaDate } from "@/lib/sky/time";
 import { UNKNOWN_WEATHER } from "@/lib/sky/weather";
 
-describe("lightning", () => {
-  it("is a double pulse: 80 ms on, 60 ms off, 120 ms on", () => {
-    expect(lightningEnvelope(0.04)).toBe(1);
-    expect(lightningEnvelope(0.1)).toBe(0);
-    expect(lightningEnvelope(0.2)).toBeGreaterThan(0);
-    expect(lightningEnvelope(0.3)).toBe(0);
-  });
-  it("never flashes more than 3 times in any second (WCAG 2.3.1), even with the shortest 18 s gap", () => {
-    let flashes = 0;
-    let on = false;
-    for (let ms = 0; ms < 1000; ms++) {
-      const now = lightningEnvelope(ms / 1000) > 0;
-      if (now && !on) flashes++;
-      on = now;
-    }
-    expect(flashes).toBeLessThanOrEqual(3);
-  });
-});
+// Lightning is src/lib/sky/lightning.ts now (Weather v6): tests/unit/sky-lightning.test.ts.
 
 describe("wind", () => {
   it("drifts 0.6 px/s per km/h, away from where it blows from; east is screen-left", () => {

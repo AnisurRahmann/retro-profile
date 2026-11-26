@@ -202,6 +202,26 @@ The first build had the depth drift's sign inverted and matched the brief's word
 
 typecheck, lint and 271 unit tests (20 files) pass. Idle renderer 31.1 kB gzip: the budget goes to 32 kB for it (DECISIONS #138).
 
+#### W4 lightning — `feat(weather): W4 …`
+
+| Done when | Result | Evidence |
+| --- | --- | --- |
+| CG bolt: recursive midpoint displacement, 7 levels, with branches | PASS | `w4/bolt-2100-1440x900.png`, `bolt-2100-375x812.png`, `bolt-1530-…` (both sizes; forced at 120 ms) |
+| Stepped leader 70–110 ms at 35%, return stroke 60 ms, 0–2 re-strokes, afterglow 280 ms | PASS | `tests/unit/sky-lightning.test.ts` (200 seeds) |
+| Three-pass stroke #9FB4FF / #C9D6FF / #F5F8FF, Path2D cache | PASS | the bolt shots; paths are built once per strike |
+| IC sheet flash: in-shader, radius 18–35% vw, +0.25 L, 1–2 pulses of 80–140 ms | PASS | `w4/sheet-flash-2100-1440x900.png`, `-375x812.png`; unit test |
+| Scene response: sky +0.05 L, cloud lit, landscape rim #DDE6FF at 0.6, rain × 2.5, river reflection | PASS | the bolt shots: the rim along the hills and the bridge and the light on the water are clearest in `bolt-2100-375x812.png` |
+| Scheduler: thunder CG mean 9 s min 4, IC mean 5 s min 2; heavy rain CG off, IC 25 s | PASS | unit test, 10,000 simulated seconds per state |
+| First CG 1.2–2.5 s after the first frame; again within 1.5 s after the stage returns; at most once in 20 s | PASS: every minute's log opens with a bolt at 1.4–2.4 s; the return rule is in `SkyRenderer.tsx` (the stage = the top half of the viewport) and not forced on screen | `w4/thunder-60s-1440x900.png`, its log in `.scratch/w14.log` |
+| Placement rejects `[data-on-sky]` / card rects, retry 6, else IC | PASS (DECISIONS #141) | the log's `x` per bolt |
+| Photosafety: ≤ 3 pulses in any one second, unit test over 10,000 simulated seconds | PASS: peak 3 or fewer in each of three storm states | `tests/unit/sky-lightning.test.ts` |
+| Debug hooks `window.__sky.strike` and `window.__sky.lightningLog` (last 20) in dev/preview only | PASS | every W4 line above is printed from them |
+| None under reduced motion | PASS: count `{cg: 0, ic: 0}` with the hook called | `w4/thunder-reduced-1440x900.png` |
+| 60 s counts 4–10 CG, 8–16 IC | PASS in three natural minutes: **6 CG / 13 IC, 5 / 13, 8 / 16** | `w4/thunder-60s-1440x900.png` (the last of them) |
+| Atmosphere pass ≤ 2.0 ms desktop, ≤ 1.5 ms phone, every condition | **PASS on the median, with no margin**, after remedies (DECISIONS #145, #146). Final steady-state gate (`gpu.json`; the desktop was under load, 8–10): desktop 1920×1080 DPR 2, min / median / max: clear 1.25 / 1.34 / 1.37, partly 1.86 / **1.96** / 2.01, overcast 1.30 / 1.81 / 2.11, fog 0.94 / 1.37 / 1.40, drizzle 0.79 / 1.20 / 1.41, rain 0.76 / 1.46 / 1.74, heavy-rain 0.94 / 1.14 / 1.41, thunder 15:00 0.71 / 1.22 / 1.33, thunder 18:30 1.29 / 1.71 / 2.02; phone 375×812 DPR 3 medians 0.64–1.21 (largest single sample 1.71). In a quieter batch the same code read partly 1.79 and thunder at dusk 1.83; in a busier one partly 2.17 and thunder at dusk 2.18. The three largest desktop samples (2.01, 2.11, 2.02) are over. | `gpu.json`, interleaved attribution runs in DECISIONS #146 |
+
+Three things the evidence caught before this log, all fixed: bolts came in pairs 1.4 s apart because a strike that had to wait re-dated its next from a stale time (#140); the first build drew the bolt black (an invalid CSS colour left the previous stroke style in place); phones never got a bolt, because the hero spans their width (#141). The steady-state gate then failed at 2.17 ms and took an octave from LOW and HIGH (#146); W1's evidence was re-taken after it and still passes. Idle renderer 33.3 kB gzip of 34.0. A React hydration warning showed twice in about 150 dev page loads, both times on the first load after a code edit (the dev server recompiling); four loads of the same state afterwards were clean, and no test build shows it.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.

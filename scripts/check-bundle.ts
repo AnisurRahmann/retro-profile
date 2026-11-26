@@ -19,7 +19,7 @@ import vm from "node:vm";
 import zlib from "node:zlib";
 
 const NEXT = process.env.NEXT_DIST_DIR ?? ".next";
-const BUDGET = { upfront: 13_000, idle: 32_000 };
+const BUDGET = { upfront: 13_000, idle: 34_000 };
 /** suncalc itself (its UMD factory defines the API), not the modules that call it. */
 const SUNCALC = /getMoonIllumination\s*=\s*function/;
 
