@@ -68,7 +68,7 @@ export function rainSlant(kmh: number, fromDeg: number): number {
   return Math.sin((fromDeg * Math.PI) / 180) < -1e-6 ? -theta : theta;
 }
 
-/** Gusts swing the slant by up to ±4° (`gust` from clouds.ts: 1 ± 0.2), away from the vertical as the wind swells. */
+/** Gusts swing the slant by up to ±4° (`gust` from flat-clouds.ts: 1 ± 0.2), away from the vertical as the wind swells. */
 export const GUST_SLANT = (4 * Math.PI) / 180;
 export const gustSlant = (slant: number, gust: number) =>
   slant === 0 ? 0 : slant + Math.sign(slant) * GUST_SLANT * Math.max(-1, Math.min(1, (gust - 1) / 0.2));

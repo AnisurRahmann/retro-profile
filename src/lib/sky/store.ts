@@ -71,7 +71,7 @@ export const skyStore = {
   },
 };
 
-/** Typical cloud cover and WMO code per condition, for the ?wx= override (and the cloud sheets' coverage: clouds.ts). */
+/** Typical cloud cover and WMO code per condition, for the ?wx= override (and the flat clouds' coverage: flat-clouds.ts). */
 export const WX_DEFAULTS: Record<Condition, { cloudCover: number; code: number }> = {
   clear: { cloudCover: 0.04, code: 0 },
   partly: { cloudCover: 0.45, code: 2 },
