@@ -30,7 +30,7 @@ Which file does what (as found by grep, 2026-11-26). Paths are relative to the r
   - `src/lib/sky/backing.ts`: the model (`decide`, `HALO_CURVE`, the chip's alpha). `src/components/sky/backing-runner.ts`: writes `data-backing`, `--halo-a`, `--chip-a` on each `[data-on-sky]` element.
 - Sky maths (`src/lib/sky/`)
   - `arc.ts`: the sun/moon arc, `stageHeightFor`, `SCENE_HORIZON`. `view.ts`: live page geometry. `horizon.ts`: where the horizon is on screen.
-  - `store.ts`: the sky store, the `?sky` / `?wx` overrides, `SKY_DEBUG`. `first-paint.ts`: the inline first-paint script.
+  - `store.ts`: the sky store, the `?sky` / `?wx` overrides and where they are honoured (`SKY_DEBUG`, `overridesAllowed`, the production preview badge). `first-paint.ts`: the inline first-paint script.
   - `model.ts`, `gradient.ts`, `palette.ts`, `astro.ts`, `time.ts`, `scrub.ts`, `weather.ts`, `color.ts`: the sky model, colours, the keyframe palette, astronomy, Dhaka time, time travel, the weather shape, colour maths.
 - Landscape (`src/lib/sky/landscape/`)
   - `anchors.ts`: parallax, landmark anchors, `landMode`, `sceneBand`, the scene walks. `world.ts`: `buildWorld` (the fixed band), `buildStageScene`, `buildClosingScene`, `buildFillers` (the generic fillers alone, for the first-paint fallback).
@@ -38,7 +38,7 @@ Which file does what (as found by grep, 2026-11-26). Paths are relative to the r
   - `colors.ts`: layer colours, `teaRowColor`, `sunLight`. `lights.ts`: window schedules, the city glow alpha.
 - Tests and tools
   - `tests/unit/sky-*.test.ts`: arc, plane, landscape, horizon, contrast, render, gradient (incl. the first-paint script).
-  - `tests/e2e/sky.spec.ts`, `sky-backing.spec.ts` (the pixel gate), `sky-nowebgl.spec.ts`, `sky-firstpaint.spec.ts` (the first paint without JavaScript, and the hand-over to the canvas), `pixels.ts`. `tests/unit/sky-fallback.test.tsx`: the fallback's markup.
+  - `tests/e2e/sky.spec.ts`, `sky-backing.spec.ts` (the pixel gate), `sky-nowebgl.spec.ts`, `sky-firstpaint.spec.ts` (the first paint without JavaScript, and the hand-over to the canvas), `pixels.ts`. `tests/unit/sky-fallback.test.tsx`: the fallback's markup. `tests/unit/sky-overrides.test.ts`: the overrides in each kind of build, the preview badge.
   - `scripts/check-bundle.ts` (the budgets), `scripts/shots-sky.ts`, `scripts/probe/` (review shots and probes).
 
 ## v5.1 resume (2026-11-26)
@@ -139,6 +139,20 @@ At 03:30 clear, 375×812 and 1440×900:
 - Two defects of my own first version, found by this hand-over test and fixed before the commit: (1) the fallback's filled shapes inherited the layer's stroke colour at SVG's default width of 1 unit, so every hill edge, tree crown and the tower's spire was a unit fatter than the canvas's (skyline offset median 1 px, 15–20 on thin tips); (2) the band fallback stood between the stage and the first section in the markup, which switches off the phones' `main > .sky-stage + .section`, so on a phone "Shipped" sat 32px high until the fallback was removed, then jumped down. The band fallback now comes before the stage, and the test checks that the section does not move.
 - How: `src/components/sky/SkyFallback.tsx` (a server component) builds the landscape as inline SVG from the same functions the canvas uses (`buildStageScene`, `buildFillers`, the ridge functions and the shapes' path data), so every silhouette is where the canvas will draw it. Its colours are CSS variables that mix each layer toward the horizon as `landscape/colors.ts` does and follow `html[data-sky]`, which the first-paint script sets before paint. Stars: one element with about 60 box-shadow dots from a fixed seed (mulberry32), shown when the first-paint script finds the sun below −6°, and on a page without JavaScript. DECISIONS #117.
 - Not in the fallback, by choice (DECISIONS #117): the desktop band's riverside trees and houses (the canvas skips them around the landmarks, which stand where the viewport puts them), the canvas's own detail (tea rows, night lights, the sun, moon and arc), the slow life, and tablets from 640 to 1099px (their stage scene depends on the viewport's width). All of it arrives with the canvas, in place.
+
+#### T9 · reviewing day and dusk in production
+
+- PASS: in a production build without the flag, `?sky` is ignored. `tests/unit/sky-overrides.test.ts` loads the sky store as that build bundles it (`NODE_ENV=production`, no `NEXT_PUBLIC_SKY_DEBUG`): `parseOverrides("?sky=2026-11-26T16:45&wx=rain")` is `{ timeOverride: null, wxOverride: null }`, and the first-paint script paints midday for `?sky=2026-12-15T02:00` and marks nothing.
+- PASS: with `&preview=1` it is applied and the badge is visible. The same test: the override is parsed (16:45 Dhaka, rain); the first-paint script paints 02:00 as night and marks the page "preview 02:00", the same paint as a build that needs no key; `previewBadge` gives "preview 16:45"; and the rule in `globals.css` draws that mark (`html[data-sky-preview]::after`) with `content: attr(data-sky-preview)`, fixed, at the bottom left, in the mono font. Only the exact value counts (`preview=0`, `preview=true` are ignored).
+- The same on a real build, `pnpm build` with no flag, served with `WEATHER_MOCK=1` (`.shots/v5.1/T9/production-build-output.txt`):
+  - plain `/`: no badge, the live sky (07:09).
+  - `/?sky=2026-11-26T16:45&wx=clear`: ignored. No badge, sky "day", zenith `rgb(35, 44, 60)` as on the plain URL, label "07:09".
+  - the same with `&preview=1`: applied. Already at DOMContentLoaded the first-paint script has painted it (sky "golden") and set "preview 16:45"; settled, the badge renders as `"preview 16:45"`, fixed 12px from the left and 12px from the bottom, 12px mono, and the label reads "16:45 · 21°C · clear". Its gradient is the test build's for 16:45 (`rgb(16, 36, 73)` / `rgb(36, 64, 115)` / `rgb(199, 113, 23)`).
+  - `/?sky=…&preview=0`: ignored. `/?wx=thunder&preview=1`: applied, badge "preview 07:09" (the time the sky is drawn for), label "thunderstorm".
+  - No page errors in any of them.
+- Test output: `tests/unit/sky-overrides.test.ts` — 13 passed (13) (`.shots/v5.1/T9/unit-test-output.txt`); typecheck, lint and vitest green (269 passed).
+- Shots: `.shots/v5.1/T9/t9-prod-{375x812,1440x900}-preview-1645.png` (the badge; sheets `sheet-t9-badge.png`, `sheet-t9-hero.png`), `t9-prod-{375x812,1440x900}-sky-ignored.png`, `t9-prod-1440x900-plain.png`, `t9-prod-1440x900-preview-wx-thunder.png`.
+- How: `overridesAllowed` in `src/lib/sky/store.ts` (always where `SKY_DEBUG`; otherwise in a production build only with `preview=1`). The badge is one attribute on `<html>`, set by the first-paint script before hydration and kept by `SkyController` after, so the badge and the override always switch together. The first-paint script is 1404 B in a plain production build (limit 1500). Default production behaviour is unchanged: a URL without `preview=1` gets the same markup, paint and label as before. DECISIONS #118.
 
 ## Done
 

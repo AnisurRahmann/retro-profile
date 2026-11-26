@@ -926,6 +926,27 @@ a.card:hover {
     display: none;
   }
 }
+
+/* ── Preview badge (v5.1 T9) ────────────────────────────────── */
+/* A production build with a sky override (?sky=, ?wx= with NEXT_PUBLIC_SKY_DEBUG=1, or with &preview=1): "preview 16:45",
+   fixed at the bottom left, so nobody takes it for the live sky. The first-paint script sets the attribute before
+   hydration, SkyController.tsx keeps it (src/lib/sky/store.ts previewBadge). */
+html[data-sky-preview]::after {
+  content: attr(data-sky-preview);
+  position: fixed;
+  left: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 30;
+  padding: 3px 8px;
+  border: 1px solid var(--signal);
+  border-radius: 4px;
+  background: var(--ink);
+  color: var(--signal);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  pointer-events: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .sky-place-name {
     animation: none;

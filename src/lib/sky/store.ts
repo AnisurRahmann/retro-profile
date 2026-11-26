@@ -2,12 +2,31 @@
  * Client-side sky state shared by the controller, the label, the clock and the renderer.
  * A tiny external store (useSyncExternalStore-compatible), no React context.
  */
-import { atDhakaMinutes, parseDhakaLocal } from "./time";
+import { atDhakaMinutes, formatHM, parseDhakaLocal } from "./time";
 import { CONDITIONS, UNKNOWN_WEATHER, type Condition, type SylhetWeather } from "./weather";
 
-/** Debug overrides (?sky=, ?wx=, &wind=, &from=, &cloud=) work in dev and test builds, or with NEXT_PUBLIC_SKY_DEBUG=1. */
-export const SKY_DEBUG =
-  process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_SKY_DEBUG === "1" || process.env.NEXT_PUBLIC_E2E === "1";
+/** This is a production build (`next build`, `next start`). */
+export const SKY_PRODUCTION = process.env.NODE_ENV === "production";
+/** The test build (`NEXT_PUBLIC_E2E=1`): the overrides always work and nothing marks them. */
+const E2E = process.env.NEXT_PUBLIC_E2E === "1";
+
+/**
+ * Debug overrides (?sky=, ?wx=, &wind=, &from=, &cloud=): always honoured in development, in the test build and in a
+ * production build made with NEXT_PUBLIC_SKY_DEBUG=1. Any other production build honours them only on a URL that also
+ * has preview=1 (`overridesAllowed`), so day and dusk can be reviewed in production (v5.1 T9).
+ */
+export const SKY_DEBUG = !SKY_PRODUCTION || process.env.NEXT_PUBLIC_SKY_DEBUG === "1" || E2E;
+
+/**
+ * A production build marks a honoured override with the fixed "preview 16:45" badge (`html[data-sky-preview]`,
+ * globals.css). Not the test build: its pages are compared with and without overrides.
+ */
+export const SKY_PREVIEW_BADGE = SKY_PRODUCTION && !E2E;
+
+/** Whether this URL's ?sky= and ?wx= are honoured (see SKY_DEBUG). */
+export function overridesAllowed(search: string): boolean {
+  return SKY_DEBUG || (SKY_PRODUCTION && new URLSearchParams(search).get("preview") === "1");
+}
 
 export type SkySnapshot = {
   /** Last /api/sylhet value (null until the first response). */
@@ -61,7 +80,7 @@ const WX_DEFAULTS: Record<Condition, { cloudCover: number; code: number }> = {
 };
 
 export function parseOverrides(search: string): Pick<SkySnapshot, "timeOverride" | "wxOverride"> {
-  if (!SKY_DEBUG) return { timeOverride: null, wxOverride: null };
+  if (!overridesAllowed(search)) return { timeOverride: null, wxOverride: null };
   const q = new URLSearchParams(search);
   const timeOverride = parseDhakaLocal(q.get("sky"));
   const wx = q.get("wx");
@@ -101,4 +120,13 @@ export function liveNow(s: SkySnapshot = snap): Date {
 export function skyTime(s: SkySnapshot = snap): Date {
   const now = liveNow(s);
   return s.preview === null ? now : atDhakaMinutes(now, s.preview);
+}
+
+/**
+ * The badge's text while an override is honoured in a production build: `template` with {time} = the time the sky is
+ * drawn for ("preview 16:45"). Else null. The first-paint script sets the same text before hydration (first-paint.ts).
+ */
+export function previewBadge(s: SkySnapshot, template: string): string | null {
+  if (!SKY_PREVIEW_BADGE || (!s.timeOverride && !s.wxOverride)) return null;
+  return template.replace("{time}", formatHM(skyTime(s)));
 }

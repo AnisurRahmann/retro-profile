@@ -4,7 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import { Header } from "@/components/Header";
 import { SkyBackdrop } from "@/components/sky/SkyBackdrop";
 import { firstPaintScript } from "@/lib/sky/first-paint";
-import { SKY_DEBUG } from "@/lib/sky/store";
+import { SKY_DEBUG, SKY_PREVIEW_BADGE, SKY_PRODUCTION } from "@/lib/sky/store";
 import { brand } from "@/lib/brand";
 import { links, profile, ui } from "@/site";
 import "./globals.css";
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 
 const INPUT_MODALITY = `(()=>{const d=document.documentElement,o={capture:true,passive:true};addEventListener("pointerdown",()=>{d.dataset.input="pointer"},o);addEventListener("keydown",e=>{if(e.key==="Tab")d.dataset.input="keyboard"},o)})()`;
 
-const SKY_FIRST_PAINT = firstPaintScript(SKY_DEBUG);
+const SKY_FIRST_PAINT = firstPaintScript(SKY_DEBUG, SKY_PRODUCTION, SKY_PREVIEW_BADGE ? ui.sky.preview : "");
 
 export const viewport: Viewport = {
   themeColor: brand.ink,

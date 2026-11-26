@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import type { Content } from "@/content.schema";
 import { animatePreview, backToNow, CANCEL_MS, minutesFromToday, setPreview, smootherstep01, stopPreviewAnimation, timeAtDrag, TIMELAPSE_MS } from "@/lib/sky/scrub";
-import { liveNow, SKY_DEBUG, skyStore } from "@/lib/sky/store";
+import { liveNow, overridesAllowed, skyStore } from "@/lib/sky/store";
 import { dhakaParts } from "@/lib/sky/time";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
@@ -75,7 +75,7 @@ export function SkyStage({
     if (!el) return;
     const q = new URLSearchParams(location.search);
     // Test builds arm it only with ?teaser (so it can't wander into unrelated tests).
-    if ((TEST && !q.has("teaser")) || (SKY_DEBUG && q.has("sky"))) return;
+    if ((TEST && !q.has("teaser")) || (overridesAllowed(location.search) && q.has("sky"))) return;
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     try {
       if (sessionStorage.getItem(TEASER_KEY)) return;

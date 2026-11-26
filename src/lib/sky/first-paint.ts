@@ -30,13 +30,24 @@ export function firstPaintTable(): string {
 }
 
 /**
- * @param debug honour ?sky=YYYY-MM-DDTHH:mm (Asia/Dhaka), like the client overrides.
+ * @param debug honour ?sky=YYYY-MM-DDTHH:mm (Asia/Dhaka) on every URL, as the client overrides do in development and
+ *   test builds.
+ * @param production a production build without `debug`: ?sky= is honoured only on a URL that also has preview=1.
+ * @param badge where given (a production build), an honoured ?sky= also marks the page for the badge in globals.css:
+ *   `html[data-sky-preview]` = this text with {time} replaced ("preview 16:45"). SkyController.tsx keeps it after
+ *   hydration.
  * Also sets html[data-sky] (night | civil | golden | day; the controller refines it to the exact state).
  */
-export function firstPaintScript(debug: boolean): string {
-  const dbg = debug
-    ? `var m=location.search.match(/sky=(\\d+)-(\\d+)-(\\d+)T(\\d+):(\\d+)/);if(m)t=Date.UTC(+m[1],m[2]-1,+m[3],+m[4],+m[5])-216e5;`
-    : "";
+export function firstPaintScript(debug: boolean, production = false, badge = ""): string {
+  const dbg =
+    !debug && !production
+      ? ""
+      : `var m=${debug ? "" : "/[?&]preview=1(&|$)/.test(location.search)&&"}location.search.match(/sky=(\\d+)-(\\d+)-(\\d+)T(\\d+):(\\d+)/);` +
+        `if(m){t=Date.UTC(+m[1],m[2]-1,+m[3],+m[4],+m[5])-216e5;` +
+        (badge
+          ? `D.dataset.skyPreview=${JSON.stringify(badge.replace("{time}", ""))}+("0"+m[4]).slice(-2)+":"+("0"+m[5]).slice(-2);`
+          : "") +
+        `}`;
   const last = (FP_MAX - FP_MIN) / FP_STEP;
   return `(function(){var T="${firstPaintTable()}",t=Date.now(),D=document.documentElement;${dbg}var p=(${ELEVATION_SRC})(t),E=p[0],i=Math.min(Math.max((E+${-FP_MIN})/${FP_STEP},0),${last}),k=i|0,f=i-k,n=["zenith","mid","horizon"],q,b,o,v,x,z;function c(j,o){return parseInt(T.substr(j*24+o,2),16)}for(q=0;q<3;q++){o=q<2?q*6:p[1]<0?12:18;v="#";for(b=0;b<6;b+=2){x=c(k,o+b);z=c(Math.min(k+1,${last}),o+b);v+=(256|x+(z-x)*f+.5).toString(16).slice(1)}D.style.setProperty("--sky-"+n[q],v)}D.dataset.sky=E<=-6?"night":E<0?"civil":E<8?"golden":"day"})()`;
 }

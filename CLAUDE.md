@@ -76,7 +76,9 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
   (`src/lib/sky/landscape/anchors.ts`).
   Scroll is read by a passive listener and applied in rAF; landscape paths never re-run per scroll frame (strip
   bitmaps). Time travel goes through `src/lib/sky/scrub.ts` (preview minutes, back to now in 1.6 s). Nothing dims
-  the sun or moon behind text (only cloud and altitude change them); the backing counts them instead.
+  the sun or moon behind text (only cloud and altitude change them); the backing counts them instead. `?sky` / `?wx`
+  work in dev and test builds; in production only with `NEXT_PUBLIC_SKY_DEBUG=1` or `&preview=1`, and then the page
+  shows the fixed "preview HH:MM" badge (`html[data-sky-preview]`, `SKY_PREVIEW_BADGE`; never in the test build).
 - Sky rules: state comes from sun elevation (suncalc), never clock hour. Every displayed time is Asia/Dhaka via Intl.
   Weather comes only from `/api/sylhet` (server-cached Open-Meteo, 15 min); the browser never calls Open-Meteo.
   The keyframe palette lives in `src/lib/sky/palette.ts` (the only hex outside `globals.css`); retune it only with
