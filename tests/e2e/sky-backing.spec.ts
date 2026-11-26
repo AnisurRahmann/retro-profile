@@ -3,10 +3,12 @@
  * 1440×900 (DPR 1) and 375×812 (DPR 2), every loose-text element ([data-on-sky]) fully in view is screenshotted
  * and measured (tests/e2e/pixels.ts measureBox: median glyph pixel vs the 90th-percentile pixel of the glyphs'
  * surround). The shot is the box grown by the chip's footprint (1px × 6px), so an icon's surround is in it too.
- * Every element must reach 4.5:1. The worst five are printed.
+ * Every element must reach 4.5:1, or 3:1 where it is large text (WCAG 1.4.3: from 24px, or 18.66px at weight 700;
+ * the same rule the backing module applies, src/lib/sky/backing.ts isLargeText). The worst five are printed.
  * Reduced motion: a static frame, no status-line rotation or fades mid-shot; backing and sky are otherwise the same.
  */
 import { expect, test } from "@playwright/test";
+import { isLargeText, weightOf } from "../../src/lib/sky/backing";
 import { cssRgb, measureBox } from "./pixels";
 
 const STATES = [
@@ -25,14 +27,14 @@ const SIZES = [
 ];
 const SPOTS = ["top", "shipped", "closer"] as const;
 
-type Row = { where: string; id: string; mode: string; contrast: number; text: string; bg: string };
+type Row = { where: string; id: string; mode: string; min: number; contrast: number; text: string; bg: string };
 const hex = (c: number[]) =>
   `#${c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
 
 test.describe.configure({ mode: "parallel" });
 
 for (const size of SIZES) {
-  test(`loose text reaches 4.5:1 in every state at ${size.width}`, async ({ browser }) => {
+  test(`loose text reaches 4.5:1 (3:1 for large text) in every state at ${size.width}`, async ({ browser }) => {
     test.setTimeout(300_000);
     const ctx = await browser.newContext({
       viewport: { width: size.width, height: size.height },
@@ -76,6 +78,8 @@ for (const size of SIZES) {
                 w: r.width,
                 h: r.height,
                 color: cs.color,
+                fontSize: cs.fontSize,
+                fontWeight: cs.fontWeight,
                 vis: cs.visibility,
                 op: Number(cs.opacity),
               };
@@ -108,6 +112,7 @@ for (const size of SIZES) {
             where: `${q} ${size.width} ${spot}`,
             id: e.id,
             mode: e.mode,
+            min: isLargeText(parseFloat(e.fontSize) || 16, weightOf(e.fontWeight)) ? 3 : 4.5,
             contrast: Math.round(m.contrast * 100) / 100,
             text: hex(m.text),
             bg: hex(m.bg),
@@ -122,11 +127,11 @@ for (const size of SIZES) {
         .slice(0, 5)
         .map(
           (r) =>
-            `  ${r.contrast.toFixed(2)}:1  ${r.id} (${r.mode}) text ${r.text} on ${r.bg} at ${r.where}`,
+            `  ${r.contrast.toFixed(2)}:1 (needs ${r.min})  ${r.id} (${r.mode}) text ${r.text} on ${r.bg} at ${r.where}`,
         )
         .join("\n")}`,
     );
     expect(rows.length).toBeGreaterThan(40);
-    expect(rows.filter((r) => r.contrast < 4.5)).toEqual([]);
+    expect(rows.filter((r) => r.contrast < r.min)).toEqual([]);
   });
 }

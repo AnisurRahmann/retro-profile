@@ -4,6 +4,8 @@
  * test (tests/e2e/sky-backing.spec.ts) is the gate against what the browser paints; this sweep is the model's own
  * guarantee and the gate for any palette retune.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Phase } from "@/lib/sky/astro";
 import { skyColors, smoothstep, sunColor } from "@/lib/sky/gradient";
@@ -20,10 +22,13 @@ import {
   GRAPHITE,
   haloFor,
   haloInk,
+  HERO_HALO_MAX,
   INK,
+  isLargeText,
   ON_SKY,
   parseCssColor,
   sizeBucket,
+  weightOf,
   skyAt,
   TEXT,
   type Scene,
@@ -188,5 +193,76 @@ describe("per-element backing", () => {
     };
     const on = backgroundFor(s, { x0: 95, y0: 95, x1: 105, y1: 105 });
     expect(contrast(on, sunColor(5))).toBeLessThan(1.1);
+  });
+});
+
+describe("large text and the hero's text (v5.1 T10)", () => {
+  /** A sky (ink toward white) over which `text` reads just under k:1 before any backing. */
+  const skyOf = (text: [number, number, number], k: number) => {
+    let t = 0;
+    while (contrast(text, over(INK, [1, 1, 1], t + 0.001)) > k) t += 0.001;
+    return over(INK, [1, 1, 1], t);
+  };
+
+  it("knows WCAG 1.4.3's large text, and reads a computed weight", () => {
+    expect(isLargeText(36, 500)).toBe(true); // the name
+    expect(isLargeText(24, 400)).toBe(true);
+    expect(isLargeText(23.9, 400)).toBe(false);
+    expect(isLargeText(18.66, 700)).toBe(true);
+    expect(isLargeText(18.66, 600)).toBe(false);
+    expect(isLargeText(16, 700)).toBe(false);
+    expect(weightOf("500")).toBe(500);
+    expect(weightOf("normal")).toBe(400);
+    expect(weightOf("bold")).toBe(700);
+  });
+
+  it("holds large text to 3:1, and everything else to its colour's target", () => {
+    // The name (36px) over a sky it reads 3.5:1 on.
+    const bg = skyOf(TEXT, 3.5);
+    // Judged as normal text it is --text, which wants 7:1: it is backed.
+    expect(decide(bg, TEXT, 36, 1).mode).not.toBe("none");
+    expect(decide(bg, TEXT, 36, 1, { weight: 500 }).mode).toBe("none");
+    expect(decide(bg, TEXT, 36, 1, { weight: 500 }).contrast).toBeGreaterThanOrEqual(3.2);
+    // Under 3:1 even large text is backed.
+    expect(decide(skyOf(TEXT, 2.9), TEXT, 36, 1, { weight: 500 }).mode).not.toBe("none");
+    // Body text on the same sky keeps its target: nothing of it is left bare under 4.5:1.
+    for (const t of [TEXT, ON_SKY, GRAPHITE]) {
+      const d = decide(bg, t, 16, 1, { weight: 400 });
+      expect(d.mode, "body text").not.toBe("none");
+      expect(effective(bg, t, d, 16, 1)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("lets the hero's text take a halo up to HERO_HALO_MAX before a chip", () => {
+    // A small deficit (4.6:1): a halo, as for any text.
+    for (const hero of [false, true]) {
+      const d = decide(skyOf(ON_SKY, 4.6), ON_SKY, 16, 2, { hero });
+      expect(d.mode, `hero ${hero}`).toBe("halo");
+      if (hero) expect(d.a).toBeLessThanOrEqual(HERO_HALO_MAX);
+    }
+    // A big deficit (3:1): no halo can carry it, so it is a chip.
+    const bright = skyOf(ON_SKY, 3);
+    expect(decide(bright, ON_SKY, 16, 2, { hero: true }).mode).toBe("chip");
+  });
+
+  it("never puts a chip behind the hero's text while a scrub or the time-lapse runs", () => {
+    const bright = skyOf(ON_SKY, 3);
+    const d = decide(bright, ON_SKY, 16, 2, { hero: true, scrubbing: true });
+    expect(d).toMatchObject({ mode: "halo", a: HERO_HALO_MAX });
+    // Not for other text, not once the scrub is over, and a halo or none is left as it is.
+    expect(decide(bright, ON_SKY, 16, 2, { scrubbing: true }).mode).toBe("chip");
+    expect(decide(bright, ON_SKY, 16, 2, { hero: true, scrubbing: false }).mode).toBe("chip");
+    const slight = skyOf(ON_SKY, 4.6);
+    expect(decide(slight, ON_SKY, 16, 2, { hero: true, scrubbing: true })).toEqual(
+      decide(slight, ON_SKY, 16, 2, { hero: true, scrubbing: false }),
+    );
+  });
+
+  it("draws chips without a border", () => {
+    const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+    const chip = css.match(/\[data-on-sky\]::before \{([^}]*)\}/)?.[1];
+    expect(chip).toBeTruthy();
+    expect(chip).toMatch(/background: color-mix\(in srgb, var\(--ink\)/);
+    expect(chip).not.toMatch(/\bborder(?!-radius)|outline|box-shadow/);
   });
 });

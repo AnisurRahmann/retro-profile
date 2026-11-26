@@ -2,10 +2,14 @@
  * Per-element backing for "loose text": text that sits directly on the sky (`data-on-sky`), as opposed to text
  * on a glass card. Each element gets only as much backing as the sky behind it needs, and only where it needs it:
  *
- * - "none": the text already reads (≥ 7:1 for --text, ≥ 4.8:1 for secondary text: --graphite, --on-sky).
+ * - "none": the text already reads (≥ 7:1 for --text, ≥ 4.8:1 for secondary text: --graphite, --on-sky; large text
+ *   ≥ 3.2:1, WCAG 1.4.3).
  * - "halo": a text-shadow halo in --ink (1px, 6px, 16px at a, a, 0.6a) is enough; a comes from HALO_CURVE.
  * - "chip": a light glass chip behind the text, no border (--ink at CHIP_ALPHA or more, blur 10px, radius 5px,
  *   1px × 6px around the text), solved to CHIP_TARGET: comfortably over the 4.5 gate, not to the "none" 7:1.
+ *
+ * The hero's text (the name, the status line, the one-liner, the label) tries a halo up to HERO_HALO_MAX before a
+ * chip, and never wears one while a scrub or the time-lapse runs (v5.1 T10).
  *
  * The background is estimated from the renderer's CPU-side model, never sampled from pixels at runtime: the
  * gradient colour at the element's height, the brightest cloud tops the 64×36 cloud mirror puts over its box,
@@ -53,6 +57,34 @@ export const TARGET_SECONDARY = 4.8;
 /** Is this text colour the primary text (--text) rather than a secondary one? */
 export const isPrimary = (c: RGB) => Math.max(...c.map((v, i) => Math.abs(v - TEXT[i]!))) < 0.03;
 export const targetFor = (c: RGB) => (isPrimary(c) ? TARGET_PRIMARY : TARGET_SECONDARY);
+
+/**
+ * WCAG 1.4.3's "large text": at least 24px, or 18.66px (14pt) at weight 700 or more. It has to reach 3:1, not 4.5:1
+ * (the pixel gate asks 3 of it too). As 4.8 is for the 4.5 gate, the module keeps a margin for its model.
+ */
+export const LARGE_PX = 24;
+export const LARGE_BOLD_PX = 18.66;
+export const LARGE_WEIGHT = 700;
+export const TARGET_LARGE = 3.2;
+export const isLargeText = (fontPx: number, weight: number) =>
+  fontPx >= LARGE_PX || (fontPx >= LARGE_BOLD_PX && weight >= LARGE_WEIGHT);
+/** A computed font-weight ("400", "normal", "bold") as a number. */
+export const weightOf = (css: string) => (css === "bold" ? 700 : parseFloat(css) || 400);
+
+/**
+ * The hero's text takes a halo up to this alpha before a chip, and never wears a chip while a scrub or the
+ * time-lapse runs: the strongest halo instead, so no box pops in or out of the animation (v5.1 T10).
+ */
+export const HERO_HALO_MAX = 0.9;
+/** What the runner knows about an element beyond its colour and size. */
+export type Style = {
+  /** Its computed font-weight: with the size, whether it is large text. Absent: judge it as normal text. */
+  weight?: number;
+  /** One of the hero's text elements (backing-runner.ts HERO_TEXT). */
+  hero?: boolean;
+  /** A scrub, a drag or the time-lapse is running. */
+  scrubbing?: boolean;
+};
 
 /** The chip's --ink alpha (v4: 0.5); solved higher, up to CHIP_MAX, where the sky needs it. */
 export const CHIP_ALPHA = 0.5;
@@ -132,9 +164,12 @@ export type Decision = {
   contrast: number;
 };
 
-/** Pick the lightest backing that keeps `text` readable over `bg` (as rendered at this size and DPR). */
-export function decide(bg: RGB, text: RGB, fontPx: number, dpr = 2): Decision {
-  const min = targetFor(text);
+/**
+ * Pick the lightest backing that keeps `text` readable over `bg` (as rendered at this size and DPR). Large text is
+ * held to TARGET_LARGE, the rest to its colour's target; `o` says which the element is (Style).
+ */
+export function decide(bg: RGB, text: RGB, fontPx: number, dpr = 2, o: Style = {}): Decision {
+  const min = o.weight !== undefined && isLargeText(fontPx, o.weight) ? TARGET_LARGE : targetFor(text);
   const aa = aaMix(fontPx, dpr);
   const on = (k: number) => {
     const b = over(bg, INK, k);
@@ -143,20 +178,21 @@ export function decide(bg: RGB, text: RGB, fontPx: number, dpr = 2): Decision {
   const bare = on(0);
   if (bare >= min) return { mode: "none", a: 0, contrast: bare };
   const bucket = sizeBucket(fontPx);
-  // A halo, if one can make the "none" target; small text tries it up to SMALL_HALO_MAX, and settles for the chip's
-  // target from a halo rather than wear a chip.
-  const a = haloFor(
-    inkNeeded(bg, text, min, 1, aa),
-    bucket,
-    fontPx <= SMALL_PX ? SMALL_HALO_MAX : 1,
-  );
+  // A halo, if one can make the "none" target. The most it may take: the hero's text HERO_HALO_MAX, small text
+  // (≤ SMALL_PX: the caption, strip labels, footer) SMALL_HALO_MAX, anything else 1.
+  const max = o.hero ? HERO_HALO_MAX : fontPx <= SMALL_PX ? SMALL_HALO_MAX : 1;
+  const a = haloFor(inkNeeded(bg, text, min, 1, aa), bucket, max);
   if (a !== null) return { mode: "halo", a, contrast: on(haloInk(a, bucket)) };
   const goal = Math.min(min, CHIP_TARGET);
+  // Small text settles for the chip's target from a halo rather than wear a chip.
   if (fontPx <= SMALL_PX) {
     const s = haloFor(inkNeeded(bg, text, goal, 1, aa), bucket, SMALL_HALO_MAX);
     if (s === 0) return { mode: "none", a: 0, contrast: bare };
     if (s !== null) return { mode: "halo", a: s, contrast: on(haloInk(s, bucket)) };
   }
+  // While a scrub or the time-lapse runs, the hero's text never wears a box: the strongest halo instead.
+  if (o.hero && o.scrubbing)
+    return { mode: "halo", a: HERO_HALO_MAX, contrast: on(haloInk(HERO_HALO_MAX, bucket)) };
   const chip = Math.min(
     CHIP_MAX,
     Math.max(CHIP_ALPHA, Math.ceil(inkNeeded(bg, text, goal, CHIP_MAX, aa) * 100) / 100),

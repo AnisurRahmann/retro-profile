@@ -66,10 +66,11 @@ Next.js 16 (App Router, Turbopack), TypeScript strict, Tailwind 4, pnpm. Branch:
   not between the stage and the first section.
 - Loose text (text directly on the sky, `data-on-sky`) gets per-element backing, never a scrim:
   `src/lib/sky/backing.ts` estimates the brightest sky behind each box (gradient, cloud mirror, glow, fog, sun and
-  moon, city glow, landscape) and picks none (≥ 7:1 `--text`, ≥ 4.8:1 secondary) · halo (text-shadow in `--ink`,
+  moon, city glow, landscape) and picks none (≥ 7:1 `--text`, ≥ 4.8:1 secondary, ≥ 3.2:1 large text) · halo (text-shadow in `--ink`,
   `--halo-a` from the calibrated `HALO_CURVE`) · chip (glass pseudo-element, `--ink` at ≥ 0.62, blur 8px, radius 6).
-  Cards stay glass. The gate is the pixel test `tests/e2e/sky-backing.spec.ts` (≥ 4.5:1 for every loose element,
-  8 states × 3 scrolls × 1440/375). New text on the sky needs `data-on-sky` and a box that hugs it (`w-fit`).
+  Cards stay glass. The hero's four text elements take a halo up to 0.9 before a chip and never a chip while a scrub
+  runs (`decide`'s `hero` and `scrubbing`). The gate is the pixel test `tests/e2e/sky-backing.spec.ts` (≥ 4.5:1 for
+  every loose element, 3:1 for large text; 8 states × 3 scrolls × 1440/375). New text on the sky needs `data-on-sky` and a box that hugs it (`w-fit`).
 - Sky v2/v3 rules: the celestial layer never scrolls (parallax 0); the landscape is real parallax (L1 0.04, L2 0.15,
   L3 0.45, L4 0.9). ≥ 1100px each landmark reaches its gutter centre (alternating sides, ≤ 90% of the gutter; the
   bridge may run under the column) when its section's top is at 40%; below 1100px, scene mode

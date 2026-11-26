@@ -27,7 +27,7 @@ Which file does what (as found by grep, 2026-11-26). Paths are relative to the r
   - `src/components/sky/particles.ts`: stars, the moon, meteors, rain. `bodies.ts`: the sun sprites, the dotted arc, `drawHalo` (the 22° ring).
   - `src/components/sky/atmosphere.ts`, `sky-shader.ts`, `cloud-field.ts`, `ambient.ts`, `hooks.ts`: the WebGL2 sky, its shader, the CPU cloud mirror, birds / planes / fireflies / rickshaw, shared hooks.
 - Text backing
-  - `src/lib/sky/backing.ts`: the model (`decide`, `HALO_CURVE`, the chip's alpha). `src/components/sky/backing-runner.ts`: writes `data-backing`, `--halo-a`, `--chip-a` on each `[data-on-sky]` element.
+  - `src/lib/sky/backing.ts`: the model (`decide`, `HALO_CURVE`, the chip's alpha, the large-text rule, the hero's rules). `src/components/sky/backing-runner.ts`: writes `data-backing`, `--halo-a`, `--chip-a` on each `[data-on-sky]` element.
 - Sky maths (`src/lib/sky/`)
   - `arc.ts`: the sun/moon arc, `stageHeightFor`, `SCENE_HORIZON`. `view.ts`: live page geometry. `horizon.ts`: where the horizon is on screen.
   - `store.ts`: the sky store, the `?sky` / `?wx` overrides and where they are honoured (`SKY_DEBUG`, `overridesAllowed`, the production preview badge). `first-paint.ts`: the inline first-paint script.
@@ -38,7 +38,7 @@ Which file does what (as found by grep, 2026-11-26). Paths are relative to the r
   - `colors.ts`: layer colours, `teaRowColor`, `sunLight`. `lights.ts`: window schedules, the city glow alpha.
 - Tests and tools
   - `tests/unit/sky-*.test.ts`: arc, plane, landscape, horizon, contrast, render, gradient (incl. the first-paint script).
-  - `tests/e2e/sky.spec.ts`, `sky-backing.spec.ts` (the pixel gate), `sky-nowebgl.spec.ts`, `sky-firstpaint.spec.ts` (the first paint without JavaScript, and the hand-over to the canvas), `pixels.ts`. `tests/unit/sky-fallback.test.tsx`: the fallback's markup. `tests/unit/sky-overrides.test.ts`: the overrides in each kind of build, the preview badge.
+  - `tests/e2e/sky.spec.ts`, `sky-backing.spec.ts` (the pixel gate), `sky-nowebgl.spec.ts`, `sky-firstpaint.spec.ts` (the first paint without JavaScript, and the hand-over to the canvas), `pixels.ts`. `tests/unit/sky-fallback.test.tsx`: the fallback's markup. `tests/unit/sky-overrides.test.ts`: the overrides in each kind of build, the preview badge. `tests/e2e/sky-hero-backing.spec.ts`: the hero's text wears no chip on a phone.
   - `scripts/check-bundle.ts` (the budgets), `scripts/shots-sky.ts`, `scripts/probe/` (review shots and probes).
 
 ## v5.1 resume (2026-11-26)
@@ -153,6 +153,16 @@ At 03:30 clear, 375×812 and 1440×900:
 - Test output: `tests/unit/sky-overrides.test.ts` — 13 passed (13) (`.shots/v5.1/T9/unit-test-output.txt`); typecheck, lint and vitest green (269 passed).
 - Shots: `.shots/v5.1/T9/t9-prod-{375x812,1440x900}-preview-1645.png` (the badge; sheets `sheet-t9-badge.png`, `sheet-t9-hero.png`), `t9-prod-{375x812,1440x900}-sky-ignored.png`, `t9-prod-1440x900-plain.png`, `t9-prod-1440x900-preview-wx-thunder.png`.
 - How: `overridesAllowed` in `src/lib/sky/store.ts` (always where `SKY_DEBUG`; otherwise in a production build only with `preview=1`). The badge is one attribute on `<html>`, set by the first-paint script before hydration and kept by `SkyController` after, so the badge and the override always switch together. The first-paint script is 1404 B in a plain production build (limit 1500). Default production behaviour is unchanged: a URL without `preview=1` gets the same markup, paint and label as before. DECISIONS #118.
+
+#### T10 · heavy chips on the mobile hero
+
+- PASS: at 375×812, 11:00 partly cloudy, none of the 4 hero text elements is a chip. `data-backing`: name = none, status = none, one-liner = none, label = none (`.shots/v5.1/T10/data-backing.txt`). The screenshot (`.shots/v5.1/T10/t10-1100-partly-375x812.png`) shows the name, the status line, the one-liner and the label as text on the blue sky, no box behind any of them.
+- PASS: 16:45 clear: name = none, status = none, one-liner = none, label = none; text over the sky with the sunset under it (`t10-1645-clear-375x812.png`).
+- PASS: 17:20 clear: the same four at none; text over the dusk (`t10-1720-clear-375x812.png`). Sheet of the three: `sheet-t10-phones.png`.
+- PASS: the pixel-contrast gate still passes, with large text now asked for 3:1 as WCAG 1.4.3 does and everything else for 4.5:1: `tests/e2e/sky-backing.spec.ts` at 375: 88 measurements, worst 4.82:1; at 1440: 200 measurements, worst 4.75:1. (Same as before the change: 4.82 and 4.75.)
+- While the sky is dragged (a scrub) and after it is released, the same four are still none in each of the three states, and in six more (06:20 partly, 09:00 fog, 12:00 clear, 14:00 heavy rain, 18:30 clear, 21:00 thunder). `tests/e2e/sky-hero-backing.spec.ts` holds the three states to it.
+- What the module does now (`src/lib/sky/backing.ts`): (1) large text, a computed font size of 24px or more, or 18.66px or more at weight 700 or more, is held to 3:1 (3.2:1 in the model, which keeps the same margin over the gate as 4.8 does for 4.5); everything else keeps its target. (2) The hero's four elements take a halo up to alpha 0.9 before a chip. (3) While a scrub, a drag or the time-lapse runs they never get a chip: the strongest halo (0.9) instead. (4) Chips have no border: they already had none (the v4 chip); a test now says so.
+- Why they were chips in the brief's screenshot and are not now: T3 moved the text block to the top of the stage, where the sky is dark at every hour, so on a phone the four read at 7:1 or more without any backing. The module's targets did the rest of what the brief asked for and keep it so if the layout or the sky changes. DECISIONS #119.
 
 ## Done
 
