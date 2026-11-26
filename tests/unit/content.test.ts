@@ -53,4 +53,10 @@ describe("content", () => {
     const text = JSON.stringify({ ui: site.ui, profile: site.profile, closer: site.closer }).toLowerCase();
     for (const banned of ["relocat", "visa", "salary", "open to work", " uk "]) expect(text).not.toContain(banned);
   });
+
+  it("has one short status line per status line, in the same order, none longer than its full line", () => {
+    const { statusLines, statusLinesShort } = content.profile;
+    expect(statusLinesShort).toHaveLength(statusLines.length);
+    statusLinesShort.forEach((s, i) => expect(s.length, s).toBeLessThanOrEqual(statusLines[i]!.length));
+  });
 });

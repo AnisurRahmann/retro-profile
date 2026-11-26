@@ -2,7 +2,14 @@
 
 import { useEffect } from "react";
 import { skyModel } from "@/lib/sky/model";
-import { effectiveWeather, parseOverrides, skyStore, skyTime } from "@/lib/sky/store";
+import {
+  effectiveWeather,
+  parseOverrides,
+  previewBadge,
+  SKY_PREVIEW_BADGE,
+  skyStore,
+  skyTime,
+} from "@/lib/sky/store";
 import {
   landMode,
   nearestPlace,
@@ -47,9 +54,21 @@ function paint() {
  * visible, recomputes astronomy every 60 s, and repaints the CSS gradient on every change.
  * Renders nothing.
  */
-export function SkyController() {
+/**
+ * @param preview the badge's copy ("preview {time}", src/content.ts).
+ */
+export function SkyController({ preview }: { preview: string }) {
   useEffect(() => {
     skyStore.set(parseOverrides(window.location.search));
+    // A production build marks a honoured override with the fixed "preview 16:45" badge, as the first-paint script
+    // does before hydration (v5.1 T9).
+    const mark = () => {
+      const text = previewBadge(skyStore.get(), preview);
+      if (text) document.documentElement.dataset.skyPreview = text;
+      else delete document.documentElement.dataset.skyPreview;
+    };
+    const unmark = SKY_PREVIEW_BADGE ? skyStore.subscribe(mark) : () => {};
+    if (SKY_PREVIEW_BADGE) mark();
 
     let lastFetch = -Infinity;
     let pollTimer = 0;
@@ -129,6 +148,7 @@ export function SkyController() {
     return () => {
       dead = true;
       unsub();
+      unmark();
       unsubView();
       unsubAnchors();
       unsubPlace();
@@ -137,7 +157,7 @@ export function SkyController() {
       window.clearTimeout(tick);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [preview]);
 
   return null;
 }

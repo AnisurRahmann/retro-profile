@@ -3,6 +3,7 @@ import { Closer } from "@/components/Closer";
 import { hasPortrait, Portrait } from "@/components/Portrait";
 import { ReceiptCard } from "@/components/ReceiptCard";
 import { StatusLine } from "@/components/StatusLine";
+import { SkyFallbackBand, SkyFallbackStage } from "@/components/sky/SkyFallback";
 import { SkyLabel } from "@/components/sky/SkyLabel";
 import { SkyStage } from "@/components/sky/SkyStage";
 import { Waveform } from "@/components/Waveform";
@@ -27,7 +28,11 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd).replace(/</g, "\\u003c") }}
       />
-      <SkyStage copy={ui.sky}>
+      {/* First-paint fallback (v5.1 T8) for the fixed band (from 1100px), under the canvases (z −3). It is fixed, so it
+          can stand anywhere: here, before the stage, because the first section's margin goes by the stage's next
+          sibling (globals.css `main > .sky-stage + .section`) and must not wait for this to be removed. */}
+      <SkyFallbackBand />
+      <SkyStage copy={ui.sky} fallback={<SkyFallbackStage />}>
         {/* Mobile: a 56px portrait beside the name, the rest full width under them; without a photo (the initials
             fallback) the avatar is hidden below 640px and the name comes first. Desktop: the 88px portrait beside
             the whole block. */}
@@ -41,11 +46,12 @@ export default function Home() {
             {profile.name}
           </h1>
           <div className={`mt-3 min-w-0 sm:col-span-1 sm:col-start-2 sm:mt-0 sm:self-start${photo ? " col-span-2" : " max-sm:mt-2"}`}>
-            <p className="mt-0 flex min-h-12 items-start gap-2.5 text-base leading-6 text-on-sky sm:mt-2 sm:min-h-7 sm:text-lg sm:leading-7">
+            {/* One line of status (24px on phones: the short lines never wrap), then the one-liner 4px under it. */}
+            <p className="mt-0 flex min-h-6 items-start gap-2.5 text-base leading-6 text-on-sky sm:mt-2 sm:min-h-7 sm:text-lg sm:leading-7">
               <span className="flex h-6 items-center sm:h-7">
                 <Waveform />
               </span>
-              <StatusLine lines={profile.statusLines} />
+              <StatusLine lines={profile.statusLines} short={profile.statusLinesShort} />
             </p>
             <p className="mt-1 w-fit text-sm text-on-sky" data-on-sky="one-liner">
               {profile.oneLiner}

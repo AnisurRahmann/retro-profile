@@ -58,6 +58,17 @@ export const CITY_GLOW_REACH = 0.14;
  * × (1 + 0.8 · cloud cover) (low cloud reflects city light), dimming to × 0.6 between 22:00 and 01:00 in step with
  * the windows, back to full between 05:00 and 06:00. `night` 0..1 fades it in from sunset to sunrise.
  */
+/** The moonlight rim's alpha on a full moon (landscape.ts: MOON_RIM along the top of the hills and the bridge). */
+export const MOON_RIM_ALPHA = 0.3;
+
+/**
+ * Moonlight rim (v5.1 T4): while the moon is above the horizon, 0.3 × its illumination. It fades with the night (no
+ * rim from a daytime moon) and with cloud (no rim from a moon that's hidden).
+ */
+export function moonRimAlpha(up: boolean, illumination: number, night: number, cloudCover: number): number {
+  return up ? MOON_RIM_ALPHA * illumination * night * Math.max(0, 1 - cloudCover) : 0;
+}
+
 export function cityGlowAlpha(minutes: number, cloudCover: number, night: number): number {
   const m = ((minutes % 1440) + 1440) % 1440;
   const t = m >= 12 * 60 ? Math.min(1, Math.max(0, (m - 22 * 60) / 180)) : m < 5 * 60 ? 1 : Math.max(0, 1 - (m - 5 * 60) / 60);

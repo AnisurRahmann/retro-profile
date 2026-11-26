@@ -6,12 +6,13 @@ import {
   arcGeom,
   arcPoint,
   moonPass,
+  nightPoint,
   SCENE_HORIZON,
   seasonScale,
   stageHeightFor,
   sunPass,
 } from "@/lib/sky/arc";
-import { sceneBand } from "@/lib/sky/landscape/anchors";
+import { PHONE_HILL_TOP, sceneBand } from "@/lib/sky/landscape/anchors";
 import { solarNoon } from "@/lib/sky/astro";
 import { dhakaDate } from "@/lib/sky/time";
 import { SYLHET } from "@/lib/sky/weather";
@@ -98,21 +99,47 @@ describe("moon pass (suncalc.getMoonTimes)", () => {
     }
   });
 
-  it("on a 375×812 phone the arc spans ≥ 300px, from header + 16 down into the stage scene's hills", () => {
+  it("on a 375×812 phone (the postcard stage) the arc spans the open sky band: 8% and 92% wide, 8px above the hills, its apex 28px under the text", () => {
     const stage = stageHeightFor(375, 812);
-    expect(stage).toBeCloseTo(0.76 * 812, 6);
-    const m = arcGeom(375, 812, stage, true);
-    expect(m.apexY).toBe(64 + 16);
+    expect(stage).toBe(812 - 40); // the first screen less 40px, so "Shipped" peeks in
+    expect(stageHeightFor(375, 568)).toBe(600);
+    const textBottom = 88 + 164; // the header + 24px, then the text block
+    const m = arcGeom(375, 812, stage, true, textBottom);
+    expect(m.apexY).toBe(textBottom + 28);
     const band = sceneBand(375, 812);
-    expect(m.horizonY).toBeCloseTo(stage - (1 - SCENE_HORIZON) * band, 6);
+    expect(band).toBe(200);
+    expect(m.horizonY).toBeCloseTo(stage - band + PHONE_HILL_TOP * (band / 100) - 8, 6);
     expect(m.horizonY - m.apexY).toBeGreaterThanOrEqual(300);
-    // 16:45 on 15 Dec: low in the west, right of centre, above the hills, inside the screen.
-    const t = new Date("2026-12-15T16:45:00+06:00");
+    expect(arcPoint(0, 0, 45, m).x).toBeCloseTo(0.08 * 375, 6);
+    expect(arcPoint(1, 0, 45, m).x).toBeCloseTo(0.92 * 375, 6);
+    expect(arcPoint(0.5, 45, 45, m).x).toBeCloseTo(187.5, 6);
+    // The night continuation runs under the horizon from the west end back to the east end.
+    expect(nightPoint(0, m, 10).x).toBeCloseTo(0.92 * 375, 6);
+    expect(nightPoint(1, m, 10).x).toBeCloseTo(0.08 * 375, 6);
+    // It follows the text block: a taller one lifts the arc with it, and a resize recomputes it.
+    expect(arcGeom(375, 812, stage, true, textBottom + 20).apexY).toBe(textBottom + 20 + 28);
+    expect(arcGeom(320, 568, 600, true, textBottom).horizonY).toBeCloseTo(600 - 200 + PHONE_HILL_TOP * 2 - 8, 6);
+    // Unmeasured text block: a nominal one.
+    expect(arcGeom(375, 812, stage, true).apexY).toBe(64 + 24 + 164 + 28);
+    // 16:45 on 26 Nov: low in the west, right of centre, in the sky band, inside the screen, clear of the text.
+    const t = new Date("2026-11-26T16:45:00+06:00");
     const p = sunPass(t);
     const pt = arcPoint(p.u, p.alt, p.maxAlt, m);
     expect(pt.cx).toBeGreaterThan(375 / 2);
     expect(pt.cx + 13).toBeLessThanOrEqual(375);
-    expect(pt.y).toBeLessThan(m.horizonY - 13);
-    expect(stageHeightFor(375, 600)).toBe(540);
+    expect(pt.y).toBeLessThan(m.horizonY);
+    expect(pt.y - 13).toBeGreaterThan(textBottom);
+    // Nothing on the arc reaches the text block, wherever it is: the apex is the highest point.
+    for (let u = 0; u <= 1; u += 0.01) expect(arcPoint(u, 90, 90, m).y - 13).toBeGreaterThan(textBottom);
+  });
+
+  it("from 640px up the arc is as it was: header + 16 to the far hills' foot in the stage scene", () => {
+    const stage = stageHeightFor(768, 1024);
+    expect(stage).toBeCloseTo(0.7 * 1024, 6);
+    const m = arcGeom(768, 1024, stage, true, 400);
+    expect(m.apexY).toBe(64 + 16);
+    expect(m.span).toBeUndefined();
+    expect(m.horizonY).toBeCloseTo(stage - (1 - SCENE_HORIZON) * sceneBand(768, 1024), 6);
+    expect(arcPoint(0, 0, 45, m).x).toBeCloseTo(ARC.east * 768, 6);
   });
 });

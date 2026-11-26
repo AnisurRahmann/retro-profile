@@ -7,7 +7,8 @@
  *
  * Colour: each layer = mix(horizon, near, depth) in OKLab with depths 0.25 / 0.45 / 0.7 / 0.95, near = --ink
  * darkened 15%. Golden hour: a 1 px rim along the top of L2–L4 in the horizon colour at 50%, brightest toward
- * the sun.
+ * the sun. Moonlight (while the moon is up and the sun's rim is off): a 1 px rim along the top of every layer,
+ * the far hills included, in MOON_RIM at 0.3 × illumination, brightest toward the moon (v5.1 T4).
  */
 import { brand } from "@/lib/brand";
 import {
@@ -15,6 +16,7 @@ import {
   hexToRgb,
   mixLab,
   oklabToRgb,
+  over,
   scaleL,
   type Lab,
   type RGB,
@@ -29,7 +31,7 @@ import { PARALLAX, type LayerId } from "@/lib/sky/landscape/anchors";
 import { BANK_Y, RIVER } from "@/lib/sky/landscape/shapes";
 /** The 1px glint's line, band units: just above the near bank's lowest point (ridgeL4 ≥ 87.2). */
 const GLINT_Y = 87.4;
-import { CITY_GLOW } from "@/lib/sky/palette";
+import { CITY_GLOW, MOON_RIM } from "@/lib/sky/palette";
 import { ridgeL1, ridgeL2, ridgeL4, type Placed, type World } from "@/lib/sky/landscape/world";
 import type { Shape } from "@/lib/sky/landscape/shapes";
 
@@ -67,7 +69,8 @@ export type Lighting = {
   /** City glow (sodium) at the horizon, alpha (cityGlowAlpha), and its reach above the horizon in px. */
   glow: number;
   glowReach: number;
-  /** Moonlight rim strength (0.3 × illumination while the moon is up) and the moon's screen x. */
+  /** Moonlight rim strength: the alpha of MOON_RIM along the layer's top edge (0.3 × illumination while the moon is
+   * up), and the moon's screen x. */
   moonRim: number;
   moonX: number;
 };
@@ -100,7 +103,7 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
     moonX: 0,
   };
   const glowRgb = hexToRgb(CITY_GLOW);
-  const moonLab = hexToLab(brand.text);
+  const moonRgb = hexToRgb(MOON_RIM);
   let lightKey = "";
   const colors = {} as Record<LayerId, string>;
   let river = "rgba(0,0,0,1)";
@@ -233,16 +236,17 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
     const x0 = x0Px / s;
     const x1 = (x0Px + sw) / s;
     const body = colors[layer];
-    // Rim: golden hour (the horizon colour at 50%, brightest toward the sun) or moonlight (the moon's colour at
-    // 0.3 × illumination, on the moon's side): the layer in the rim colour, then the body 1 px lower.
+    // Rim: golden hour (the horizon colour at 50%, brightest toward the sun) or moonlight (MOON_RIM at
+    // 0.3 × illumination over the layer, brightest toward the moon; the far hills too, so their outline reads
+    // against the night sky): the layer in the rim colour, then the body 1 px lower.
     const moon = light.rim <= 0.02 && light.moonRim > 0.02;
-    if ((light.rim > 0.02 || moon) && layer !== "L1") {
+    if ((light.rim > 0.02 || moon) && (moon || layer !== "L1")) {
       // Golden-hour light is this rim only: 1px of the horizon colour at 0.55 on the sun's side.
       const base = layerColorLit(light, layer);
-      const tint = moon ? moonLab : light.horizon;
-      const k = moon ? light.moonRim : 0.55 * light.rim;
-      const hi = oklabToRgb(mixLab(base, tint, k));
       const lo = oklabToRgb(base);
+      const hi = moon
+        ? over(lo, moonRgb, light.moonRim)
+        : oklabToRgb(mixLab(base, light.horizon, 0.55 * light.rim));
       const sunU = ((moon ? light.moonX : light.sunX) + offsetPx) / s;
       const span = w / s;
       const grad = g.createLinearGradient(sunU - span, 0, sunU + span, 0);

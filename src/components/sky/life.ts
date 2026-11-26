@@ -9,8 +9,9 @@
  * - the sun's or moon's shimmer column on the river when it's within 12° of the horizon (1 px dashes, lengths
  *   re-jittered at 12 fps, alpha 0.3),
  * - the plane at the gate, which takes off (src/lib/sky/landscape/plane.ts: taxi, roll, rotate, climb, 4.6 s)
- *   when the renderer says so (every arrival at the airport, "Book 30 min"); at night with a red beacon, a
- *   white wingtip strobe and a landing light on the runway. 2.5 s after it's gone the next one fades in.
+ *   when the renderer says so (every arrival at the airport, "Book 30 min"). From sunset to sunrise (v5.1 T5), in
+ *   every state: a red beacon and a white wingtip strobe over the silhouette, a rim of the city's glow along its top,
+ *   and a landing light on the runway while it rolls. 2.5 s after it's gone the next one fades in.
  * Sprites are built once; frames allocate nothing.
  */
 import { hexToRgb, type RGB } from "@/lib/sky/color";
@@ -18,6 +19,7 @@ import type { LayerId } from "@/lib/sky/landscape/anchors";
 import { TV_HZ, windowLit, windowSchedule } from "@/lib/sky/landscape/lights";
 import { RIVER } from "@/lib/sky/landscape/shapes";
 import {
+  FADE_IN_S,
   gateAt,
   PLANE_BODY,
   PLANE_GEAR,
@@ -31,7 +33,7 @@ import {
   type TakeoffParams,
 } from "@/lib/sky/landscape/plane";
 import type { AirportGeom, World } from "@/lib/sky/landscape/world";
-import { RWY_GREEN, RWY_RED, TV_LIT, WINDOW_LIT } from "@/lib/sky/palette";
+import { CITY_GLOW, RWY_GREEN, RWY_RED, TV_LIT, WINDOW_LIT } from "@/lib/sky/palette";
 import { LIFT } from "./landscape";
 
 const rgba = (c: RGB, a: number) =>
@@ -77,10 +79,14 @@ export function createLife(textRgb: RGB) {
   const body = new Path2D(PLANE_BODY);
   const gear = new Path2D(PLANE_GEAR);
   const green = rgba(hexToRgb(RWY_GREEN), 1);
-  const red = rgba(hexToRgb(RWY_RED), 1);
+  const redRgb = hexToRgb(RWY_RED);
+  const red = rgba(redRgb, 1);
+  const glowCss = rgba(hexToRgb(CITY_GLOW), 1);
   /** The take-off in progress (or the last one): its start and its path. */
   let t0 = -Infinity;
   let path: TakeoffParams | null = null;
+  /** How visible the plane was (0..1) when that take-off started: one that begins during the gate's fade-in finishes fading in as it goes. */
+  let startAlpha = 1;
   let flights = 0;
   /** Test builds: hold the take-off at this many seconds in (the review's roll / rotation / climb frames). */
   let pinned: number | null = null;
@@ -97,6 +103,24 @@ export function createLife(textRgb: RGB) {
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 64);
   }
+
+  // The plane's lights: a soft radial glow that fades to nothing at its edge (drawn at 10px for the beacon, 14px for
+  // the strobe, under a 3px dot).
+  const lightGlow = (c: RGB) => {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = 64;
+    const gc = cv.getContext("2d")!;
+    const grad = gc.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, rgba(c, 0.85));
+    grad.addColorStop(0.2, rgba(c, 0.5));
+    grad.addColorStop(0.5, rgba(c, 0.16));
+    grad.addColorStop(1, rgba(c, 0));
+    gc.fillStyle = grad;
+    gc.fillRect(0, 0, 64, 64);
+    return cv;
+  };
+  const beaconGlow = lightGlow(redRgb);
+  const strobeGlow = lightGlow(textRgb);
 
   /** The plane's path for a take-off starting now, in world px (x) and band px (y): roll to the visible runway's end (phones: earlier). */
   const pathFor = (ap: AirportGeom, f: LifeFrame, o3: number): TakeoffParams => {
@@ -180,16 +204,18 @@ export function createLife(textRgb: RGB) {
     const pf = p0 ? planeAt(since, { ...p0, bounds: { x0: o, x1: o + f.w, y0: -LIFT } }) : null;
     const x = (pf ? pf.x : ap.gate[0] * s) - o;
     const y = pf ? pf.y : ap.gate[1] * s;
-    const alpha = pf ? pf.alpha : f.moving ? gate.alpha : 1;
+    // A take-off that began during the gate's fade-in finishes it at the gate's own pace as it taxis.
+    const alpha = pf ? pf.alpha * Math.min(1, startAlpha + since / FADE_IN_S) : f.moving ? gate.alpha : 1;
     if (alpha <= 0.01 || x < -f.planePx || x > f.w + f.planePx) return;
     const k = (f.planePx / PLANE_LEN) * (pf ? pf.scale : 1);
-    const night = f.lamps > 0.3;
-    // The landing light on the runway while it rolls (night): a soft wedge ahead of the nose.
-    if (pf && night && (pf.state === "roll" || pf.state === "taxi")) {
+    // Night: 0 by day … 1 from sunset to sunrise (LifeFrame.lamps). The strength of the lights.
+    const night = f.lamps;
+    // The landing light on the runway while it rolls (night): a soft wedge ahead of the nose, at 0.25.
+    if (pf && night > 0.01 && (pf.state === "roll" || pf.state === "taxi")) {
       const lx = x + PLANE_LIGHTS.landing[0] * k;
       const len = 70;
       const grad = g.createLinearGradient(lx, 0, lx - len, 0);
-      grad.addColorStop(0, rgba(textRgb, 0.25 * alpha));
+      grad.addColorStop(0, rgba(textRgb, 0.25 * alpha * night));
       grad.addColorStop(1, rgba(textRgb, 0));
       g.fillStyle = grad;
       g.beginPath();
@@ -205,33 +231,58 @@ export function createLife(textRgb: RGB) {
     // Nose to the left: pitching up is a clockwise turn on screen.
     g.rotate(((pf?.pitchDeg ?? 0) * Math.PI) / 180);
     g.scale(k, k);
-    // A 1px rim light along the top, then the silhouette.
+    // A 1px rim light along the top, then the silhouette. At night the rim is the city glow at 0.5, so the dark
+    // shape reads against the dark sky.
     g.translate(0, -1 / k);
-    g.fillStyle = f.tones.rim;
-    g.fill(body);
+    if (night < 0.99) {
+      g.globalAlpha = alpha * (1 - night);
+      g.fillStyle = f.tones.rim;
+      g.fill(body);
+    }
+    if (night > 0.01) {
+      g.globalAlpha = alpha * night * 0.5;
+      g.fillStyle = glowCss;
+      g.fill(body);
+    }
+    g.globalAlpha = alpha;
     g.translate(0, 1 / k);
     g.fillStyle = f.l3;
     g.fill(body);
     if (!pf || pf.gearDown) g.fill(gear);
-    if (pf && night) {
-      const dot = (p: readonly [number, number], css: string, r = 1.6) => {
+    // The lights, on top of the silhouette and in every state (parked too), from sunset to sunrise: a red beacon, a
+    // 3px dot in a 10px glow, on for 0.15 s every second; a white strobe, a 3px dot in a 14px glow, two flashes every
+    // 1.2 s. Their sizes are screen px whatever the plane's scale. A still frame (t = 0) shows both on.
+    if (night > 0.01) {
+      const light = (at: readonly [number, number], on: boolean, glow: HTMLCanvasElement, r: number, css: string) => {
+        if (!on) return;
+        g.globalAlpha = alpha * night;
+        const u = r / k;
+        g.drawImage(glow, at[0] - u, at[1] - u, 2 * u, 2 * u);
         g.fillStyle = css;
-        g.fillRect(p[0] - r / k / 2, p[1] - r / k / 2, r / k, r / k);
+        g.beginPath();
+        g.arc(at[0], at[1], 1.5 / k, 0, Math.PI * 2);
+        g.fill();
       };
-      if (f.t % 1 < 0.12) dot(PLANE_LIGHTS.beacon, red);
+      const sec = f.t % 1;
       const ph = f.t % 1.2;
-      if (ph < 0.05 || (ph > 0.15 && ph < 0.2)) dot(PLANE_LIGHTS.strobe, textCss, 1.8);
+      light(PLANE_LIGHTS.beacon, sec < 0.15, beaconGlow, 10, red);
+      light(PLANE_LIGHTS.strobe, ph < 0.06 || (ph >= 0.14 && ph < 0.2), strobeGlow, 14, textCss);
     }
     g.restore();
   };
 
   return {
-    /** Start a take-off now if a plane is parked at the gate (and none is flying). o3: the L3 offset. */
+    /**
+     * Start a take-off now if a plane is at the gate (and none is flying). o3: the L3 offset. "Book 30 min" may be
+     * hovered while the plane is still fading in after the last one (v5.1 T5): it goes, and finishes fading in as it
+     * taxis. Arrivals wait for the plane to be fully there (`ready`).
+     */
     takeoff(t: number, f: LifeFrame | null, o3: number): boolean {
       const ap = f?.world.airport;
       if (!f || !ap) return false;
       const gate = gateAt(t, t0);
-      if (gate.state !== "parked" || gate.alpha < 1) return false;
+      if (gate.state !== "parked") return false;
+      startAlpha = gate.alpha;
       path = pathFor(ap, f, o3);
       t0 = t;
       flights++;

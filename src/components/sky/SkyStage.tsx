@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import type { Content } from "@/content.schema";
 import { animatePreview, backToNow, CANCEL_MS, minutesFromToday, setPreview, smootherstep01, stopPreviewAnimation, timeAtDrag, TIMELAPSE_MS } from "@/lib/sky/scrub";
-import { liveNow, SKY_DEBUG, skyStore } from "@/lib/sky/store";
+import { liveNow, overridesAllowed, skyStore } from "@/lib/sky/store";
 import { dhakaParts } from "@/lib/sky/time";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
@@ -21,7 +21,16 @@ const HINT_MS = 4000;
  * from now to now + 24 h (smootherstep) and a 4 s hint. Any input cancels it (back to now in 600 ms). Skipped
  * under reduced motion, in a hidden tab and with ?sky set.
  */
-export function SkyStage({ copy, children }: { copy: Content["ui"]["sky"]; children: React.ReactNode }) {
+export function SkyStage({
+  copy,
+  children,
+  fallback,
+}: {
+  copy: Content["ui"]["sky"];
+  children: React.ReactNode;
+  /** The server-rendered first-paint fallback for the stage's scene (src/components/sky/SkyFallback.tsx). */
+  fallback?: React.ReactNode;
+}) {
   const stage = useRef<HTMLElement>(null);
   const drag = useRef<{ id: number; x0: number; y0: number; on: boolean; at: Date } | null>(null);
   const [grabbing, setGrabbing] = useState(false);
@@ -66,7 +75,7 @@ export function SkyStage({ copy, children }: { copy: Content["ui"]["sky"]; child
     if (!el) return;
     const q = new URLSearchParams(location.search);
     // Test builds arm it only with ?teaser (so it can't wander into unrelated tests).
-    if ((TEST && !q.has("teaser")) || (SKY_DEBUG && q.has("sky"))) return;
+    if ((TEST && !q.has("teaser")) || (overridesAllowed(location.search) && q.has("sky"))) return;
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     try {
       if (sessionStorage.getItem(TEASER_KEY)) return;
@@ -161,7 +170,10 @@ export function SkyStage({ copy, children }: { copy: Content["ui"]["sky"]; child
       onPointerCancel={onUp}
     >
       {/* Scene mode (< 1100px): the landscape is the stage's horizon (the renderer draws into this slot). */}
-      <div aria-hidden="true" className="sky-scene sky-scene-stage" data-sky-scene="stage" />
+      {/* The fallback is server-rendered inside the slot; the renderer appends the canvas after it, over it. */}
+      <div aria-hidden="true" className="sky-scene sky-scene-stage" data-sky-scene="stage">
+        {fallback}
+      </div>
       <div aria-hidden="true" className="sky-stage-open" data-sky-open="" />
       <div className="column" data-sky-open="">
         <div className="relative w-fit max-w-full" data-sky-hero="">

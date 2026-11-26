@@ -6,10 +6,10 @@ import { onSky } from "@/lib/signal-bus";
 import { hexToRgb, oklabToRgb, rgbToOklab, toGamma, toLinear, type Lab } from "@/lib/sky/color";
 import { dayness } from "@/lib/sky/gradient";
 import { driftVector, MIN_DRIFT, skyModel, type SkyModel } from "@/lib/sky/model";
-import { effectiveWeather, SKY_DEBUG, skyStore, skyTime } from "@/lib/sky/store";
+import { effectiveWeather, skyStore, skyTime } from "@/lib/sky/store";
 import { dayOfYear, dhakaParts } from "@/lib/sky/time";
 import { sunColor } from "@/lib/sky/gradient";
-import { ALT_REF, nightPoint, sunPath, type ArcGeom } from "@/lib/sky/arc";
+import { nightPoint, sunPath, type ArcGeom } from "@/lib/sky/arc";
 import {
   COLUMN_BREAK,
   geomNow,
@@ -26,10 +26,16 @@ import { CLOUD_REFRESH_S, createCloudField } from "./cloud-field";
 import { createLandscape, GLOW_HORIZON, LIFT, type Landscape } from "./landscape";
 import { createLife, TAKEOFF_S, type Life, type LifeFrame } from "./life";
 import { createAmbient, type Ambient } from "./ambient";
-import { cityGlowAlpha, CITY_GLOW_REACH, fireflyCount } from "@/lib/sky/landscape/lights";
+import {
+  cityGlowAlpha,
+  CITY_GLOW_REACH,
+  fireflyCount,
+  moonRimAlpha,
+} from "@/lib/sky/landscape/lights";
 import { createParticles, mulberry32, type Particles, type ParticleState } from "./particles";
 import {
   closingWalk,
+  gutterCentre,
   landMode,
   PARALLAX,
   solveAnchors,
@@ -38,7 +44,14 @@ import {
 } from "@/lib/sky/landscape/anchors";
 import { buildClosingScene, buildStageScene, buildWorld } from "@/lib/sky/landscape/world";
 import { sunLight, WASH_MAX } from "@/lib/sky/landscape/colors";
-import { createArrival, FADE_IN_S, planePx, RESPAWN_S } from "@/lib/sky/landscape/plane";
+import {
+  bandArrival,
+  createArrival,
+  FADE_IN_S,
+  planePx,
+  RESPAWN_S,
+  visibleShare,
+} from "@/lib/sky/landscape/plane";
 import { SCENE_HORIZON } from "@/lib/sky/arc";
 import {
   awayY,
@@ -51,6 +64,8 @@ import {
 } from "@/lib/sky/horizon";
 
 const TEST = process.env.NEXT_PUBLIC_E2E === "1";
+/** The sky's debug flag (store.ts SKY_DEBUG), written out here so a release build folds what it guards away (as atmosphere.ts does). */
+const DEBUG = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_SKY_DEBUG === "1" || process.env.NEXT_PUBLIC_E2E === "1";
 /** The clear-sky cirrus floor on phones (an aesthetic choice, DECISIONS). */
 const CIRRUS_FLOOR = 0.06;
 
@@ -161,7 +176,7 @@ function start(
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
   const coarse = matchMedia("(pointer: coarse)").matches;
   const q = new URLSearchParams(window.location.search);
-  const forceBolt = SKY_DEBUG && q.get("bolt") === "1";
+  const forceBolt = DEBUG && q.get("bolt") === "1";
   const origin = performance.now();
   const now = () => (performance.now() - origin) / 1000;
   const rng = mulberry32(Date.now() & 0xffffffff);
@@ -187,11 +202,10 @@ function start(
   let backing: BackingRunner | null = null;
   let lastLight = -Infinity;
   let takeoffUntil = -Infinity;
-  // The plane takes off on every arrival at the airport (src/lib/sky/landscape/plane.ts createArrival): desktop when
-  // the airport is within 60px of its gutter target (re-armed beyond 240px), scene mode when the closing scene is
-  // ≥ 60% visible (re-armed under 15%).
+  // The plane takes off on every arrival at the airport (src/lib/sky/landscape/plane.ts createArrival): in the
+  // fixed band once at least half the airport is on screen and the page is within 400px of its bottom (re-armed
+  // under a tenth of it visible; v5.1 T5), in scene mode when the closing scene is ≥ 60% visible (re-armed under 15%).
   const arrival = createArrival();
-  let airportTarget: number | null = null;
   let closingRatio = 0;
   const closingIO = new IntersectionObserver(
     (es) => {
@@ -223,6 +237,22 @@ function start(
     const top = b.docTop - view.y - b.land.lift;
     return top < view.vh && top + b.land.height + b.land.lift > 0;
   };
+  // Scenes are pre-rendered before they enter the viewport (v5.1 T7). Each is drawn once on the first frame, and
+  // drawn ahead while it is within 1.5 viewport heights of the screen, so it is already there, and no longer fading
+  // in, when it arrives: even a jump from far away (from the top of the page to the bottom) finds it drawn.
+  const approaching = new Set<Element>();
+  /** Scenes not drawn yet: each is drawn once whatever is on screen. */
+  const undrawn = new Set<Band>();
+  const approachIO = new IntersectionObserver(
+    (es) => {
+      for (const e of es) {
+        if (e.isIntersecting) approaching.add(e.target);
+        else approaching.delete(e.target);
+      }
+    },
+    { rootMargin: "150% 0px" },
+  );
+  const drawable = (b: Band) => visible(b) || undrawn.has(b) || (!!b.slot && approaching.has(b.slot));
   // The horizon tracks the visible ground in scene mode (src/lib/sky/horizon.ts): the CSS gradient (--sky-h/--sky-b
   // on its layer), the shader (uHorizonY/B) and the backing model all read it.
   const gradEl = document.querySelector<HTMLElement>("[data-sky-gradient]");
@@ -356,7 +386,6 @@ function start(
       (1 - 0.6 * n("uFog")),
     moonR: moonR(),
     moonDim: 1,
-    halo: { r: (22 / ALT_REF) * (geom.horizonY - geom.apexY), a: model.humidity > 85 ? 1 : 0 },
   });
 
   const sunState = (): SunState => {
@@ -445,7 +474,7 @@ function start(
   // Dev/test builds: main-thread ms per frame, logged every 60 frames next to the GPU timer.
   const cpu: number[] = [];
   const draw = (t: number, dt: number, still: boolean) => {
-    const c0 = SKY_DEBUG ? performance.now() : 0;
+    const c0 = DEBUG ? performance.now() : 0;
     let lightning = 0;
     if (!still && model.thunder) {
       if (forceBolt) lightning = 1;
@@ -545,9 +574,7 @@ function start(
             smooth01(0.5, -1.5, alt0),
           ),
           glowReach: CITY_GLOW_REACH * view.vh,
-          moonRim: model.moon.up
-            ? 0.3 * n("uMoonIllum") * n("uNight") * Math.max(0, 1 - n("uCloudCover"))
-            : 0,
+          moonRim: moonRimAlpha(model.moon.up, n("uMoonIllum"), n("uNight"), n("uCloudCover")),
           moonX: v2("uMoonPos")[0]! * view.vw,
         };
         for (const b of active) b.land.setLighting(lighting);
@@ -583,7 +610,8 @@ function start(
         const world = b.land.world;
         // Off screen, the closing scene can still re-arm the arrival.
         if (world?.airport && !visible(b)) arrival.update(false, closingRatio < 0.15, false);
-        if (!world || !visible(b)) continue;
+        if (!world || !drawable(b)) continue;
+        undrawn.delete(b);
         const f: LifeFrame = {
           t,
           moving: !still,
@@ -622,11 +650,11 @@ function start(
           if (b.id === "closing") {
             near = closingRatio >= 0.6;
             away = closingRatio < 0.15;
-          } else if (airportTarget !== null) {
+          } else {
+            // The fixed band: how much of the airport's width is on screen, and how far the page is from its bottom.
             const m = world.marks.find((k) => k.id === "airport");
-            const d = m ? Math.abs(((m.x0 + m.x1) / 2) * world.s - o3 - airportTarget) : Infinity;
-            near = d <= 60;
-            away = d > 240;
+            const seen = m ? visibleShare(m.x0 * world.s - o3, m.x1 * world.s - o3, view.vw) : 0;
+            ({ near, away } = bandArrival(seen, view.docH - view.vh - view.y));
           }
           if (arrival.update(near, away, life.ready(t) && b.frame !== null)) startTakeoff(t, b, o3);
         }
@@ -657,7 +685,7 @@ function start(
           };
       }
     }
-    if (SKY_DEBUG && !still) {
+    if (DEBUG && !still) {
       cpu.push(performance.now() - c0);
       if (cpu.length >= 60) {
         const avg = cpu.reduce((a, b) => a + b, 0) / cpu.length;
@@ -676,6 +704,10 @@ function start(
     if (frames === 1) {
       atmCanvas.dataset.ready = "";
       ptsCanvas.dataset.ready = "";
+      // The server-rendered first-paint fallback (src/components/sky/SkyFallback.tsx) has done its job: it fades out
+      // over 400ms and is then hidden (globals.css). Never removed: React owns those nodes, and removing them here
+      // made the next client navigation throw "removeChild".
+      document.documentElement.dataset.skyFallbackDone = "done";
     }
     return lightning > 0;
   };
@@ -817,7 +849,16 @@ function start(
   let resizeTimer = 0;
   /** Scene slots on this page get a canvas each; bands whose slot left the page (client navigation) are dropped. */
   const ensureScenes = () => {
-    bands = bands.filter((b) => b.id === "fixed" || b.slot?.isConnected);
+    bands = bands.filter((b) => {
+      if (b.id === "fixed" || b.slot?.isConnected) return true;
+      undrawn.delete(b);
+      if (b.slot) {
+        approaching.delete(b.slot);
+        approachIO.unobserve(b.slot);
+        closingIO.unobserve(b.slot);
+      }
+      return false;
+    });
     document.querySelectorAll<HTMLElement>("[data-sky-scene]").forEach((slot) => {
       if (bands.some((b) => b.slot === slot)) return;
       const c = document.createElement("canvas");
@@ -826,15 +867,19 @@ function start(
       slot.appendChild(c);
       const stage = slot.dataset.skyScene !== "closing";
       const l = createLandscape(c, LIFT, GROUND_FADE);
-      if (l)
-        bands.push({
+      if (l) {
+        const band: Band = {
           id: stage ? "stage" : "closing",
           canvas: c,
           land: l,
           frame: null,
           slot,
           docTop: 0,
-        });
+        };
+        bands.push(band);
+        undrawn.add(band);
+      }
+      approachIO.observe(slot);
       if (!stage) closingIO.observe(slot);
     });
   };
@@ -852,12 +897,18 @@ function start(
           Math.max(0, view.docH - view.vh),
           mode === "scene" ? "centre" : mode,
         );
-        airportTarget = anchors.find((a) => a.id === "airport")?.target ?? null;
-        b.land.resize(
-          view.vw,
-          H,
-          buildWorld(anchors, view.vw, view.vh, view.docH, H, mode === "scene" ? "centre" : mode),
-        );
+        const wd = buildWorld(anchors, view.vw, view.vh, view.docH, H, mode === "scene" ? "centre" : mode);
+        b.land.resize(view.vw, H, wd);
+        // The first-paint fallback drew Ali Amjad's Clock on its right gutter's centre at the top of the page, which
+        // is where the solver puts it on most viewports. Where it doesn't, the tower would jump when the canvas takes
+        // over: hide the fallback's landmarks there, they arrive with the canvas instead (v5.1 T8).
+        const clock = wd.marks.find((k) => k.id === "clock");
+        document
+          .querySelector("[data-sky-fallback-landmarks]")
+          ?.toggleAttribute(
+            "hidden",
+            !clock || Math.abs(((clock.x0 + clock.x1) / 2) * wd.s - gutterCentre(view.vw, "right")) > 3,
+          );
       } else {
         const H = b.slot!.clientHeight;
         if (H < 10) continue; // hidden (gutter mode)
@@ -901,9 +952,9 @@ function start(
       });
     life = createLife(tx);
     ambient = createAmbient(rng, readToken("--signal"), tx, {
-      force: SKY_DEBUG && q.get("life") === "1",
+      force: DEBUG && q.get("life") === "1",
     });
-    atm = await createAtmosphere(atmCanvas, SKY_DEBUG, isDead);
+    atm = await createAtmosphere(atmCanvas, isDead);
     if (dead) return;
     if (!atm) onNoWebGL();
     if (TEST)
@@ -951,6 +1002,7 @@ function start(
     unsubBus();
     ro.disconnect();
     closingIO.disconnect();
+    approachIO.disconnect();
     motion.removeEventListener("change", applyMotion);
     document.removeEventListener("visibilitychange", onVisibility);
     atmCanvas.removeEventListener("webglcontextlost", onLost);

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  ARRIVAL_FROM_BOTTOM,
+  bandArrival,
   CLIMB_DEG,
   createArrival,
   FADE_IN_S,
@@ -15,6 +17,7 @@ import {
   TAKEOFF_S,
   TAXI_PX_S,
   TAXI_S,
+  visibleShare,
   type TakeoffParams,
 } from "@/lib/sky/landscape/plane";
 
@@ -90,9 +93,9 @@ describe("planeAt: the take-off choreography (4.6 s)", () => {
     expect(edge.alpha).toBeCloseTo(0.25, 6);
   });
 
-  it("is 70px long on phones and 90px above", () => {
-    expect(planePx(375)).toBe(70);
-    expect(planePx(1440)).toBe(90);
+  it("is 90px long on phones and 100px above (v5.1 T5)", () => {
+    expect(planePx(375)).toBe(90);
+    expect(planePx(1440)).toBe(100);
   });
 });
 
@@ -106,6 +109,39 @@ describe("gateAt: the next plane", () => {
       state: "parked",
       alpha: 1,
     });
+  });
+});
+
+describe("the arrival in the fixed band (v5.1 T5)", () => {
+  // 1440×900: the airport is 302px wide; at the bottom of the page it spans x 1110–1412.
+  const at = (scroll: number) => bandArrival(visibleShare(1704 - 0.45 * scroll, 2006 - 0.45 * scroll, 1440), 1321 - scroll);
+
+  it("measures how much of a landmark's width is on screen", () => {
+    expect(visibleShare(100, 200, 1440)).toBe(1);
+    expect(visibleShare(1400, 1500, 1440)).toBeCloseTo(0.4, 9); // its right 60px are off screen
+    expect(visibleShare(1340, 1440, 1440)).toBe(1);
+    expect(visibleShare(-50, 50, 1440)).toBeCloseTo(0.5, 9);
+    expect(visibleShare(1500, 1600, 1440)).toBe(0);
+    expect(visibleShare(100, 100, 1440)).toBe(0);
+  });
+
+  it("fires once at least half the airport is on screen and the page is within 400px of its bottom", () => {
+    expect(ARRIVAL_FROM_BOTTOM).toBe(400);
+    expect(at(0)).toEqual({ near: false, away: true });
+    expect(at(400)).toEqual({ near: false, away: true }); // not on screen yet
+    // Its left edge enters at scroll ≈ 588, a tenth of it by ≈ 655, half by ≈ 924.
+    expect(at(650).away).toBe(true);
+    expect(at(660)).toEqual({ near: false, away: false }); // more than a tenth on screen, but too high on the page
+    expect(at(921)).toEqual({ near: false, away: false }); // just under half on screen
+    expect(at(924)).toEqual({ near: true, away: false });
+    expect(at(1321)).toEqual({ near: true, away: false }); // the bottom of the page
+  });
+
+  it("re-arms only once under a tenth of the airport is visible", () => {
+    // Scrolling back up from the bottom: it stays armed-to-fire until a tenth of its width is left, then re-arms.
+    expect(at(900).away).toBe(false);
+    expect(at(660).away).toBe(false);
+    expect(at(650).away).toBe(true);
   });
 });
 

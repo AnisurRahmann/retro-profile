@@ -10,6 +10,9 @@ import {
   MIN_GAP_VH,
   nearestPlace,
   PARALLAX,
+  PHONE_HILL_TOP,
+  POSTCARD_MARK,
+  sceneBand,
   scenePlace,
   screenX,
   solveAnchors,
@@ -21,16 +24,26 @@ import {
   fireflyCount,
   LATE_SHARE,
   LIT_SHARE,
+  moonRimAlpha,
+  MOON_RIM_ALPHA,
   windowLit,
   windowSchedule,
 } from "@/lib/sky/landscape/lights";
 import { keaneBridge } from "@/lib/sky/landscape/shapes";
-import { layerColor, sunLight } from "@/lib/sky/landscape/colors";
+import {
+  HAZE,
+  layerColor,
+  layerColorLit,
+  sunLight,
+  teaRowColor,
+  teaRowNight,
+} from "@/lib/sky/landscape/colors";
+import { CITY_GLOW, LAND_TEA_ROWS, MOON_RIM } from "@/lib/sky/palette";
 import { cityGlowOver, gradientAt, type CityGlow } from "@/lib/sky/backing";
-import { luminance, oklabToRgb } from "@/lib/sky/color";
+import { hexToLab, luminance, mixLab, oklabToRgb } from "@/lib/sky/color";
 import { skyColors } from "@/lib/sky/gradient";
 import { CONDITIONS } from "@/lib/sky/weather";
-import { buildClosingScene, buildStageScene, buildWorld } from "@/lib/sky/landscape/world";
+import { buildClosingScene, buildStageScene, buildWorld, ridgeL1 } from "@/lib/sky/landscape/world";
 
 // Section tops (document px) for a 1440×900 home page.
 const SECTIONS = {
@@ -67,6 +80,21 @@ describe("landmark anchors, centre mode (pages without a stage, < 1100px)", () =
     expect(nearestPlace(anchors, 1740)).toBe("airport");
     expect(nearestPlace(anchors, 2200)).toBe("airport");
     expect(nearestPlace([], 0)).toBeNull();
+  });
+
+  it("names the landmark of the section at the 40% line even when the landmarks had to be kept apart (v5.1)", () => {
+    // The home page at 1440×900 (measured): its sections are closer together than the landmarks' minimum gap, so
+    // Keane Bridge is pushed back to scroll 0 and the label used to say "city rooftops" all through Shipped.
+    const sections = { stage: 0, shipped: 622, bench: 950, receipts: 1658, closer: 1806 };
+    const anchors = solveAnchors(sections, VW, VH, 1483, "gutter");
+    const bridge = anchors.find((a) => a.id === "bridge")!;
+    expect(bridge.s).toBe(0); // pushed back so it keeps clear of the city
+    expect(bridge.at).toBe(262); // its section's 40% line
+    const at = (id: string) => sections[id as keyof typeof sections]! - ANCHOR_AT * VH;
+    expect(nearestPlace(anchors, at("stage"))).toBe("tea");
+    expect(nearestPlace(anchors, at("shipped"))).toBe("bridge");
+    expect(nearestPlace(anchors, at("bench"))).toBe("city");
+    expect(nearestPlace(anchors, at("closer"))).toBe("airport");
   });
 
   it("keeps the sky still and the near layer fastest (real parallax)", () => {
@@ -201,23 +229,53 @@ describe("scene mode (< 1100px with a stage)", () => {
     expect(closingWalk(-200, 200, 812, 375)).toBeCloseTo(0.15 * 375, 9);
   });
 
-  it("puts the tea gardens and Keane Bridge on the stage's horizon, the airport in the closing band", () => {
-    const stage = buildStageScene(375, 114);
+  it("on a tablet puts the tea gardens, Keane Bridge and the clock tower on the stage's horizon, the airport in the closing band", () => {
+    const stage = buildStageScene(768, 140);
     expect(stage.marks.map((m) => m.id).sort()).toEqual(["bridge", "clock"]);
     const bridge = stage.marks.find((m) => m.id === "bridge")!;
     // On screen at the top of the page.
     expect(bridge.x0 * stage.s).toBeGreaterThan(0);
-    expect(bridge.x1 * stage.s).toBeLessThan(375 + 40);
+    expect(bridge.x1 * stage.s).toBeLessThan(768 + 40);
     expect(stage.layers.L2.length).toBeGreaterThan(3); // shade trees over the tea mounds
-    const closing = buildClosingScene(375, 200);
+    // The near foreground keeps its palms (the only things standing on the bank line itself, y = 0).
+    expect(stage.layers.L4.some((it) => it.y === 0)).toBe(true);
+    const closing = buildClosingScene(768, 200);
     expect(closing.marks.map((m) => m.id)).toEqual(["airport"]);
     for (const m of closing.marks) {
       expect(m.x0 * closing.s).toBeGreaterThanOrEqual(-1);
-      expect(m.x1 * closing.s).toBeLessThanOrEqual(376);
+      expect(m.x1 * closing.s).toBeLessThanOrEqual(769);
     }
     expect(closing.plane).not.toBeNull();
     expect(closing.plane![0] * closing.s).toBeGreaterThan(0);
-    expect(closing.plane![0] * closing.s).toBeLessThan(375);
+    expect(closing.plane![0] * closing.s).toBeLessThan(768);
+  });
+
+  it("on a phone (the postcard stage) shows only the tea gardens and Keane Bridge: centred, 1.6× its old size, nothing else", () => {
+    const H = sceneBand(375, 812);
+    expect(H).toBe(200);
+    const stage = buildStageScene(375, H);
+    expect(stage.marks.map((m) => m.id)).toEqual(["bridge"]);
+    const [b] = stage.marks;
+    expect(((b!.x0 + b!.x1) / 2) * stage.s).toBeCloseTo(375 / 2, 6);
+    // The old 150px band drew its 192 units (five spans and both approach ramps) at 1.5 px/unit = 288px wide.
+    expect((b!.x1 - b!.x0) * stage.s).toBeCloseTo(POSTCARD_MARK * 192 * 1.5, 6);
+    expect(stage.layers.L2.length).toBeGreaterThan(3); // shade trees over the tea mounds
+    // No clock tower on L3; no palms (y = 0) and no rickshaw (y ≈ 90) on the near layer.
+    expect(stage.layers.L3.some((it) => it.shape.x1 - it.shape.x0 === 14)).toBe(false);
+    expect(stage.layers.L4.filter((it) => it.y === 0)).toHaveLength(0);
+    expect(stage.layers.L4.filter((it) => it.y > 80)).toHaveLength(0);
+    // A short phone keeps the proportions (the scale follows the band height).
+    expect(buildStageScene(320, H).marks[0]!.x1 - buildStageScene(320, H).marks[0]!.x0).toBeCloseTo(
+      b!.x1 - b!.x0,
+      9,
+    );
+  });
+
+  it("PHONE_HILL_TOP is the far hills' highest point over a phone's width in the 200px scene", () => {
+    const s = 200 / 100;
+    let top = Infinity;
+    for (let x = 0; x <= 375 / s; x += 0.05) top = Math.min(top, ridgeL1(x));
+    expect(Math.abs(PHONE_HILL_TOP - top)).toBeLessThan(0.1);
   });
 
   it("names the stage scene's landmark nearest the centre", () => {
@@ -269,6 +327,45 @@ describe("the night landscape", () => {
     expect(cityGlowAlpha(23 * 60 + 30, 0, 1)).toBeLessThan(0.16);
     expect(cityGlowAlpha(23 * 60 + 30, 0, 1)).toBeGreaterThan(0.096);
     expect(cityGlowAlpha(12 * 60, 0, 0)).toBe(0); // by day
+  });
+
+  it("shows the tea rows as their own green by day and as the hill 3% lighter at night: texture, never glowing lines (T4)", () => {
+    const horizon = skyColors(10, "evening", "clear").horizon;
+    const light = (e: number) => ({ horizon, k: sunLight(e) });
+    const hill = (e: number) => layerColorLit(light(e), "L2");
+    const chroma = (c: [number, number, number]) => Math.hypot(c[1], c[2]);
+    // Night (at −6° and below): the hill's own chroma, exactly, and no more than 3% lighter.
+    expect(teaRowNight(light(-30))).toBe(1);
+    const night = teaRowColor(light(-30));
+    expect(night[0]).toBeCloseTo(hill(-30)[0] + 0.03, 9);
+    expect(night.slice(1)).toEqual(hill(-30).slice(1));
+    // By day: the tea green's own chroma, hazed like the hills, 6% lighter than the hill (as before T4).
+    expect(teaRowNight(light(30))).toBe(0);
+    const day = teaRowColor(light(30));
+    expect(day[0]).toBeCloseTo(hill(30)[0] + 0.06, 9);
+    const teaGreen = mixLab(hexToLab(LAND_TEA_ROWS), horizon, HAZE.L2);
+    expect(day.slice(1)).toEqual([teaGreen[1], teaGreen[2]]);
+    // Dusk is between the two.
+    const dusk = teaRowColor(light(-3));
+    expect(0 < teaRowNight(light(-3)) && teaRowNight(light(-3)) < 1).toBe(true);
+    expect(dusk[0]).toBeGreaterThan(hill(-3)[0] + 0.03);
+    expect(dusk[0]).toBeLessThan(hill(-3)[0] + 0.06);
+    expect(chroma(night)).toBeLessThan(chroma(day));
+  });
+
+  it("rims the top of the hills and the bridge with moonlight only while the moon is up: 0.3 × illumination in #C9D4E8 (T4)", () => {
+    expect(MOON_RIM).toBe("#C9D4E8");
+    expect(moonRimAlpha(true, 1, 1, 0)).toBeCloseTo(MOON_RIM_ALPHA, 9);
+    expect(moonRimAlpha(true, 0.5, 1, 0)).toBeCloseTo(0.15, 9);
+    expect(moonRimAlpha(false, 1, 1, 0)).toBe(0); // below the horizon
+    expect(moonRimAlpha(true, 1, 0, 0)).toBe(0); // daylight
+    expect(moonRimAlpha(true, 1, 1, 1)).toBe(0); // hidden by cloud
+  });
+
+  it("keeps the city glow at #E8A15A, 0.16 at the horizon, fading to 0 at 14% of the viewport height", () => {
+    expect(CITY_GLOW).toBe("#E8A15A");
+    expect(cityGlowAlpha(21 * 60, 0, 1)).toBeCloseTo(0.16, 9);
+    expect(CITY_GLOW_REACH).toBe(0.14);
   });
 
   it("keeps every silhouette darker than the sky behind it at night, city glow included", () => {

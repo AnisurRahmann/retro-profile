@@ -4,7 +4,6 @@
  */
 import { hexToRgb } from "@/lib/sky/color";
 import { STAR_COOL, STAR_WARM } from "@/lib/sky/palette";
-import { drawHalo } from "./bodies";
 
 export { mulberry32 } from "@/lib/sky/random";
 import { mulberry32 } from "@/lib/sky/random";
@@ -26,8 +25,6 @@ export type ParticleState = {
   moonR: number;
   /** Extra dimming of the moon (behind the hero text), 0..1. */
   moonDim: number;
-  /** 22° halo: radius in px and strength (0 unless humidity > 85%). */
-  halo: { r: number; a: number };
 };
 
 /** Extra drawing between layers: `back` before the stars (the arc), `front` after the moon (sun, birds, planes). */
@@ -200,12 +197,12 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
         }
       }
 
-      // Moon: lit disc + terminator ellipse; earthshine on the dark limb.
+      // Moon: lit disc + terminator ellipse; earthshine on the dark limb. Its soft glow is the shader's
+      // (sky-shader.ts); there is no ring around it (the 22° halo was removed: it read as a UI circle, v5.1 T2).
       if (s.moon.up && s.moonVisible > 0.01) {
         const R = s.moonR;
         const cx = s.moon.x * w;
         const cy = s.moon.y * h;
-        drawHalo(ctx, cx, cy, s.halo.r, s.halo.a * s.moonVisible, text);
         ctx.globalAlpha = 0.06 * s.moonVisible * s.moonDim;
         ctx.fillStyle = text;
         ctx.beginPath();

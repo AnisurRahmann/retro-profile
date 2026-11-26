@@ -7,11 +7,51 @@ const LEAVE_MS = 180;
 const CHAR_MS = 18;
 const MAX_TYPE_MS = 600;
 
+/** One variant of the line (`wide`: the full lines, when a short set exists; `short`: phones, below 640px). */
+const Line = ({
+  lines,
+  variant,
+  index,
+  shown,
+  leaving,
+  testId,
+}: {
+  lines: string[];
+  variant: "wide" | "short" | undefined;
+  index: number;
+  shown: number | null;
+  leaving: boolean;
+  testId: string;
+}) => {
+  const text = lines[index] ?? "";
+  const visible = shown === null ? text : text.slice(0, shown);
+  const hidden = shown === null ? "" : text.slice(shown);
+  return (
+    <span
+      className={`status-line${variant ? ` status-line--${variant}` : ""}`}
+      data-leaving={leaving}
+      data-testid={testId}
+      data-on-sky="status"
+    >
+      {/* Typed-out remainder: rendered invisible, so the width is final from the first character. */}
+      <span className="status-line-text">
+        {visible}
+        {hidden ? (
+          <span aria-hidden="true" className="invisible">
+            {hidden}
+          </span>
+        ) : null}
+      </span>
+    </span>
+  );
+};
+
 /**
- * Rotating status line. The first line is server-rendered (no layout shift);
- * height is reserved by CSS. Under reduced motion: one line per page load, no cycling.
+ * Rotating status line. The first line is server-rendered (no layout shift); height is reserved by CSS.
+ * With `short`, both variants render (the same line, the same moment) and CSS shows one: below 640px the short
+ * line, from 640px up the full one (globals.css). Under reduced motion: one line per page load, no cycling.
  */
-export function StatusLine({ lines }: { lines: string[] }) {
+export function StatusLine({ lines, short }: { lines: string[]; short?: string[] }) {
   const [index, setIndex] = useState(0);
   const [shown, setShown] = useState<number | null>(null); // chars revealed; null = all
   const [leaving, setLeaving] = useState(false);
@@ -67,18 +107,12 @@ export function StatusLine({ lines }: { lines: string[] }) {
     };
   }, [lines]);
 
-  const text = lines[index] ?? "";
-  const visible = shown === null ? text : text.slice(0, shown);
-  const hidden = shown === null ? "" : text.slice(shown);
-
   return (
-    <span className="status-line" data-leaving={leaving} data-testid="status-line" data-on-sky="status">
-      {visible}
-      {hidden ? (
-        <span aria-hidden="true" className="invisible">
-          {hidden}
-        </span>
+    <>
+      {short ? (
+        <Line lines={short} variant="short" index={index} shown={shown} leaving={leaving} testId="status-line-short" />
       ) : null}
-    </span>
+      <Line lines={lines} variant={short ? "wide" : undefined} index={index} shown={shown} leaving={leaving} testId="status-line" />
+    </>
   );
 }

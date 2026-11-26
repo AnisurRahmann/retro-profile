@@ -28,8 +28,19 @@ export type LandMode = "gutter" | "scene" | "centre";
 /** Landscape band height for a viewport: 18vh (≥ 808px) / 14vh, clamped to 110–200 px (CSS mirrors it). */
 export const bandHeight = (vw: number, vh: number) =>
   Math.round(Math.min(200, Math.max(110, (vw < 808 ? 0.14 : 0.18) * vh)));
-/** The stage scene's height in scene mode: 150px on phones (< 640px), the band height above (CSS --scene-h). */
-export const sceneBand = (vw: number, vh: number) => (vw < 640 ? 150 : bandHeight(vw, vh));
+/** Below this width phones get the postcard stage (v5.1 T3): the text block at the top, open sky, the scene at the bottom. */
+export const POSTCARD_VW = 640;
+/** The stage scene's height on phones, px (CSS --scene-h). */
+export const STAGE_SCENE_PX = 200;
+/** The stage scene's height in scene mode: STAGE_SCENE_PX on phones, the band height above. */
+export const sceneBand = (vw: number, vh: number) => (vw < POSTCARD_VW ? STAGE_SCENE_PX : bandHeight(vw, vh));
+/** On phones the stage scene's landmark (Keane Bridge) is this × its size at the old 150px band, on screen. */
+export const POSTCARD_MARK = 1.6;
+const OLD_STAGE_SCENE_PX = 150;
+/** The landmark's scale (about the bank) in a stage scene `H` px tall that makes it POSTCARD_MARK × its old size. */
+export const stageMarkK = (H: number) => (POSTCARD_MARK * OLD_STAGE_SCENE_PX) / H;
+/** The far hills' highest point over a phone's width, band units (world.ts ridgeL1; sky-landscape.test.ts keeps it true). */
+export const PHONE_HILL_TOP = 28.9;
 export const landMode = (vw: number, hasStage: boolean): LandMode =>
   vw >= GUTTER_MIN_VW ? "gutter" : hasStage ? "scene" : "centre";
 
@@ -53,6 +64,8 @@ export const MIN_GAP_VH = 0.6;
 
 export type Anchor = Spec & {
   /** scroll at which it reaches its target */ s: number;
+  /** scroll at which its section's top is at 40% of the viewport, before landmarks were kept apart: what the label goes by. */
+  at: number;
   /** world x, CSS px */ x: number;
   /** screen x it reaches at that scroll */ target: number;
 };
@@ -86,23 +99,28 @@ export function solveAnchors(
   const end = Number.isFinite(maxScroll) ? Math.max(0, maxScroll - END_MARGIN) : Infinity;
   const list = LANDMARKS.filter((l) => sections[l.section] !== undefined).map((l) => ({
     l,
+    at: anchorScroll(sections[l.section]!, vh, end),
     s: anchorScroll(sections[l.section]!, vh, end),
   }));
   const last = list[list.length - 1];
   if (last?.l.id === "airport" && Number.isFinite(end)) last.s = end;
   for (let i = list.length - 2; i >= 0; i--)
     list[i]!.s = Math.max(0, Math.min(list[i]!.s, list[i + 1]!.s - MIN_GAP_VH * vh));
-  return list.map(({ l, s }) => {
+  return list.map(({ l, s, at }) => {
     const target = mode === "gutter" ? gutterCentre(vw, l.side) : vw / 2;
-    return { ...l, s, target, x: target + s * PARALLAX[l.layer] };
+    return { ...l, s, at, target, x: target + s * PARALLAX[l.layer] };
   });
 }
 
-/** The place the label names at a scroll position: the landmark whose section is nearest its 40% line. */
+/**
+ * The place the label names at a scroll position: the landmark whose section is nearest its 40% line. That is
+ * `at`, not the anchor's own scroll `s`: when sections are close, landmarks are reached earlier so they keep apart
+ * (solveAnchors), and going by `s` the label named the next section's landmark (v5.1: "city rooftops" at Shipped).
+ */
 export function nearestPlace(anchors: Anchor[], scrollY: number): PlaceId | null {
   let best: Anchor | null = null;
   for (const a of anchors)
-    if (!best || Math.abs(a.s - scrollY) < Math.abs(best.s - scrollY)) best = a;
+    if (!best || Math.abs(a.at - scrollY) < Math.abs(best.at - scrollY)) best = a;
   return best?.place ?? null;
 }
 

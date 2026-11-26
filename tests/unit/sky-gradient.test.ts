@@ -112,7 +112,7 @@ describe("first-paint script", () => {
     return { props, state: html.dataset.sky };
   };
 
-  it("is under 1.5 kB in production (the ?sky= parser adds ~120 B to dev and test builds only)", () => {
+  it("is under 1.5 kB without the ?sky= parser (the builds that honour it are sized in sky-overrides.test.ts)", () => {
     expect(firstPaintScript(false).length).toBeLessThan(1500);
     expect(firstPaintScript(true).length - firstPaintScript(false).length).toBeLessThan(140);
   });
@@ -147,5 +147,8 @@ describe("first-paint script", () => {
     expect(night.state).toBe("night");
     const prod = run(firstPaintScript(false), "?sky=2026-12-15T02:00", dhakaDate(2026, 12, 15, 12 * 60).getTime());
     expect(prod.state).toBe("day");
+    // A production build needs &preview=1 for it (v5.1 T9).
+    const release = run(firstPaintScript(false, true), "?sky=2026-12-15T02:00", dhakaDate(2026, 12, 15, 12 * 60).getTime());
+    expect(release.state).toBe("day");
   });
 });
