@@ -3,7 +3,7 @@
  * photosafety rule can be tested over simulated hours. src/components/sky/SkyRenderer.tsx drives it.
  *
  * The viewer never sees more than three bright pulses in any second (WCAG 2.3.1). A strike has at most three (the
- * return stroke and up to two re-strokes, or two sheet pulses), every pulse falls within 400 ms of its strike
+ * return stroke and up to two re-strokes, or two sheet pulses), every pulse falls within 450 ms of its strike
  * beginning, and no two strikes begin within SEPARATION of each other.
  */
 import { mulberry32 } from "./random";
@@ -27,12 +27,12 @@ export type Strike = {
 
 export const BOLT = {
   levels: 7,
-  /** The stepped leader: 70–110 ms at 0.35. */
+  /** The stepped leader: 70–110 ms at a steady 0.35, drawn down from the cloud (no flicker: it is not a pulse). */
   leaderMs: [70, 110] as [number, number],
   leaderAlpha: 0.35,
   strokeMs: 60,
-  /** 0–2 re-strokes, each 30–90 ms after the one before. */
-  restrokeGap: [30, 90] as [number, number],
+  /** 0–2 re-strokes, each after a dark gap of 50–90 ms from the end of the stroke before. */
+  restrokeGap: [50, 90] as [number, number],
   restrokeMs: 45,
   afterglowMs: 280,
 };
@@ -72,10 +72,12 @@ export function newStrike(kind: Kind, t0: number, rng: () => number): Strike {
   }
   const leaderMs = between(rng, BOLT.leaderMs);
   const restrokes: number[] = [];
-  let at = leaderMs + BOLT.strokeMs / 2;
+  let at = leaderMs;
+  let len = BOLT.strokeMs;
   for (let i = 0, n = Math.floor(rng() * 3); i < n; i++) {
-    at += between(rng, BOLT.restrokeGap);
+    at += len + between(rng, BOLT.restrokeGap);
     restrokes.push(at);
+    len = BOLT.restrokeMs;
   }
   return { kind, t0, leaderMs, restrokes, pulses: [], x: -1, y: 0, r: 0 };
 }
@@ -93,15 +95,16 @@ export function strikeEnd(s: Strike): number {
   return s.kind === "cg" ? last[0] + last[1] + BOLT.afterglowMs : last[0] + last[1];
 }
 
-/** A CG bolt's brightness 0..1 at `ms` since it began: its stepped leader at 0.35 (flickering), the return stroke, its re-strokes, the afterglow. */
+/** A CG bolt's brightness 0..1 at `ms` since it began: its stepped leader at 0.35, the return stroke, its re-strokes, the afterglow. */
 export function boltAlpha(s: Strike, ms: number): number {
   if (s.kind !== "cg" || ms < 0) return 0;
-  if (ms < s.leaderMs) return BOLT.leaderAlpha * (Math.floor(ms / 13) % 2 ? 0.55 : 1);
+  if (ms < s.leaderMs) return BOLT.leaderAlpha;
   let a = 0;
   for (const [start, len] of pulseTimes(s)) if (ms >= start && ms < start + len) a = Math.max(a, 1 - 0.45 * ((ms - start) / len));
   if (a > 0) return a;
-  const ago = ms - strikeEnd(s) + BOLT.afterglowMs;
-  return ago < BOLT.afterglowMs ? 0.28 * (1 - ago / BOLT.afterglowMs) : 0;
+  // Between strokes the channel is dark; after the last, its core glows and fades.
+  const ago = ms - (strikeEnd(s) - BOLT.afterglowMs);
+  return ago >= 0 && ago < BOLT.afterglowMs ? 0.28 * (1 - ago / BOLT.afterglowMs) : 0;
 }
 
 /** An IC sheet flash's strength 0..1 at `ms` since it began. */

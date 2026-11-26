@@ -39,7 +39,12 @@ export const SPLASH = { life: 0.3, r0: 1.5, r1: 5, alpha: 0.6 } as const;
 /**
  * How many of `n` streaks each depth takes: far 50%, mid 35%, and the rest near, so the shares add up exactly.
  */
-export function layerCounts(n: number): Record<RainLayer, number> {
+export function layerCounts(n: number, drizzle = false): Record<RainLayer, number> {
+  if (drizzle) {
+    // Far and mid only, in their own proportion (50 : 35).
+    const far = Math.round((n * RAIN_LAYER.far.share) / (RAIN_LAYER.far.share + RAIN_LAYER.mid.share));
+    return { far, mid: n - far, near: 0 };
+  }
   const far = Math.round(n * RAIN_LAYER.far.share);
   const mid = Math.round(n * RAIN_LAYER.mid.share);
   return { far, mid, near: Math.max(0, n - far - mid) };
@@ -51,14 +56,25 @@ export const slantWind = (kmh: number, thunder: boolean) => (thunder ? Math.max(
 
 /**
  * The streaks' angle from the vertical (radians): atan((km/h ÷ 3.6) ÷ 7.5), the wind's speed against a drop's
- * fall speed of 7.5 m/s, at most 35°. Signed by the east–west wind: rain falls toward where the wind blows, and
- * east is screen-left (the viewer faces south), so a west wind leans the streaks left and an east wind right. A
- * north or south wind is along the view, and the streaks stay vertical.
+ * fall speed of 7.5 m/s, at most 35°. The east–west wind gives only its sign (the brief: "signed by the east–west
+ * component"), not its size: rain falls toward where the wind blows, and east is screen-left (the viewer faces
+ * south), so a west wind leans the streaks left and an east wind right. A wind straight from the north or the south
+ * leans them right: rain in a wind is never drawn vertical (W7), and a projected angle (13° for 30 km/h from 200°)
+ * reads as a calm sky.
  */
 export function rainSlant(kmh: number, fromDeg: number): number {
-  const lean = Math.tan(Math.min(MAX_SLANT, Math.atan(kmh / 3.6 / 7.5)));
-  return Math.atan(-Math.sin(((fromDeg + 180) * Math.PI) / 180) * lean);
+  const theta = Math.min(MAX_SLANT, Math.atan(kmh / 3.6 / 7.5));
+  // sin(from) is the screen-rightward share of where the wind blows (toward from + 180°, east to the left).
+  return Math.sin((fromDeg * Math.PI) / 180) < -1e-6 ? -theta : theta;
 }
+
+/** Gusts swing the slant by up to ±4° (`gust` from clouds.ts: 1 ± 0.2), away from the vertical as the wind swells. */
+export const GUST_SLANT = (4 * Math.PI) / 180;
+export const gustSlant = (slant: number, gust: number) =>
+  slant === 0 ? 0 : slant + Math.sign(slant) * GUST_SLANT * Math.max(-1, Math.min(1, (gust - 1) / 0.2));
+
+/** A drizzle: only the far and mid depths, streaks 0.6 as long and falling 0.6 as fast. */
+export const DRIZZLE = { len: 0.6, speed: 0.6 } as const;
 
 /**
  * The lights come on with the sky, not the clock. The mid sky's relative luminance (linear) at which the lamps and

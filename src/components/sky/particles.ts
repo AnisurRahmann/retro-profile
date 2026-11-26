@@ -4,7 +4,16 @@
  */
 import { hexToRgb } from "@/lib/sky/color";
 import { STAR_COOL, STAR_WARM } from "@/lib/sky/palette";
-import { RAIN_LAYER, RAIN_LAYERS, RAIN_MAX, layerCounts } from "@/lib/sky/rain";
+import { DRIZZLE, RAIN_LAYER, RAIN_LAYERS, RAIN_MAX, layerCounts } from "@/lib/sky/rain";
+
+/** How far past each side a streak may be before it wraps (px): more than the widest streak leans. */
+const RAIN_EDGE = 40;
+/** A streak drawn whole, or in two parts (from, to, alpha factor along its length from the head): the near ones. */
+const SOLID = [[0, 1, 1]] as const;
+const NEAR_BLUR = [
+  [0, 0.55, 1],
+  [0.55, 1, 0.4],
+] as const;
 
 export { mulberry32 } from "@/lib/sky/random";
 import { mulberry32 } from "@/lib/sky/random";
@@ -22,6 +31,8 @@ export type ParticleState = {
   fog: number;
   rainDensity: number;
   rainSlant: number;
+  /** A drizzle: far and mid streaks only, shorter and slower (rain.ts DRIZZLE). */
+  drizzle: boolean;
   /** A lightning flash 0..1: the streaks' alpha × (1 + 1.5 · flash), so × 2.5 in a stroke. */
   flash: number;
   moon: { x: number; y: number; up: boolean; fraction: number; waxing: boolean };
@@ -121,7 +132,7 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
     rV = new Float32Array(cap);
     rainRng = mulberry32(11);
     for (let i = 0; i < cap; i++) {
-      rX[i] = rainRng() * w * 1.2 - 0.1 * w;
+      rX[i] = rainRng() * (w + 2 * RAIN_EDGE) - RAIN_EDGE;
       rY[i] = rainRng() * h;
       rU[i * 3] = rainRng();
       rU[i * 3 + 1] = rainRng();
@@ -158,18 +169,21 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
     /** Advance rain by dt seconds (0 under reduced motion). */
     step(dt: number, s: ParticleState) {
       nRain = Math.min(rX.length, Math.round((s.rainDensity * w * h) / 100_000));
-      if (nRain !== nDrawn) {
-        const n = layerCounts(nRain);
+      const key = nRain * 2 + (s.drizzle ? 1 : 0);
+      if (key !== nDrawn) {
+        const n = layerCounts(nRain, s.drizzle);
+        const kl = s.drizzle ? DRIZZLE.len : 1;
+        const kv = s.drizzle ? DRIZZLE.speed : 1;
         let i = 0;
         for (const id of RAIN_LAYERS) {
           const spec = RAIN_LAYER[id];
           for (let k = 0; k < n[id]; k++, i++) {
-            rL[i] = spec.len[0] + rU[i * 3]! * (spec.len[1] - spec.len[0]);
+            rL[i] = kl * (spec.len[0] + rU[i * 3]! * (spec.len[1] - spec.len[0]));
             rA[i] = spec.alpha[0] + rU[i * 3 + 1]! * (spec.alpha[1] - spec.alpha[0]);
-            rV[i] = spec.speed[0] + rU[i * 3 + 2]! * (spec.speed[1] - spec.speed[0]);
+            rV[i] = kv * (spec.speed[0] + rU[i * 3 + 2]! * (spec.speed[1] - spec.speed[0]));
           }
         }
-        nDrawn = nRain;
+        nDrawn = key;
       }
       if (!dt || !nRain) return;
       const slope = Math.tan(s.rainSlant);
@@ -178,8 +192,12 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
         rX[i] = rX[i]! + rV[i]! * dt * slope;
         if (rY[i]! - rL[i]! > h) {
           rY[i] = -rL[i]! - rainRng() * 40;
-          rX[i] = rainRng() * w * 1.2 - 0.1 * w;
+          rX[i] = rainRng() * (w + 2 * RAIN_EDGE) - RAIN_EDGE;
         }
+        // A slanted streak drifts up to 0.7 of the height sideways while it falls: it wraps, so the upwind side
+        // keeps its rain (spawning across the width alone leaves a dry wedge in the lower corner).
+        if (rX[i]! > w + RAIN_EDGE) rX[i] = rX[i]! - (w + 2 * RAIN_EDGE);
+        else if (rX[i]! < -RAIN_EDGE) rX[i] = rX[i]! + (w + 2 * RAIN_EDGE);
       }
     },
     /** @param hero the hero text block in viewport px: stars behind its text are dimmed (they read as dots in the copy). */
@@ -279,7 +297,7 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
         const slope = Math.tan(s.rainSlant);
         ctx.strokeStyle = text;
         ctx.lineCap = "butt";
-        const n = layerCounts(nRain);
+        const n = layerCounts(nRain, s.drizzle);
         const flash = 1 + 1.5 * s.flash;
         let i0 = 0;
         for (const id of RAIN_LAYERS) {
@@ -287,20 +305,25 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
           const i1 = i0 + n[id];
           const mid = (spec.alpha[0] + spec.alpha[1]) / 2;
           ctx.lineWidth = spec.width;
-          for (const half of [0, 1]) {
-            const a = spec.alpha[0] + (spec.alpha[1] - spec.alpha[0]) * (0.25 + 0.5 * half);
-            for (const inCol of [false, true]) {
-              ctx.globalAlpha = a * (inCol ? 0.4 : 1) * flash;
-              ctx.beginPath();
-              for (let i = i0; i < i1; i++) {
-                if (Number(rA[i]! > mid) !== half) continue;
-                const x = rX[i]!;
-                const y = rY[i]!;
-                if (under(x, y) > 0.5 ? !inCol : inCol) continue;
-                ctx.moveTo(x, y);
-                ctx.lineTo(x - rL[i]! * slope, y - rL[i]!);
+          // The near streaks are motion-blurred: the head at full alpha, the tail fading (two strokes, not a
+          // gradient per streak).
+          for (const [from, to, k] of id === "near" ? NEAR_BLUR : SOLID) {
+            for (const half of [0, 1]) {
+              const a = spec.alpha[0] + (spec.alpha[1] - spec.alpha[0]) * (0.25 + 0.5 * half);
+              for (const inCol of [false, true]) {
+                ctx.globalAlpha = Math.min(1, a * k * (inCol ? 0.4 : 1) * flash);
+                ctx.beginPath();
+                for (let i = i0; i < i1; i++) {
+                  if (Number(rA[i]! > mid) !== half) continue;
+                  const x = rX[i]!;
+                  const y = rY[i]!;
+                  if (under(x, y) > 0.5 ? !inCol : inCol) continue;
+                  const l = rL[i]!;
+                  ctx.moveTo(x - l * from * slope, y - l * from);
+                  ctx.lineTo(x - l * to * slope, y - l * to);
+                }
+                ctx.stroke();
               }
-              ctx.stroke();
             }
           }
           i0 = i1;

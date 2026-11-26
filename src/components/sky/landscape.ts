@@ -245,12 +245,13 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
   let fogRgb: [number, number, number] = [0, 0, 0];
   /** The three bands of ground fog, half resolution and one period wider than the viewport, rebuilt when the size or the colour changes. */
   const fogStrips: HTMLCanvasElement[] = [];
-  let fogKey = "";
+  /** Each strip's own key (size and colour): one shared key left the second and third strips stale after a change. */
+  const fogKeys: string[] = [];
   const fogStrip = (k: number) => {
     const { h } = GROUND_FOG[k]!;
     const key = `${w}|${fogRgb.map((v) => Math.round(v / 8)).join()}`;
     const c = fogStrips[k] ?? (fogStrips[k] = document.createElement("canvas"));
-    if (key === fogKey && c.dataset.k === String(k)) return c;
+    if (fogKeys[k] === key) return c;
     const W = Math.ceil((FOG_PERIOD + w) / 2);
     const Hh = Math.ceil(h / 2) + 1;
     c.width = W;
@@ -266,8 +267,7 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
         img.data[o + 3] = Math.round(255 * groundFog(i * 2, j * 2, h, k));
       }
     g.putImageData(img, 0, 0);
-    fogKey = key;
-    c.dataset.k = String(k);
+    fogKeys[k] = key;
     return c;
   };
   /** Ground fog: three bands lying on the ground, the tallest the nearest and the fastest, drifting with the wind. */

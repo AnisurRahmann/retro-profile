@@ -27,16 +27,24 @@ describe("a cloud-to-ground bolt", () => {
       expect(s.leaderMs).toBeGreaterThanOrEqual(70);
       expect(s.leaderMs).toBeLessThanOrEqual(110);
       expect(s.restrokes.length).toBeLessThanOrEqual(2);
-      expect(boltAlpha(s, s.leaderMs / 2)).toBeLessThanOrEqual(0.35);
-      expect(boltAlpha(s, s.leaderMs / 2)).toBeGreaterThanOrEqual(0.35 * 0.55);
+      // A steady leader: no flicker (a pulse train at 38 Hz is what WCAG 2.3.1 is about).
+      for (let ms = 0; ms < s.leaderMs; ms += 3) expect(boltAlpha(s, ms)).toBe(0.35);
       expect(boltAlpha(s, s.leaderMs)).toBe(1);
       expect(boltAlpha(s, s.leaderMs + 59)).toBeGreaterThan(0.5);
-      expect(strikeEnd(s)).toBeLessThanOrEqual(110 + 30 + 180 + 45 + 280);
+      expect(strikeEnd(s)).toBeLessThanOrEqual(110 + 60 + 90 + 45 + 90 + 45 + 280);
+      // Each re-stroke after a dark gap of 50–90 ms.
+      const p = pulseTimes(s);
+      for (let i = 1; i < p.length; i++) {
+        const gap = p[i]![0] - (p[i - 1]![0] + p[i - 1]![1]);
+        expect(gap).toBeGreaterThanOrEqual(50);
+        expect(gap).toBeLessThanOrEqual(90);
+        expect(boltAlpha(s, p[i - 1]![0] + p[i - 1]![1] + gap / 2)).toBeLessThan(0.3);
+      }
       expect(boltAlpha(s, strikeEnd(s))).toBe(0);
       expect(boltAlpha(s, -1)).toBe(0);
-      // At most three bright pulses, all within 400 ms.
+      // At most three bright pulses, all within 450 ms.
       expect(pulseTimes(s).length).toBeLessThanOrEqual(MAX_PULSES);
-      for (const [start, len] of pulseTimes(s)) expect(start + len).toBeLessThan(400);
+      for (const [start, len] of pulseTimes(s)) expect(start + len).toBeLessThan(450);
     }
     // With no re-stroke the stroke fades to 0.55 and the afterglow takes over.
     const one = { ...newStrike("cg", 0, mulberry32(3)), restrokes: [] };

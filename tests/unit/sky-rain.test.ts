@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  DRIZZLE,
+  GUST_SLANT,
   LAMPS_AT,
   MAX_SLANT,
+  gustSlant,
   RAIN_DENSITY,
   slantWind,
   RAIN_LAYER,
@@ -28,8 +31,9 @@ describe("the slant of the rain", () => {
     // The viewer faces south. A west wind (from 270°) blows east: the streaks' lower ends are to the left.
     expect(Math.tan(rainSlant(20, 270))).toBeLessThan(0);
     expect(Math.tan(rainSlant(20, 90))).toBeGreaterThan(0);
-    // From 200° (south-south-west) it blows toward 20°, which has an eastward component: left, at atan(0.34 · tan 35°).
-    expect(deg(rainSlant(30, 200))).toBeCloseTo(13.4, 0);
+    // From 200° (south-south-west) it blows toward 20°, which has an eastward component: left, at the full angle
+    // (the east–west wind signs the slant; it does not shrink it).
+    expect(deg(rainSlant(30, 200))).toBeCloseTo(35, 6);
     expect(Math.tan(rainSlant(30, 200))).toBeLessThan(0);
   });
 
@@ -39,9 +43,20 @@ describe("the slant of the rain", () => {
     expect(slantWind(45, true)).toBe(45);
   });
 
-  it("stays vertical in a north or south wind (along the view)", () => {
-    expect(rainSlant(40, 0)).toBeCloseTo(0, 12);
-    expect(rainSlant(40, 180)).toBeCloseTo(0, 12);
+  it("is never vertical in a wind, a north or south one included (W7)", () => {
+    for (const from of [0, 180, 360, 179.9, 0.1]) expect(deg(rainSlant(40, from))).toBeCloseTo(35, 6);
+    for (let from = 0; from < 360; from += 7.5) expect(deg(rainSlant(12, from))).toBeGreaterThan(20);
+  });
+
+  it("swings ±4° with the gusts, away from the vertical as the wind swells, and never off zero", () => {
+    const base = rainSlant(30, 90);
+    expect(deg(gustSlant(base, 1.2) - base)).toBeCloseTo(4, 6);
+    expect(deg(gustSlant(base, 0.8) - base)).toBeCloseTo(4, 6);
+    expect(gustSlant(base, 1.2)).toBeGreaterThan(base);
+    expect(gustSlant(-base, 1.2)).toBeLessThan(-base);
+    expect(gustSlant(base, 1)).toBe(base);
+    expect(gustSlant(0, 1.2)).toBe(0);
+    expect(GUST_SLANT).toBeCloseTo((4 * Math.PI) / 180, 12);
   });
 });
 
@@ -50,6 +65,10 @@ describe("three depths", () => {
     expect(layerCounts(1000)).toEqual({ far: 500, mid: 350, near: 150 });
     expect(layerCounts(7)).toEqual({ far: 4, mid: 2, near: 1 });
     expect(layerCounts(0)).toEqual({ far: 0, mid: 0, near: 0 });
+    // A drizzle has no near streaks: far and mid in their own 50 : 35.
+    expect(layerCounts(85, true)).toEqual({ far: 50, mid: 35, near: 0 });
+    expect(layerCounts(7, true).near).toBe(0);
+    expect(DRIZZLE).toEqual({ len: 0.6, speed: 0.6 });
     expect(RAIN_LAYER.far.share + RAIN_LAYER.mid.share + RAIN_LAYER.near.share).toBe(1);
   });
 

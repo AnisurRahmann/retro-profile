@@ -7,8 +7,8 @@ import { hexToRgb, oklabToRgb, rgbToOklab, toGamma, toLinear, type Lab } from "@
 import { smoothstep } from "@/lib/sky/gradient";
 import { skyModel, type SkyModel } from "@/lib/sky/model";
 import { EVO_PERIOD, EVOLUTION, SHEETS, cloudPlan, depthK, gust, planeWind, type SheetId } from "@/lib/sky/clouds";
-import { LAMPS_AT, SPLASH_RATE } from "@/lib/sky/rain";
-import { bolt, boltAlpha, createLightningScheduler, sheetAlpha, strikeEnd, type Kind, type Strike } from "@/lib/sky/lightning";
+import { LAMPS_AT, SPLASH_RATE, gustSlant } from "@/lib/sky/rain";
+import { bolt, boltAlpha, createLightningScheduler, SEPARATION, sheetAlpha, strikeEnd, type Kind, type Strike } from "@/lib/sky/lightning";
 import { LIGHTNING_CORE, LIGHTNING_HALO, LIGHTNING_MID } from "@/lib/sky/palette";
 import { effectiveWeather, skyStore, skyTime, WX_DEFAULTS } from "@/lib/sky/store";
 import { dayOfYear, dhakaParts } from "@/lib/sky/time";
@@ -298,6 +298,8 @@ function start(
   let midLuma = 0;
   /** The lightning envelope of the frame (the rain brightens in it) and the mean frame time (splashes on phones). */
   let flashNow = 0;
+  /** The rain's slant this frame: the model's, swung ±4° by the gusts. */
+  let slantNow = 0;
   let emaDt = 1 / 60;
   /** The ground fog's drift in wind-seconds: held in a still frame (reduced motion). */
   let fogT = 0;
@@ -340,6 +342,9 @@ function start(
   let stageWas = true;
   let boltPaths: Path2D[] = [];
   let boltX = 0;
+  /** The bolt's top (under the cloud base) and its foot (the cloud horizon), CSS px: the leader grows down between them. */
+  let boltTop = 0;
+  let boltFoot = 0;
   const boltPass = ([["halo", LIGHTNING_HALO, 10, 0.22], ["mid", LIGHTNING_MID, 4, 0.6], ["core", LIGHTNING_CORE, 1.6, 1]] as const).map(
     ([, hex, width, alpha]) => {
       const [r, g, b] = hexToRgb(hex).map((v) => Math.round(v * 255)) as [number, number, number];
@@ -395,17 +400,30 @@ function start(
     strike = scheduler.begin(k, nowMs);
     if (place) {
       boltX = place.x;
-      boltPaths = bolt(rng, place.x, place.top, cloudHz()).map(toPath);
+      boltTop = place.top;
+      boltFoot = cloudHz();
+      boltPaths = bolt(rng, place.x, place.top, boltFoot).map(toPath);
     }
     lightningCount[k]++;
-    nextL[kind] = scheduler.due(kind, nowMs, model.thunder, true);
+    nextL[kind] = scheduler.due(kind, nowMs, model.thunder, model.condition === "heavy-rain");
     lightningLog.push({ t: Math.round(nowMs / 100) / 10, kind: k, x: place ? Math.round(place.x) : -1 });
     if (lightningLog.length > 20) lightningLog.shift();
   };
-  /** The bolt, in three passes: a blue halo, a body, a white core. The branches are thinner and dimmer. */
-  const paintBolt = (ctx: CanvasRenderingContext2D, a: number) => {
+  /**
+   * The bolt, in three passes: a blue halo, a body, a white core. The branches are thinner and dimmer. `reveal`
+   * (0..1) is how far down the stepped leader has got: it is drawn down from the cloud, the branches with it.
+   */
+  const paintBolt = (ctx: CanvasRenderingContext2D, a: number, reveal: number) => {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    const clip = reveal < 1;
+    if (clip) {
+      ctx.save();
+      ctx.beginPath();
+      // Branches run up to a quarter of the bolt's height below its foot; the reveal covers them too.
+      ctx.rect(0, 0, view.vw, boltTop + reveal * 1.3 * (boltFoot - boltTop));
+      ctx.clip();
+    }
     boltPaths.forEach((path, i) => {
       for (const [color, width, alpha] of boltPass) {
         ctx.strokeStyle = color;
@@ -414,6 +432,7 @@ function start(
         ctx.stroke(path);
       }
     });
+    if (clip) ctx.restore();
     ctx.globalAlpha = 1;
   };
   const scheduleMeteor = (t: number) => (nextMeteor = t + 40 + rng() * 50);
@@ -502,7 +521,8 @@ function start(
     deck: (cur.uStyle as number[])[2]!,
     fog: n("uFog"),
     rainDensity: model.rainDensity,
-    rainSlant: model.rainSlant,
+    rainSlant: slantNow,
+    drizzle: model.condition === "drizzle",
     flash: flashNow,
     moon: { ...model.moon, x: (cur.uMoonPos as number[])[0]!, y: (cur.uMoonPos as number[])[1]! },
     moonVisible:
@@ -619,15 +639,21 @@ function start(
     // back, at most once in 20 s. Never in a still frame (reduced motion): nothing is scheduled or drawn.
     const nowMs = t * 1000;
     let lightning = 0;
+    let reveal = 1;
     const flashAt = [0, 0, 0, 0];
     const onStage = view.y < view.vh * 0.5;
-    if (!still && !lost && !noLightning && (model.thunder || n("uRainDark") >= 1)) {
+    // Keyed to the condition, not the eased uRainDark: that never quite reaches 1 after a change of weather.
+    const heavy = model.condition === "heavy-rain";
+    if (!still && !lost && !noLightning && (model.thunder || heavy)) {
       if (!stormOn) {
         stormOn = true;
-        // The first bolt 1.2–2.5 s in; the first sheet flash never before its second has passed (never at the
-        // first frame), so nothing delays it.
-        const first = model.thunder ? (scheduler.intro(nowMs, true) ?? Infinity) : nowMs;
-        nextL = { cg: first, ic: scheduler.due("ic", first + 1400, model.thunder, true) };
+        // Thunder: the first bolt 1.2–2.5 s in (or when due, if one fell under 20 s ago), the first sheet flash a
+        // separation after it. Heavy rain: no bolt ever, the first sheet flash after a separation.
+        const first = model.thunder ? (scheduler.intro(nowMs, true) ?? scheduler.due("cg", nowMs, true, false)) : Infinity;
+        nextL = {
+          cg: first,
+          ic: scheduler.due("ic", (model.thunder ? first : nowMs) + SEPARATION, model.thunder, heavy),
+        };
       }
       if (model.thunder && onStage && !stageWas) nextL.cg = Math.min(nextL.cg, scheduler.intro(nowMs, false) ?? Infinity);
       stageWas = onStage;
@@ -640,13 +666,22 @@ function start(
         fire(k, nowMs, true);
       }
       if (nowMs >= nextL.ic) fire("ic", nowMs);
-      if (nowMs >= nextL.cg) fire("cg", nowMs);
+      // Never a bolt out of a storm that has eased to heavy rain (its due time was set under thunder).
+      if (model.thunder && nowMs >= nextL.cg) fire("cg", nowMs);
       if (strike) {
         const ms = nowMs - strike.t0 * 1000;
         const end = strikeEnd(strike);
         if (strike.kind === "cg") {
           lightning = boltAlpha(strike, ms);
+          reveal = Math.min(1, ms / strike.leaderMs);
           if (ms > end) boltPaths = [];
+          else if (boltPaths.length) {
+            // The cloud around the bolt's top lights up with it (a sheet flash at the bolt's x).
+            flashAt[0] = boltX;
+            flashAt[1] = boltTop;
+            flashAt[2] = 0.24 * view.vw;
+            flashAt[3] = 0.8 * lightning;
+          }
         } else if (ms < end) {
           flashAt[0] = strike.x * view.vw;
           flashAt[1] = strike.y * view.vh;
@@ -665,7 +700,9 @@ function start(
     flashNow = lightning;
     if (dt > 0 && dt < 0.5) emaDt += (dt - emaDt) * 0.05;
     if (dt > 0 && dt < 0.5 && !still)
-      fogT += dt * (model.windKmh / 15) * (model.wind[0] < 0 ? -1 : 1);
+      // groundFogX's wind factor (1 at 15 km/h, 2 at 30), held at 1 or more: fog lies in calm air, and its banks
+      // still drift at their own speed then (≥ 2 px/s, W6).
+      fogT += dt * Math.min(2, Math.max(1, model.windKmh / 15)) * (model.wind[0] < 0 ? -1 : 1);
     const mid = v2("uMid");
     midLuma = 0.2126 * mid[0]! + 0.7152 * mid[1]! + 0.0722 * mid[2]!;
     const hzCloud = cloudHz();
@@ -674,6 +711,7 @@ function start(
     // a float holds a sheet's place to a texel for days. The wind gusts (±20% at 0.07 Hz) and LOW and HIGH evolve.
     const depth = depthK(view.vw, hzCloud);
     const swell = gust(t);
+    slantNow = gustSlant(model.rainSlant, still ? 1 : swell);
     const wl = planeWind(model.windKmh, model.windFromDeg, "low", depth);
     const wl2 = Math.hypot(wl[0], wl[1]);
     windDir = wl2 > 1e-9 ? [wl[0]! / wl2, wl[1]! / wl2] : [1, 0];
@@ -725,7 +763,7 @@ function start(
         {
           back: (ctx) => drawArc(ctx, dayPath, nightPath, text, nightArc),
           front: (ctx) => {
-            if (boltUp) paintBolt(ctx, lightning);
+            if (boltUp) paintBolt(ctx, lightning, reveal);
             sunLayer.draw(ctx, ss, still ? 0 : t, day, (a) => {
               const px = ss.x + Math.cos(a) * 180;
               const py = ss.y + Math.sin(a) * 180;
@@ -841,7 +879,7 @@ function start(
           wind: { kmh: model.windKmh, side: model.wind[0] < 0 ? -1 : 1 },
           planePx: planePx(view.vw),
           rain: {
-            slant: model.rainSlant,
+            slant: slantNow,
             density: model.rainDensity,
             // No splashes on a phone that is already under 30 fps.
             splashes: view.vw < COLUMN_BREAK && emaDt > 1 / 30 ? 0 : (SPLASH_RATE[model.condition] ?? 0),
