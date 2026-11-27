@@ -199,16 +199,29 @@ removes `VOL_TEMP_NOISE`.
 <!-- T6 -->
 ### T6: lab screenshots and GPU probe
 
-**Status:** todo
+**Status:** done (2026-11-27, `vol/T6-probes`)
 
-**Done when:**
-- `pnpm lab:shots` captures A, B and C at 1440×900 and 375×812 on the high, medium and low tiers, plus two frames of
-  A 10 s apart, into `.shots/volumetric-lab/run-<ts>/`, with a contact sheet.
-- `pnpm lab:gpu` prints and writes the GPU ms table, per state and tier, at 1920×1080 DPR 2 and 375×812 DPR 3.
-- Both have been run once against the dev server.
-- BRIEF.md has a "Tools" section appended.
+**Files:**
+- `scripts/probe/lab-shots.mts`: states A–C (from `LAB_PRESETS`) × tiers high/medium/low × 1440×900 DPR 2 and
+  375×812 DPR 3, plus two frames of A 10 s apart, into `.shots/volumetric-lab/run-<ts>/`, with a `sheet.png`
+  contact sheet (an HTML grid screenshotted by Playwright).
+- `scripts/probe/lab-gpu.mts`: GPU ms/frame per state × tier at 1920×1080 DPR 2 and 375×812 DPR 3, 5 s per cell,
+  from `window.__vol` (the renderer's per-frame EXT_disjoint_timer_query_webgl2 query); prints a table with the
+  §5 targets marked `OVER` and writes `<run>/gpu.json` (`RUN_DIR` files it beside a shots run).
+- `package.json`: `lab:shots`, `lab:gpu`. `docs/volumetric/BRIEF.md`: §11 "Tools" (appended).
 
-**Files:** (fill in) · **How to verify:** (fill in) · **Notes for the next task:** (fill in)
+**How to verify:**
+- With the dev server up (`WEATHER_MOCK=1 CHAT_MOCK=1 NEXT_DIST_DIR=.next-dev pnpm dev -p 3005`):
+  `pnpm lab:shots && RUN_DIR=$(ls -td .shots/volumetric-lab/run-* | head -1) pnpm lab:gpu`.
+- Full run against the T1–T5 code: `.shots/volumetric-lab/run-20261127-072009/` (20 shots, sheet.png, gpu.json).
+
+**Notes for the next task:**
+- Pre-T7 numbers are far over the §5 targets (100–400 ms desktop, 33–124 ms mobile) on the real GPU (verified
+  ANGLE Metal, Apple M2) — expected: the placeholder pipeline marches at full resolution every frame. `OVER`
+  marks the two target cells.
+- In several cells `gpuMs` exceeds `rafMs`; the timer-query semantics are T7's to interpret before trusting the
+  absolute values (see the hand-off).
+- Details and the tsx `__name` pitfall for `page.evaluate`: `handoffs/T6.md`.
 <!-- /T6 -->
 
 <!-- M1 -->
