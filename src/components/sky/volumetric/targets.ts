@@ -140,12 +140,13 @@ export const SINGLE_OUTPUT: PipelineOutput = { mode: "single", scale: null, sOut
 
 /**
  * The pipeline's output for a lab state (M2: from LabState, which replaced T11's URL reading). A reference render
- * (accum > 0) always uses the single output: its mean is taken of the one opaque canvas. Outside layered mode the
- * layered switches (sout, lift, clampviz) don't apply.
+ * (accum > 0) and a debug view (debug ≠ "") always use the single output: the mean is taken of the one opaque canvas,
+ * and a debug view is a raw readout of the field (the layered composite takes ~10 frames to settle after a reset,
+ * which an e2e reading the transmittance view caught). Outside layered mode the layered switches don't apply.
  */
 export function outputFor(s: LabState): PipelineOutput {
   const base = { scale: s.scale, hold: s.hold === 1 };
-  if (s.out !== "layered" || s.accum > 0) return { ...SINGLE_OUTPUT, ...base };
+  if (s.out !== "layered" || s.accum > 0 || s.debug !== "") return { ...SINGLE_OUTPUT, ...base };
   return { mode: "layered", ...base, sOut: s.sout, lift: s.lift === 1, clampViz: s.clampviz === 1 };
 }
 

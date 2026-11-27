@@ -57,6 +57,14 @@ Apache, CC0). If a permissive source shaped your code, name it in your hand-off.
 | `seed` | integer | 1 | Weather-map seed |
 | `view` | degrees or empty | empty | Camera azimuth. Empty faces the sun (the moon at night, else south) |
 | `debug` | empty, a JS view, or a shader view | empty | `registerDebugView` names, or `SHADER_DEBUG_VIEWS` (weather, density, transmittance, light, depth) |
+| `scale` | 0.25..1 or empty | empty | The cloud target's scale instead of `TIERS[tier].scale` (T9, T10) |
+| `reproject` | 0, 1 | 1 | 0: march every pixel every frame, no checkerboard, no history |
+| `accum` | integer 0..256 | 0 | > 0: freeze time and show the mean of N frames (a reference render). Always drawn with `out=single`, like every `debug` view |
+| `out` | layered, single | **layered** | The output (§5). Changing it needs a new WebGL context, so the panel reloads the page |
+| `sout` | 0.2..1 or empty | empty | layered: the cloud canvas's scale; empty = the cloud target's |
+| `hold` | 0, 1 | 0 | 1: draw the clouds only on march frames (T7 option 1; judders ~3 px per step) |
+| `lift` | 0, 1 | 1 | layered: 1 lifts the alpha so C ≤ A holds exactly; 0 clamps C (the rejected original) |
+| `clampviz` | 0, 1 | 0 | layered: paint where the C ≤ A clamp would bind (a diagnostic) |
 
 ## 4. Conventions
 
@@ -146,8 +154,34 @@ change).
   frame.
 - Automatic tiers: high on a fine pointer, medium on a coarse one. Step down when the median frame time is over 20 ms
   for 3 s.
-- **Targets:** high ≤ 2.5 ms of GPU at 1920×1080 DPR 2. Low ≤ 3 ms at 375×812 DPR 3. Measure with `pnpm lab:gpu`
-  (T6).
+- **Resolve (T11).** A spatial estimate (the pixel's fresh sample, else the bilinear mix of the fresh samples around
+  it, weighted by cloud depth), a min/max box in YCoCg + T (tight for non-fresh pixels, with an extent floor), and a
+  Catmull-Rom history clipped into it; out = mix(spatial, history, w), w = 1 − off/τ. Not the μ ± γσ box.
+
+**The output architecture (T11, the lab's default since M2: `out=layered`).**
+
+- Two canvases, both fixed and full-viewport. Underneath, the **background layer**: its own WebGL2 context at the full
+  drawing buffer, running `displayColor(background(viewRay))` alone. It redraws on a reset and on the frame *after*
+  every `BG_EVERY`-th march, never on a march frame; the browser keeps showing it in between.
+- Above it, the **cloud layer**: the march context, its canvas `{alpha: true, premultipliedAlpha: true}` with its
+  drawing buffer at s_out × the full one (s_out = the cloud target's scale, 0.35 on high), stretched by the browser.
+  It writes A = 1 − T and C = D(c + T·b) − T·D(b), with b a background cache at s_out, and the alpha **lifted** to the
+  least value that keeps every channel C ≤ A (exact for that b). No full-resolution pass runs in the cloud context.
+- `out=single` (T7's) stays as the reference and fallback: one opaque canvas, the full-resolution composite every
+  frame. Reference renders (`accum` > 0) and debug views always use it.
+- The home page already composes fixed layers this way, so stage 2 can keep the split.
+
+**The budget (M2).** A frame's cost is what every context and the browser spend on it:
+
+> **budget ms** = Σ over the WebGL contexts of the GPU ms per frame, **amortised** (the timer-query mean over ≥ 5 s, so
+> the 15 Hz march and the ¼-rate background are spread over the frames between them) **+ the compositor's** busy ms
+> per frame (Chrome's `VizCompositorThread` task time over a 3 s trace ÷ frames drawn).
+
+- `pnpm lab:gpu` measures both outputs: `sum` (cloud `gpuMs` + background `bgGpuMs`), `comp` on the two target
+  cells, and `OVER` against sum + comp. Single output has one context, so its sum is its `gpuMs`.
+- **Targets:** high ≤ 2.5 ms at 1920×1080 DPR 2. Low ≤ 3 ms at 375×812 DPR 3. Measure with `pnpm lab:gpu`.
+- On the M2 the per-frame timer peaks (11–15 ms in every mode) are the GPU clock dropping between bursts, not a
+  frame's cost (T11 D6). Judge per-frame spikes with the trace, not the timer.
 
 ## 6. Architecture: how the pieces plug together
 
@@ -175,8 +209,11 @@ src/lib/sky/volumetric/
 2. `weather.update(dt)`. Once a second, `weather.setParams` with `forcedCellFor(...)` (T5).
 3. `sceneFor(state)` → `CloudUniforms`.
 4. Begin the GPU timer query.
-5. Either a registered debug view's `draw(ctx)`, or `pipeline.render(ctx)` (T7's `targets.ts`).
-6. End the query, then notify `onFrameTime` listeners and the tier governor.
+5. Either a registered debug view's `draw(ctx)`, or `pipeline.render(ctx)` (T7's `targets.ts`, with the output from
+   `outputFor(state)`), wrapped by `applyReviewParams` (T10: `reproject=0` invalidates first; `accum` folds the canvas
+   into the running mean). With `out=layered` the pipeline also tells the background layer when to redraw.
+6. End the query, then notify `onFrameTime` listeners and the tier governor. `__vol` gets `gpuMs`, `bgGpuMs`,
+   `out` and `accumReady`.
 
 **Shaders.**
 
@@ -210,6 +247,29 @@ The three states:
 | **C** | `/lab/clouds?t=13:00&type=stratus&cov=0.95&wind=15&from=270` | Overcast deck |
 
 (`LAB_PRESETS` in `types.ts`. Date 2026-12-15, seed 1.)
+
+Review states (T9, in `scripts/probe/lab-shots.mts`):
+
+| | URL | What it is |
+| --- | --- | --- |
+| **A-away** | A + `&view=345.56` | A with the camera 180° from the sun (165.56°): the sunlit sides, the tops-vs-bases check |
+| **A-ref** | A + `&tier=high&scale=1&reproject=0&accum=64` | Every pixel marched, no history, 64-frame mean, single output: what A should converge to |
+| **C-ref** | C + the same | The overcast reference |
+
+The refs are shot at 1440×900 DPR 2 on the high tier only. The probe waits for `window.__vol.accumReady`.
+
+**Metrics** (`metrics.json`, from the 100% crops; for comparing runs, not gates):
+
+- `lattice` (T9): the 2×2 checkerboard response on the cloud target's texel grid. It reads real edge detail too, so
+  for A it is **not** a pass gate (T11 D2); the reference itself reads 0.008.
+- `edgeWidth` (T9): median 10–90% rise of the strongest 1% of edges, CSS px. Lower is crisper.
+- `bodyStd` (T9): luma σ over low-saturation 41×41 boxes: lobe structure inside cloud bodies.
+- `streak` (T9): Σ(∂y)² ÷ Σ(∂x)² over the 300 px above the horizon. Above ~3: horizontal slices.
+- T10 and T11 used scratch measures too (anisotropy and coherence of the horizon band, class asymmetry, the residual
+  against A-ref, ΔL single vs layered); their numbers are in `handoffs/T10.md` and `T11.md`, not in `metrics.json`.
+
+Explicit checks on top of the checklist (M2): no dot lattice on thin cloud; no horizontal slices in the horizon band;
+a visible bright glow around the sun in A; lobe structure in A's dark bodies; no spokes or repeated rows in C.
 
 **Checklist.** Each item is judged PASS or FAIL per state, at 1440×900 and at 375×812, on every tier:
 
@@ -294,8 +354,8 @@ Playwright through tsx, like the other `scripts/probe/` tools.
   that run's shots.
 
 **T9: review tooling for the realism round.** `scale`, `reproject`, `accum` and `out` are URL state (`lab-state.ts`)
-and controls in the panel's "review" section. **Until T10 (scale, reproject, accum) and T11 (out) merge, the four
-params change nothing on screen.** The camera azimuth is the existing `view`.
+and controls in the panel's "review" section, wired since M2 (§3 holds the full table, with T11's `sout`, `hold`,
+`lift` and `clampviz`). The camera azimuth is the existing `view`.
 
 | Param | Values | Default | Meaning |
 | --- | --- | --- | --- |

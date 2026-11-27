@@ -438,3 +438,39 @@ The detail is in `docs/volumetric/handoffs/M1.md` and in each task's hand-off.
      - On the M2, per-frame GPU timer peaks (11–15 ms in every mode) are a clock-scaling artefact, so the 8 ms frame
        rule needs the trace or another device. With tracing on, every mode held 60 fps.
 
+## Volumetric clouds lab: M2, the realism round merged (2026-11-27)
+
+The detail is in `docs/volumetric/TASKS.md` (M2) and the T9, T10 and T11 hand-offs.
+
+211. **T8's requests approved.** `WeatherMapParams.forcedCell.clear` stays (optional, used by `cloudAtSun=edge` only),
+     and so does the `vol-sun-cell.test.ts` edit: the edge cell's shift is measured against its own 3.2-km radius. M2
+     added the wedge's missing unit test (`vol-weather-map.test.ts`).
+212. **Merge bookkeeping.**
+     - T10 left its work uncommitted in its worktree. M2 committed it there (`fa2d141`, without the dev server's
+       `tsconfig.json` include) so it could merge `--no-ff` like the others.
+     - T10 and T11 both numbered their decisions from #198. T10 keeps #198–#204; T11's became #205–#210.
+     - T9 decided (its D1–D8, `handoffs/T9.md`): `LAB_URL` is required with no default port; the lattice resample is
+       phase-locked to the cloud target; the metric definitions; no image dependency; probes import as `./x.mjs`.
+213. **The review params and the output come from `LabState`; every `TEMP until T9` block is gone.**
+     - `LabState` gains `scale`, `reproject`, `accum`, `out` (T9) and T11's `sout`, `hold`, `lift`, `clampviz`, all in
+       `LAB_DEFAULTS`; `REVIEW_DEFAULTS` and `LabStateResolved` are gone.
+     - `applyReviewParams` reads the state each frame. `createPipeline` takes the review scale through
+       `PipelineOutput.scale` instead of swapping `TIERS[tier]` (T10 Request 4). `outputFor(state)` replaces T11's
+       URL reader.
+     - Reference renders (`accum` > 0) and debug views always draw with the single output: the mean is taken of the one
+       opaque canvas, and a debug view is a raw readout. With layered, the transmittance view read 0.050 at the disc
+       for the first ~10 frames after load (0.18–0.25 once settled), which failed `lab-cloud-at-sun`'s B at frame 8.
+     - The output mode is a context attribute, so the panel reloads the page when it changes; the other switches
+       rebuild the pipeline. `VolDebug` gains `accumReady` (T9 Request 2), `out`, `bgGpuMs` and `bgDrawMs`.
+214. **The lab defaults to `out=layered`** (T11's recommendation: lifted alpha, s_out = the cloud scale, no hold).
+     - Measured in M2: desktop high 3.5–3.9 ms GPU (both contexts) against 4.8–5.2 single; mobile low 0.74–0.78
+       against 1.41–1.54.
+     - Single and layered show the same staircase edges on the same frozen frame (`.shots/volumetric-lab/M2/attr/`):
+       the blockiness comes from the 0.35/0.25 cloud scale, not from the layered stretch.
+215. **The budget is GPU ms summed over the contexts, amortised, plus the compositor.**
+     - Σ over the WebGL contexts of the timer-query mean over ≥ 5 s, plus `VizCompositorThread` busy ms per frame from
+       a 3 s Chrome trace. `pnpm lab:gpu` measures both outputs and traces the two target cells.
+     - Desktop high layered: 4.1–4.5 ms, OVER 2.5. Mobile low layered: 1.3–1.6 ms, under 3.
+216. **`.next-*/` is ignored by git, ESLint and tsc** (T9 Request 4, T10 Request 5), so each worktree's dev server can
+     use its own dist dir.
+

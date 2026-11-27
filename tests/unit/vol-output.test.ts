@@ -32,8 +32,10 @@ describe("outputFor", () => {
     expect(outputFor(at({ out: "single", scale: 0.5 })).scale).toBe(0.5);
   });
 
-  it("draws a reference render (accum > 0) with the single output", () => {
+  it("draws a reference render (accum > 0) and a debug view with the single output", () => {
     expect(outputFor(at({ accum: 64, scale: 1 }))).toEqual({ ...SINGLE_OUTPUT, scale: 1 });
+    expect(outputFor(at({ debug: "transmittance" }))).toEqual(SINGLE_OUTPUT);
+    expect(outputFor(at({ debug: "noise" })).mode).toBe("single");
   });
 });
 

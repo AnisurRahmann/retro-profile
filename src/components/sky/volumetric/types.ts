@@ -177,8 +177,9 @@ export type LabState = {
   accum: number;
   /**
    * "layered" (T11, the default since M2): the background on its own full-resolution canvas, the clouds premultiplied
-   * on a canvas at sout × the drawing buffer above it. "single": one canvas, composited at full resolution. Changing
-   * it needs a new WebGL context, so the panel reloads the page.
+   * on a canvas at sout × the drawing buffer above it. "single": one canvas, composited at full resolution. Reference
+   * renders (accum) and debug views always use single. Changing the mode needs a new WebGL context, so the panel
+   * reloads the page.
    */
   out: LabOutput;
   /** layered: the cloud canvas's scale, 0.2..1; null → the cloud target's scale (T11's recommendation). */

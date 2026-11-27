@@ -242,9 +242,9 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
   // switches rebuild the pipeline (setState). Layered needs the background canvas.
   const layered = outputFor(initial).mode === "layered" && !!opts.background;
   /** The output for a state, within this context's mode (a state asking for the other mode gets this one's). */
-  const fitOutput = (s: LabState): PipelineOutput => outputFor(layered ? { ...s, out: "layered", accum: 0 } : { ...s, out: "single" });
-  /** A layered context can't take a reference mean (it needs the single canvas): accum is ignored until the reload. */
-  const fitState = (s: LabState): LabState => (layered && s.accum > 0 ? { ...s, accum: 0 } : s);
+  const fitOutput = (s: LabState): PipelineOutput => outputFor(layered ? { ...s, out: "layered", accum: 0, debug: "" } : { ...s, out: "single" });
+  /** A layered context can't take a reference mean or a debug view (both need the single canvas) until the reload. */
+  const fitState = (s: LabState): LabState => (layered && (s.accum > 0 || s.debug !== "") ? { ...s, accum: 0, debug: "" } : s);
   let output = fitOutput(initial);
   // The layered cloud canvas is premultiplied over the background canvas (T11).
   const gl = canvas.getContext("webgl2", { antialias: false, alpha: layered, depth: false, stencil: false, premultipliedAlpha: layered, powerPreference: "high-performance" });

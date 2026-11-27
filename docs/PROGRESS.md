@@ -661,7 +661,12 @@ source of context), `TASKS.md` and `plan.json` (the board: T0–T8, M1, owners, 
   - GPU unchanged within the noise.
   - Hand-off: `docs/volumetric/handoffs/T8.md`. Decisions #195–#197.
   - T3 was being built in parallel in the main folder (`vol/T3-lab-controls`).
-- **Next:** the owner reviews the lab (the three URLs in the T8 hand-off). Nothing reaches the home page before that.
+- **Realism round, M2 (2026-11-27, worktree `../rp-M2`):** T9 (review tools), T10 (mips/LOD, scattering, aureole;
+  partial) and T11 (resolve rebuilt, layered output) merged. The review params and output live in `LabState`; the lab
+  defaults to `out=layered`. Shots `.shots/volumetric-lab/M2/`. Desktop high layered 4.1–4.5 ms (GPU + compositor)
+  against 2.5; mobile low 1.3–1.6 ms. Every M2 explicit realism check FAILS (TASKS.md M2). Decisions #211–#216.
+- **Next:** the owner reviews the lab (the URLs in TASKS.md M2) and decides the desktop budget, the cloud scale, A's
+  preset and the cloud-at-sun spec. Nothing reaches the home page before that.
 
 ## Done
 

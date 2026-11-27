@@ -269,6 +269,19 @@ describe("generateWeatherMap: forcedCell", () => {
       else expect(same).toBe(true);
     }
   });
+  it("clear (cloudAtSun=edge, M2): zeroes coverage on the wedge's spine, keeps it beyond its half-width", () => {
+    // A stratus deck has coverage everywhere, so a cleared texel can only be the wedge's doing.
+    const deck = over({ type: "stratus", coverage: 0.95 });
+    const plain = generateWeatherMap(deck);
+    const clear = { u0: 0.3, v0: 0.5, u1: 0.7, v1: 0.5, r0: 0.03, r1: 0.03 };
+    const m = generateWeatherMap({ ...deck, forcedCell: { u: 0.1, v: 0.1, radius: 0, clear } });
+    for (let x = 0; x < SIZE; x++) {
+      const u = (x + 0.5) / SIZE;
+      if (u > 0.31 && u < 0.69) expect(ch(m, 0, x, 64)).toBe(0); // the spine (v = 0.504)
+      expect(ch(m, 0, x, 80)).toBe(ch(plain, 0, x, 80)); // 0.125 uv off the spine, past r = 0.03
+    }
+    expect(ch(plain, 0, 64, 64)).toBeGreaterThan(150);
+  });
 });
 
 describe("windVelocity", () => {

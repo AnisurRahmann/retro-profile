@@ -557,3 +557,113 @@ no visible difference from single. The decision table is in `handoffs/T11.md`.
 - The remaining desktop cost is the march and resolve (about 2.5 ms amortised).
 - The remaining motion artefact is reprojection lag across the wind (cause not found).
 <!-- /T11 -->
+
+<!-- M2 -->
+### M2: merge and review of T9–T11
+
+**Status:** done (2026-11-27, `feat/volumetric-lab`). The lab is **not** signed off: most realism checks still FAIL
+(below). Nothing touches the home page.
+
+**Merged** (each `--no-ff`, gates green after each):
+- `vol/T9-review-tools` (`13231b9`).
+- `vol/T10-realism`: T10 left its work uncommitted in its worktree (status partial). M2 committed it there as
+  `fa2d141` (without the dev server's `tsconfig.json` include) and merged that.
+- `vol/T11-pipeline` (`7596206`). Conflicts in `renderer.ts`, `TASKS.md` and `DECISIONS.md` (T11's #198–#203 → #205–#210).
+
+**Step 1 (T8's requests):** approved `WeatherMapParams.forcedCell.clear` and the one-line `vol-sun-cell.test.ts` edit
+(the shift is measured against the edge cell's own 3.2-km radius, which is right). Added the missing test:
+`vol-weather-map.test.ts` "clear … zeroes coverage on the wedge's spine, keeps it beyond its half-width".
+
+**Review of the branches:**
+- **T9:** inside its ownership (the `LabState` type only in `types.ts`). Tests are real (the metrics are checked on
+  synthetic patterns with known answers; the codec is byte-exact). Weak spot: `lattice` reads sharpness as lattice
+  (T11 D2), and `streak` says A's band improved (3.28 → 1.52) while the slices are still plainly visible at 100%.
+- **T10:** shaders, `noise-gpu.ts` filtering and `applyReviewParams` only. **No tests and no committed metrics
+  tooling**; its numbers come from scratch scripts in its worktree. Left `lab-cloud-at-sun.spec.ts` failing (DECISIONS #204).
+- **T11:** inside its row. `vol-output.test.ts` only tested the TEMP URL parser; M2 replaced it with `outputFor` /
+  `sameOutput` tests. Its key measures (class asymmetry, residual, ΔL) are scratch, not in `lab:shots`.
+
+**Integration (renderer.ts and friends):** every `// TEMP until T9` block is gone. The review params and T11's output
+switches are `LabState` fields (`scale`, `reproject`, `accum`, `out`, `sout`, `hold`, `lift`, `clampviz`), all in
+`LAB_DEFAULTS` (T9 Request 1). `applyReviewParams` reads the state; `createPipeline` gets the review scale through
+`PipelineOutput.scale` (no more swapping `TIERS[tier]`, T10 Request 4). `accum > 0` and debug views always draw the single output.
+The output mode is a context attribute, so the panel reloads on a mode change; the other switches rebuild the
+pipeline. `VolDebug` gained `accumReady` (T9 Request 2), `out`, `bgGpuMs`, `bgDrawMs` (T11 Request 1). The panel has
+the T11 switches. `.next-*/` is ignored by git, ESLint and tsc (T9 Request 4, T10 Request 5). `lab:gpu` measures both
+outputs, sums the contexts and traces the compositor on the target cells.
+
+**Default output:** `out=layered` (T11's recommendation: lifted alpha, s_out = the cloud scale, no hold).
+Attribution check (`.shots/volumetric-lab/M2/attr/`, frozen, same frame): the staircase edges and the 375 low
+blockiness are the same in `out=single`, so they come from the 0.35/0.25 cloud scale with T10's crisp edges and
+T11's sharp history, not from the layered stretch.
+
+**Run:** `.shots/volumetric-lab/M2/` — 28 shots, `sheet.png`, `crops.png`, `pair-A.png`, `metrics.json`, `gpu.json`.
+A-ref and C-ref are true references (`accumConfirmed: true`, scale 1).
+
+**GPU** (`M2/gpu.json`, mean ms/frame, ANGLE Metal on an M2; sum = both contexts, comp = VizCompositorThread):
+
+| Viewport | Tier | Out | A | B | C | comp (A / B / C) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1920×1080 DPR 2 | high | single | 4.80 | 4.87 | 5.24 | 0.79 / 0.76 / 0.63 |
+| 1920×1080 DPR 2 | high | layered | 3.52 (3.26 + 0.26) | 3.67 | 3.94 | 0.57 / 0.56 / 0.60 |
+| 375×812 DPR 3 | low | single | 1.41 | 1.50 | 1.54 | 0.91 / 0.77 / 0.74 |
+| 375×812 DPR 3 | low | layered | 0.74 (0.65 + 0.09) | 0.78 | 0.75 | 0.54 / 0.79 / 0.76 |
+
+Budget (sum + comp): desktop high layered **4.1–4.5 ms, OVER 2.5**; mobile low layered 1.3–1.6 ms, under 3.
+
+**Metrics, T8-r3 → M2** (`T9-run/metrics.json` is T8-r3's code under T9's metric code; 1440×900, means of 6 crops;
+`streak` on the band):
+
+| Shot | lattice | edgeWidth (CSS px) | bodyStd | streak |
+| --- | --- | --- | --- | --- |
+| A high | 0.0070 → 0.0165 | 4.07 → **1.84** | 0.0885 → 0.0850 | 3.28 → 1.52 |
+| A low | 0.0163 → 0.0262 | 3.88 → 2.14 | 0.0750 → 0.0842 | 2.99 → 1.32 |
+| A-ref (real only in M2) | – → 0.0109 | – → 2.01 | – → 0.0836 | – → 1.98 |
+| A-away high | 0.0047 → 0.0118 | 5.29 → 3.20 | 0.0491 → 0.0528 | 3.09 → 1.59 |
+| B high | 0.0009 → 0.0036 | 4.97 → 2.89 | 0.0019 → 0.0127 | 2.37 → 1.33 |
+| C high | 0.0008 → 0.0023 | 6.39 → 5.88 | 0.0182 → 0.0390 | 25.0 → 12.4 |
+| C-ref (real only in M2) | – → 0.0018 | – → 5.53 | – → 0.0391 | – → 21.5 |
+
+Edges are 2.2× crisper, and A-high is now crisper than its own reference (1.84 vs 2.01): the extra is aliasing, which
+`lattice` (1.5× the reference) also shows.
+
+**Review (strict photographer, 100% crops; shot paths under `.shots/volumetric-lab/M2/`).** The tiers look alike
+except that medium and low are progressively blockier; a verdict holds for every tier unless noted.
+
+| # | Item | A 1440 | A 375 | B 1440 | B 375 | C 1440 | C 375 | A-away 1440 | A-away 375 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Sunlit tops, darker bases | PASS | PASS | PASS | PASS | – | – | PASS | PASS |
+| 2 | Detailed edges, no smear | FAIL: staircase on the 0.35 texel grid, dark specks under motion (`crops/A-high-1440x900-g1`, `-g4`) | FAIL: low is blocky (`A-low-375x812`) | FAIL: staircase rims, blotchy bodies (`crops/B-high-1440x900-g4`) | FAIL: rims break into squares at low (`B-low-375x812`) | FAIL: overhead is formless mush (`crops/C-high-1440x900-g1`) | FAIL: dotted rows (`C-high-375x812`) | FAIL: far field granular, "sugar" (`crops/A-away-high-1440x900-band`); near clouds PASS (`-g0`) | FAIL: granular (`A-away-high-375x812`) |
+| 3 | Shrink to horizon, no banding | FAIL: horizontal slices (`crops/A-high-1440x900-band`, also `A-ref`) | FAIL | FAIL: slices + a vertical comb under the right-hand cloud (`B-high-1440x900`, x 2100–2700, y 1100–1520) | FAIL | FAIL: rows + dotted rows (`crops/C-high-1440x900-band`) | FAIL | FAIL: slices (`crops/A-away-high-1440x900-band`) | FAIL |
+| 4 | Warm undersides, silver lining | – | – | PASS | PASS high/medium, FAIL low | – | – | – | – |
+| 5 | Sun hidden / bleeds through | e2e: see below | – | FAIL: the disc is a flat sticker with an opaque block across it, no bleed (`B-high-1440x900`, x 1150–1750, y 1100–1520) | FAIL (`B-low-375x812`) | – | – | – | – |
+| 6 | Overcast deck, no tiling | – | – | – | – | FAIL: continuous, no tile repeat, but dotted bright rows (pipeline; absent in `C-ref`) | FAIL | – | – |
+| 7 | Mobile equally real | – | FAIL (low) | – | FAIL | – | PASS (as desktop) | – | PASS (as desktop) |
+
+| Explicit check | Verdict | Evidence |
+| --- | --- | --- |
+| No dot lattice on thin cloud | **FAIL** | Dark specks and blocky dots in thin bright cloud: `crops/A-high-1440x900-g1.png`, `-g4.png`. `A-ref` instead shows a fine diagonal hatch on thin shaded flanks (`crops/A-ref-high-1440x900-g4.png`, lower right): the field, not the pipeline |
+| No horizontal slices in the horizon band | **FAIL** | Ruler-straight dark strips: `crops/A-high-1440x900-band.png`, `A-ref-…-band`, `A-away-…-band`, `B-high-1440x900.png`. Present in the reference, so in the field |
+| A visible bright glow around the sun in A | **FAIL** | The sun sits behind the main cumulus at the top centre; only a faint brightening beside the cloud, no disc, no bloom (`A-high-1440x900.png`, x 1200–1800, y 0–450) |
+| Lobe structure in A's dark bodies | **FAIL** | Lobes on the lit flanks only; the dark bellies are smooth grey slabs (`crops/A-high-1440x900-g3.png`, `-g4.png`); bodyStd 0.0885 → 0.0850 |
+| No spokes or repeated rows in C | **FAIL** | No radial spokes. Rows of elongated cells march to the horizon in `C-high` and `C-ref` (field); dotted bright rows in `C-high` and `C-high-375x812` only (pipeline) |
+
+**e2e** (`pnpm build:e2e && E2E_PORT=3111 pnpm e2e:only tests/e2e/lab-cloud-at-sun.spec.ts tests/e2e/lab-smoke.spec.ts
+--repeat-each=3 --workers=1`): **3 passed, 6 failed.**
+- `lab-smoke`: 3/3 PASS.
+- `lab-cloud-at-sun` A: 0/3, the "clear" precondition reads 0.443–0.455 against > 0.6 (T10's known failure, a cumulus
+  now sits over A's sun; it read 0.551 at T10). The ≥ 85% cover check never runs (by transmittance it held at T10).
+- `lab-cloud-at-sun` B: 0/3, the disc centre's T reads 0.082 against 0.14–0.65 (too covered). With `out=layered` it
+  read 0.050: a layered start-up transient of the debug view, fixed by drawing debug views with the single output
+  (DECISIONS #213). The rest is DECISIONS #204: the 0.7 edge shift was tuned for T8's soft fringe, and T10's crisp
+  fringe plus T11's sharper history leave it covering the centre. Re-solving it is the owner's call (T10 Request 2).
+- So item 5 has no passing automated check in M2.
+
+**Requests left open (not M2's to settle, or not needed yet):** T9 R3 (typecheck the probes in `pnpm typecheck`),
+T9 R6 (`LAB_PRESETS` entries for A-away / A-ref / C-ref), T10 R1–R2 (the cloud-at-sun spec and the edge shift),
+T11 R3 (adopt its scratch probes: class asymmetry, residual, ΔL; the compositor trace is now in `lab:gpu`).
+
+**Open (owner):** the desktop budget (4.1–4.5 against 2.5, even layered); whether to raise the cloud scale (the
+staircase); A's preset with the sun covered; the cloud-at-sun spec (DECISIONS #204); the field's horizontal slices
+and C's rows (T10's LOD did not remove them).
+<!-- /M2 -->
