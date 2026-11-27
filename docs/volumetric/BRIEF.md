@@ -277,3 +277,18 @@ Status: done | partial | blocked | needs-human
 - **Do not change the home page sky** (`src/components/sky/*` outside `volumetric/`, and `src/lib/sky/*` outside
   `volumetric/`). The volumetric code may import from the home page's sky code; never the other way round.
 - Never call the real Anthropic API, never hit Open-Meteo, never put keys anywhere but `.env.local`.
+
+## 11. Tools (T6)
+
+Both probes run against a dev or test build of the lab (any build where the gate is open) and take the base URL
+from `LAB_URL`, defaulting to `http://localhost:$VOL_PORT`, else `http://localhost:3005`. No new dependencies:
+Playwright through tsx, like the other `scripts/probe/` tools.
+
+- `pnpm lab:shots [A B C …]` — review shots into `.shots/volumetric-lab/run-<ts>/`: every state (§7, from
+  `LAB_PRESETS`) × tier (high, medium, low) × 1440×900 DPR 2 and 375×812 DPR 3, plus two frames of A 10 s apart
+  (wind drift), and `sheet.png`, a contact sheet of the whole run (an HTML grid screenshotted by Playwright).
+- `pnpm lab:gpu [A B C …]` — GPU ms/frame per state × tier at 1920×1080 DPR 2 and 375×812 DPR 3 (`GPU_TARGETS`),
+  5 s per cell, read through `window.__vol` from the renderer's per-frame `EXT_disjoint_timer_query_webgl2` query
+  (the probe samples the latest finished result every 100 ms). Prints a table (mean / p95 / max, rows over the §5
+  targets marked `OVER`) and writes `<run>/gpu.json`. `RUN_DIR=<shots run> pnpm lab:gpu` files the JSON next to
+  that run's shots.
