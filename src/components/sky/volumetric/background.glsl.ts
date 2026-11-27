@@ -46,6 +46,18 @@ const float BACKGROUND_MOON_GLOW_R = 0.128;
 const float BACKGROUND_STAR_CELLS = 26.0;
 const float BACKGROUND_STAR_FILL = 0.9;
 const float BACKGROUND_LAT = 0.4346;
+// T10: the Mie aureole, L += E · k · P_CS(cos θ, g). E is the sun's colour (its radiance scale here), the moon's
+// colour × MOON_E × its illuminated fraction at night (MOON_E = LIGHTING_MOON / LIGHTING_SUN: lighting comes later in
+// the assembly). k grows from LOW × K at the horizon to K by 12° of elevation, and fades out under an overcast
+// (coverage 0.6 → 0.95, lighting's overcast ramp). The colour runs from the sky's hue (at E's luminance) to E's
+// within ~TINT rad of the body.
+const float BACKGROUND_MIE_G = 0.76;
+const float BACKGROUND_MIE_K = 0.05;
+const float BACKGROUND_MIE_LOW = 0.35;
+const float BACKGROUND_MIE_TINT = 0.22;
+const float BACKGROUND_MOON_E = 0.056;
+const float BACKGROUND_OVERCAST_LO = 0.6;
+const float BACKGROUND_OVERCAST_HI = 0.95;
 
 // Elevation curves from src/lib/sky/model.ts: the horizon glow (sunrise / sunset) and night.
 float backgroundGlow() {
@@ -54,6 +66,21 @@ float backgroundGlow() {
 
 float backgroundNight() {
   return smoothstep(-6.0, -14.0, uSunElev);
+}
+
+// The Cornette–Shanks phase: 3/(8π) · (1 − g²)(1 + c²) / ((2 + g²)(1 + g² − 2g·c)^1.5).
+float backgroundMiePhase(float c, float g) {
+  float g2 = g * g;
+  return 0.1193662 * (1.0 - g2) * (1.0 + c * c) / ((2.0 + g2) * pow(max(1.0 + g2 - 2.0 * g * c, 1e-4), 1.5));
+}
+
+// The aureole around a body in direction l with irradiance-like colour e, over the sky colour c.
+vec3 backgroundAureole(vec3 rd, vec3 l, vec3 e, vec3 c) {
+  float ct = dot(rd, l);
+  float lum = dot(e, vec3(0.2126, 0.7152, 0.0722));
+  vec3 hue = c / max(dot(c, vec3(0.2126, 0.7152, 0.0722)), 1e-5) * lum;
+  vec3 col = mix(hue, e, exp(-acos(clamp(ct, -1.0, 1.0)) / BACKGROUND_MIE_TINT));
+  return col * backgroundMiePhase(ct, BACKGROUND_MIE_G);
 }
 
 vec3 skyGradient(vec3 rd) {
@@ -70,7 +97,13 @@ vec3 skyGradient(vec3 rd) {
     float del = e / 25.0;
     c = mix(c, uHorizonCol * 1.331, 0.75 * glow * exp(-(daz * daz + del * del) * 2.2));
   }
-  return c;
+  // T10: the aureole (here, so lighting's aerial perspective hazes clouds near the sun brighter too).
+  float clear = 1.0 - smoothstep(BACKGROUND_OVERCAST_LO, BACKGROUND_OVERCAST_HI, uCoverage);
+  float k = BACKGROUND_MIE_K * clear * mix(BACKGROUND_MIE_LOW, 1.0, smoothstep(0.0, 12.0, uSunElev));
+  vec3 aur = backgroundAureole(rd, uSunDir, uSunColor, c) * k * uSunVisible;
+  float moon = backgroundNight() * uMoonVisible * uMoonFraction;
+  if (moon > 0.001) aur += backgroundAureole(rd, uMoonDir, BACKGROUND_MOON_COL * BACKGROUND_MOON_E, c) * BACKGROUND_MIE_K * clear * moon;
+  return c + aur;
 }
 
 // Three uniform values in [0, 1) for a lattice point (D. Hoskins, "Hash without Sine", MIT licence).

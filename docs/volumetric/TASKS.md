@@ -441,3 +441,43 @@ is still OVER").
   wedge.
 - T1 should switch the noise to mipmapped filtering, which would clear C's last spokes.
 <!-- /T8 -->
+
+<!-- T10 -->
+### T10: realism (LOD, scattering, aureole)
+
+**Status:** partial (2026-11-27, `vol/T10-realism`, from `feat/volumetric-lab` at the T8 merge; T9 had no commits, so
+the review params sit behind `// TEMP until T9` in `renderer.ts`).
+
+**Files:**
+- `density.glsl.ts`: footprint LOD for SHAPE and DETAIL; DETAIL fades to its mean by LOD 2 → 4; σt 66 km⁻¹ without the
+  × coverage; the cumulus edge curve; the 0.32-km DETAIL tile; the wispy-to-billowy blend over height 0.05–0.5.
+- `lighting.glsl.ts`: octaves 0.5 / 0.35 / 0.5; the 40 m × 2 light march (detail on every step but the last, which
+  reads SHAPE at LOD + 2); AO from +100 m and +400 m; cumulus diffuse 0.5.
+- `march.glsl.ts`: the fixed-km detail fades are gone.
+- `background.glsl.ts`: the Cornette–Shanks aureole (sun and moon) in `skyGradient`.
+- `noise-gpu.ts`: `LINEAR_MIPMAP_LINEAR` (filtering only).
+- `renderer.ts`: `applyReviewParams` only (`scale`, `reproject=0`, `accum=N`, `az`).
+
+**Diagnosis:**
+- A-ref (scale 1, reproject=0, accum=64) matched A-high: bodyStd 12.2 vs 12.4, edge 19.6 vs 19.9 px. The softness was in
+  density and lighting.
+- The horizon slices persist in A-ref, so they were in the field.
+- Nothing is handed to T11 for the pipeline.
+
+**Results:** the full tables are in `handoffs/T10.md`; shots in `.shots/volumetric-lab/T10-r0` (baseline) to `T10-r4`
+(final), each with `metrics.json`, `crops.png` and `pair-A.png`.
+
+**Open (owner):**
+- `lab-cloud-at-sun.spec.ts` **fails on the e2e build**: A's clear precondition reads 0.551 against > 0.6, the same on every run (B and smoke pass). It also fails on medium and high:
+  - A's cover check reads luminance, and with the new scattering a covered sun's cloud glows. T shows ≥ 99% of the disc
+    hidden.
+  - A's ordinary field now has a cumulus over the sun.
+  - B's edge shift (`sun-cell.ts`) fully covers the disc on medium and high.
+- See hand-off Requests 1–2 and DECISIONS #204.
+
+**Notes for T11 (desktop GPU):**
+- T10 adds detail to light-march steps 2–4 and two AO density samples per lit sample.
+- Measured, same day and machine: desktop high A +0.50, B −0.22, C +0.96 ms (mobile low ≤ +0.27, 1.27–1.44 ms). C pays the most, because almost every
+  sample of a 95% deck is lit cloud.
+- Cheaper AO (shape only, or one sample) is the first lever. It costs some lobe contrast in backlit bodies.
+<!-- /T10 -->

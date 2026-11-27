@@ -351,3 +351,53 @@ The detail is in `docs/volumetric/handoffs/M1.md` and in each task's hand-off.
      - Sun gain 2.6, blooms 0.22 / 0.015 / 0.0014: the disc burns out like a photograph.
      - The lab waits for the owner's review: `docs/volumetric/handoffs/T8.md`.
 
+
+## Volumetric clouds lab: T10 realism (2026-11-27)
+
+198. **The noise is mipmapped and density picks its own LOD (T10; detail in `docs/volumetric/handoffs/T10.md`).**
+     - SHAPE and DETAIL use `LINEAR_MIPMAP_LINEAR`. Their box-filtered chains still tile, measured on the GPU: the wrap
+       seam over the interior difference is 1.00 at every level of 32³, 64³ and 128³.
+     - LOD = log2(max(1, footprint / texel)) per texture, with footprint = distance × vertical FOV / the cloud target's
+       height. The isotropic formula stays: stretching the footprint toward the horizon (1/sin el) doubled A's horizon
+       streak metric.
+     - DETAIL fades to its mean (0.45) as its LOD runs 2 → 4, instead of to no erosion. That replaces T8's fixed-km
+       fades (cumulus 25 → 90 km, stratus 15 → 50 km). Fading to no erosion swells far clouds.
+199. **A's softness was in density and lighting, not the pipeline.** A-ref (scale 1, every pixel marched, 64-frame mean)
+     matched A-high: bodyStd 12.2 vs 12.4, edge width 19.6 vs 19.9 px. The horizon slices were in the field too: A-ref
+     horizon anisotropy 2.36, A-high 2.15. Nothing was handed to T11.
+200. **Cumulus are surfaces.**
+     - σt = 66 km⁻¹ at density 1, a mean free path of 15 m. The density is no longer × coverage, so a body's core
+       reaches 1. Before, the MFP was 33 m at best and 50–125 m in most of A.
+     - The eroded cumulus density goes through ((d − 0.04) / 0.96)^0.35; stratus stays linear.
+     - The DETAIL tile is 0.32 km. The wispy (fbm) to billowy (1 − fbm) blend now runs over height 0.05–0.5; it used to
+       saturate at 0.125.
+201. **Lighting:**
+     - Three Wrenninge octaves, a = 0.5, b = 0.35, c = 0.5. Light-path extinction × 1, up from 0.65.
+     - The light march steps 40 m × 2 (2.5 km). Every step reads detail except the last, which reads SHAPE only, two
+       mip levels coarser.
+     - Ambient × exp(−0.14 · D), where D is the cloud above from samples at +100 m and +400 m, with detail.
+     - Cumulus diffuse transmission 0.5, up from 0.22.
+202. **A Mie aureole in `skyGradient`, so the aerial perspective inherits it.**
+     - Cornette–Shanks, g 0.76, k 0.05 × (0.35 → 1 by 12° of elevation) × (1 − overcast 0.6 → 0.95).
+     - Its colour runs from the sky's hue to the sun's within ~0.22 rad of the sun.
+     - The moon gets the same term at night, × 0.056 × its illuminated fraction.
+     - A: 5° from the sun is now 2.63× the sky 90° away (was 1.27×), and the sky beyond 30° stays blue.
+     - A brighter sky near the sun changes stage 2's text-backing solver (`backing.ts` estimates the sky behind
+       text). Re-solve it there, don't tune by eye.
+203. **Review params, TEMP until T9 (`applyReviewParams` in `renderer.ts`).**
+     - `scale` swaps `TIERS[tier].scale` only while `createPipeline` runs.
+     - `reproject=0` calls `pipeline.invalidate()` every frame, which marches all four offsets at α 1.
+     - `accum=N` freezes the clock and keeps a running mean of the canvas (an RGB8 copy into RGBA32F ping-pong
+       targets).
+     - `az` sets the camera azimuth.
+     - T9 moves these into `LabState`, and M2 removes the block.
+204. **`lab-cloud-at-sun.spec.ts` no longer matches the field. This is an owner decision, still open.**
+     - A, cover: the disc loses ≥ 99% (T 0.001–0.006), but the spec reads display luminance. With the stronger
+       scattering, a covered sun's cloud glows at 0.08–0.09: it passes at low by a 0.007 margin and fails on medium
+       and high.
+     - A, clear: a cumulus now sits over A's sun (T ≈ 0.002 against T8's 0.90). The clear check passes only through
+       that cloud's glow (0.64 at low).
+     - B: the edge shift tuned for T8's soft fringe (`sun-cell.ts`, 0.7) passes at low, where T is 0.20, but the disc
+       is fully covered on medium and high.
+     - The fix belongs to the spec and `sun-cell.ts` owners: read transmittance for A, as D3 did for B, and re-solve
+       the edge shift.

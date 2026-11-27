@@ -16,6 +16,7 @@ import {
   GEOMETRY,
   SHADER_DEBUG_VIEWS,
   TEXTURE_UNITS,
+  TIERS,
   type CloudUniformName,
   type CloudUniforms,
   type DebugContext,
@@ -108,6 +109,142 @@ function uniformsFor(scene: LabScene, s: LabState, w: WeatherMap, frame: FrameIn
   };
 }
 
+/** The hooks applyReviewParams hands the frame loop (T10). Every one is a no-op when no review param is set. */
+type ReviewHooks = {
+  /** The state with the review's overrides (accum freezes the clock; az sets the camera azimuth). */
+  state(s: LabState): LabState;
+  /** The pipeline for a tier, at the review's cloud target scale. */
+  pipeline(t: QualityTier): VolPipeline;
+  /** Before the pipeline renders: false = skip it (the average is complete and only needs presenting). */
+  before(p: VolPipeline): boolean;
+  /** After the pipeline drew the canvas: fold it into the running mean and present the mean. */
+  after(ctx: PassContext): void;
+  /** A new scene or size: restart the average. */
+  reset(): void;
+  dispose(): void;
+};
+
+/**
+ * T10's review params, for 100% crops and reference renders (A-ref: scale=1&reproject=0&accum=64):
+ * - `scale` (0.1..1): the cloud target's scale instead of TIERS[tier].scale.
+ * - `reproject=0`: every pixel is marched every frame and the history is bypassed. The pipeline is invalidated before
+ *   each frame (its public API), so it marches all four offsets with α 1 (`historyAlpha` of a reset).
+ * - `accum=N` (1..256): the clock freezes, the jitter keeps advancing (uFrame follows the marches), and the canvas shows
+ *   the running mean of N frames (display values, RGBA32F ping-pong), then holds it without rendering.
+ * - `az` (0..359): the camera azimuth (the same as `view`).
+ */
+function applyReviewParams(gl: WebGL2RenderingContext, search: string): ReviewHooks {
+  // TEMP until T9: the params are read here; T9 moves them into LabState and M2 removes this block.
+  const q = new URLSearchParams(search);
+  const num = (k: string, lo: number, hi: number) => {
+    const v = q.get(k);
+    const n = v === null || v === "" ? NaN : Number(v);
+    return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null;
+  };
+  const scale = num("scale", 0.1, 1);
+  const reproject = q.get("reproject") !== "0";
+  const accum = Math.round(num("accum", 1, 256) ?? 0);
+  const az = num("az", 0, 359);
+  // /TEMP
+
+  let acc: { tex: WebGLTexture; fbo: WebGLFramebuffer }[] = [];
+  let src: WebGLTexture | null = null;
+  let size: [number, number] = [0, 0];
+  let n = 0;
+  const free = () => {
+    acc.forEach((a) => (gl.deleteTexture(a.tex), gl.deleteFramebuffer(a.fbo)));
+    if (src) gl.deleteTexture(src);
+    acc = [];
+    src = null;
+  };
+  const tex2d = (w: number, h: number, internal: number) => {
+    const t = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, internal, w, h);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    return t;
+  };
+  // mix(prev, src, w): w = 1/k folds frame k into the mean; w = 0 presents it. (uRvW is a vec2 only so the copy
+  // scan doesn't read the declaration as prose.)
+  const MAIN = /* glsl */ `
+uniform sampler2D uRvPrev;
+uniform sampler2D uRvSrc;
+uniform vec2 uRvW;
+void main() {
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  outColor = vec4(mix(texelFetch(uRvPrev, c, 0).rgb, texelFetch(uRvSrc, c, 0).rgb, uRvW.x), 1.0);
+}
+`;
+  const UNITS = [10, 11] as const;
+  const draw = (ctx: PassContext, prev: WebGLTexture, cur: WebGLTexture, w: number, fbo: WebGLFramebuffer | null) => {
+    const p = ctx.program("review-accum", MAIN);
+    ctx.apply(p);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, ctx.width, ctx.height);
+    [prev, cur].forEach((t, i) => {
+      gl.activeTexture(gl.TEXTURE0 + UNITS[i]!);
+      gl.bindTexture(gl.TEXTURE_2D, t);
+    });
+    gl.uniform1i(gl.getUniformLocation(p, "uRvPrev"), UNITS[0]);
+    gl.uniform1i(gl.getUniformLocation(p, "uRvSrc"), UNITS[1]);
+    gl.uniform2f(gl.getUniformLocation(p, "uRvW"), w, 0);
+    ctx.fullscreen();
+  };
+
+  return {
+    state: (s) => ({ ...s, freeze: s.freeze || accum > 0, view: az ?? s.view }),
+    pipeline(t) {
+      if (scale === null) return createPipeline(gl, t);
+      const saved = TIERS[t];
+      TIERS[t] = { ...saved, scale };
+      try {
+        return createPipeline(gl, t);
+      } finally {
+        TIERS[t] = saved;
+      }
+    },
+    before(p) {
+      if (accum > 0 && n >= accum) return false;
+      if (!reproject) p.invalidate();
+      return true;
+    },
+    after(ctx) {
+      if (accum <= 0) return;
+      if (size[0] !== ctx.width || size[1] !== ctx.height) {
+        free();
+        size = [ctx.width, ctx.height];
+        n = 0;
+      }
+      if (!src) {
+        // RGB8: the canvas has no alpha (alpha: false), and a copy can't add components.
+        src = tex2d(ctx.width, ctx.height, gl.RGB8);
+        acc = [0, 1].map(() => {
+          const tex = tex2d(ctx.width, ctx.height, gl.RGBA32F);
+          const fbo = gl.createFramebuffer()!;
+          gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+          return { tex, fbo };
+        });
+      }
+      if (n < accum) {
+        // The canvas holds this frame's composite: copy it, fold it into the mean.
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.bindTexture(gl.TEXTURE_2D, src);
+        gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, ctx.width, ctx.height);
+        n++;
+        draw(ctx, acc[0]!.tex, src, 1 / n, acc[1]!.fbo);
+        acc.reverse();
+      }
+      draw(ctx, acc[0]!.tex, acc[0]!.tex, 0, null);
+    },
+    reset() {
+      n = 0;
+    },
+    dispose: free,
+  };
+}
+
 export type RendererOptions = {
   /** Where a JS debug view mounts its UI. */
   overlay?: HTMLElement | null;
@@ -123,14 +260,15 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
   const vao = gl.createVertexArray();
 
   const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
-  let state = initial;
+  const review = applyReviewParams(gl, typeof location === "undefined" ? "" : location.search);
+  let state = review.state(initial);
   let tier: QualityTier = resolveTier(state.tier, { coarsePointer: coarse });
   let scene = sceneFor(state);
   let noise: NoiseTextures = await createNoiseTextures(gl, tier);
   let weather: WeatherMap | null = null;
   const weatherParams = (): WeatherMapParams => ({ ...scene.weather, forcedCell: forcedCellFor(state, scene, weather?.offset ?? [0, 0]) });
   weather = createWeatherMap(gl, weatherParams());
-  let pipeline: VolPipeline = createPipeline(gl, tier);
+  let pipeline: VolPipeline = review.pipeline(tier);
   let governor = createTierGovernor(tier, state.tier === "auto");
   let programs = new Map<string, WebGLProgram>();
   const locations = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>();
@@ -221,7 +359,8 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
     noise.dispose();
     noise = fresh;
     pipeline.dispose();
-    pipeline = createPipeline(gl, tier);
+    pipeline = review.pipeline(tier);
+    review.reset();
     pipeline.resize(width, height);
     programs.forEach((p) => gl.deleteProgram(p));
     programs = new Map();
@@ -272,7 +411,8 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
         view.draw(ctx);
       } else {
         const ctx: PassContext = { gl, tier, width, height, frame: info, weather: weather!, program, apply, fullscreen };
-        pipeline.render(ctx);
+        if (review.before(pipeline)) pipeline.render(ctx);
+        review.after(ctx);
       }
     } catch (e) {
       debug.error = e instanceof Error ? e.message : String(e);
@@ -312,7 +452,8 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
     },
     setState(next) {
       const prevTier = state.tier;
-      state = next;
+      state = next = review.state(next);
+      review.reset();
       debug.state = next;
       scene = sceneFor(next);
       weather!.setParams(weatherParams());
@@ -338,6 +479,7 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
       ro.disconnect();
       mounted?.unmount?.();
       pipeline.dispose();
+      review.dispose();
       noise.dispose();
       weather!.dispose();
       programs.forEach((p) => gl.deleteProgram(p));

@@ -14,20 +14,28 @@ const float LIGHTING_MOON = 0.9;
 // Ambient (sky dome) strength on the tops and the bases.
 const float LIGHTING_AMBIENT_TOP = 0.95;
 const float LIGHTING_AMBIENT_BASE = 0.55;
-// The light march: 6 steps (VOL_LIGHT_STEPS), the first this long, each LIGHTING_GROWTH × the one before.
-const float LIGHTING_STEP0 = 0.07;
-const float LIGHTING_GROWTH = 1.75;
-// The light path's extinction relative to the view path's (in-scattering inside the body brightens it; < 1 stands in
-// for the light that multiple scattering carries deeper than the octaves model).
-const float LIGHTING_ABSORB = 0.65;
-// Multiple-scattering octaves (Hillaire 2016): each adds a × the energy at b × the optical depth, c × the anisotropy.
-const float LIGHTING_MS_A = 0.3;
-const float LIGHTING_MS_B = 0.45;
-const float LIGHTING_MS_C = 0.6;
+// The light march: 6 steps (VOL_LIGHT_STEPS), the first this long, each LIGHTING_GROWTH × the one before. T10: 70 m
+// × 1.75 → 40 m × 2 (40, 80, …, 1280 m: 2.5 km in all), so the first steps resolve the lobes a surface is made of.
+const float LIGHTING_STEP0 = 0.04;
+const float LIGHTING_GROWTH = 2.0;
+// The light path's extinction relative to the view path's. T10: 0.65 → 1 (the octaves now carry the light deeper).
+const float LIGHTING_ABSORB = 1.0;
+// Multiple-scattering octaves (Wrenninge 2013, as Hillaire 2016 uses): octave i scatters σs·aⁱ, sees the light path's
+// σt·bⁱ and the phase's g·cⁱ; their in-scattering sums. T10: a, b, c = 0.3, 0.45, 0.6 → 0.5, 0.35, 0.5 (b below the
+// brief's starting 0.5: the deeper octaves reach into a backlit body, which T10's denser σt otherwise left flat).
+const float LIGHTING_MS_A = 0.5;
+const float LIGHTING_MS_B = 0.35;
+const float LIGHTING_MS_C = 0.5;
+// Ambient occlusion (T10): the ambient dims by exp(−σ · D), with D the optical depth of the cloud straight above,
+// estimated from the density at +100 m and +400 m (with detail: a lobe's crevice sits under more cloud than its top).
+// D = ρ(+0.1 km)·0.25 km + ρ(+0.4 km)·0.35 km, in the march's optical-depth units.
+const float LIGHTING_AO_SIGMA = 0.14;
 // Powder (dark, unlit-looking edges where light enters) and how fast it saturates with local extinction (km).
 const float LIGHTING_POWDER_KM = 0.09;
 // Diffuse transmission through thick cloud (two-stream: T ≈ 1 / (1 + ¾·τ·(1 − g))), beyond what Beer–Lambert keeps.
-const float LIGHTING_DIFFUSE = 0.22;
+// T10: 0.22 → 0.5, the brightness the denser σt took from cumulus bodies, given back through scattering; it falls as
+// 1/τ, so a thinner lobe of a backlit body is lighter than a thicker one.
+const float LIGHTING_DIFFUSE = 0.5;
 // A stratus deck is close to the two-stream model's infinite slab (light can't leak out of its sides), so it keeps far
 // more of the diffuse light: an overcast sky at midday is luminous grey, not storm-dark. Blended by the map's type.
 const float LIGHTING_DIFFUSE_STRATUS = 1.0;
@@ -54,15 +62,15 @@ float cloudPhase(float cosTheta) {
   return mix(lightingHG(cosTheta, 0.8), lightingHG(cosTheta, -0.2), 0.5);
 }
 
-// Optical depth from p toward the light: VOL_LIGHT_STEPS steps, each longer than the last; the first two with
-// detail, the rest shape only.
+// Optical depth from p toward the light: VOL_LIGHT_STEPS steps, each longer than the last; every step with detail
+// (density fades it out by its footprint) except the last, which reads SHAPE only, two mip levels coarser.
 float lightingOpticalDepth(vec3 p, vec3 l) {
   float tau = 0.0;
   float ds = LIGHTING_STEP0;
   float t = 0.0;
   for (int i = 0; i < VOL_LIGHT_STEPS; i++) {
     vec3 q = p + l * (t + ds * 0.5);
-    tau += cloudDensity(q, i < 2 ? 0.0 : 1.0) * ds;
+    tau += cloudDensity(q, i < VOL_LIGHT_STEPS - 1 ? 0.0 : 3.0) * ds;
     t += ds;
     ds *= LIGHTING_GROWTH;
   }
@@ -111,9 +119,12 @@ vec3 cloudRadiance(vec3 p, vec3 rd, float density) {
   vec3 diffuseCol = mix(lightCol, vec3(dot(lightCol, vec3(0.2126, 0.7152, 0.0722))), LIGHTING_DIFFUSE_NEUTRAL);
   direct += diffuseCol * max(diffuseT - exp(-tau), 0.0) * (0.25 / LIGHTING_PI) * diffuse;
 
-  // Ambient from the sky: horizon colour on the bases, zenith colour on the tops; it also dims into the body.
+  // Ambient from the sky: horizon colour on the bases, zenith colour on the tops, dimmed by the cloud above (T10: AO
+  // from two samples straight up, replacing × mix(0.55, 1, h) × (0.4 + 0.6·e^(−0.02·density))).
   vec3 sky = mix(mix(uHorizonCol, uZenith, LIGHTING_BASE_ZENITH) * LIGHTING_AMBIENT_BASE, uZenith * LIGHTING_AMBIENT_TOP + uMid * 0.25, h);
-  vec3 ambient = sky * mix(0.55, 1.0, h) * (0.4 + 0.6 * exp(-density * 0.02));
+  vec3 up = normalize(p - vec3(0.0, -VOL_EARTH_R, 0.0));
+  float above = cloudDensity(p + up * 0.1, 0.0) * 0.25 + cloudDensity(p + up * 0.4, 0.0) * 0.35;
+  vec3 ambient = sky * exp(-LIGHTING_AO_SIGMA * above);
   ambient += vec3(0.75, 0.82, 1.0) * moonW * 0.03;
 
   // The precipitation hook: rain shafts and wet bases darken.
