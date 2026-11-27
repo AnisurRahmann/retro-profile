@@ -20,6 +20,7 @@ export function Slider({
   max,
   step = 1,
   format,
+  field,
   disabled = false,
   onInput,
 }: {
@@ -29,6 +30,8 @@ export function Slider({
   max: number;
   step?: number;
   format: (v: number) => string;
+  /** Accessible name of a number field shown in place of the readout, to type an exact value (keyboard: arrows step). */
+  field?: string;
   disabled?: boolean;
   onInput: (v: number) => void;
 }) {
@@ -39,7 +42,25 @@ export function Slider({
         <label htmlFor={id} className="text-graphite">
           {label}
         </label>
-        <span className="tabular-nums text-text">{format(value)}</span>
+        {field ? (
+          <input
+            type="number"
+            aria-label={field}
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            disabled={disabled}
+            onChange={(e) => {
+              // An emptied box is mid-edit: keep the current value until there is a number.
+              const v = Number(e.target.value);
+              if (e.target.value !== "" && Number.isFinite(v)) onInput(Math.min(max, Math.max(min, v)));
+            }}
+            className="w-16 rounded border border-hairline bg-surface px-1 py-0.5 text-right tabular-nums text-text"
+          />
+        ) : (
+          <span className="tabular-nums text-text">{format(value)}</span>
+        )}
       </div>
       <input
         id={id}
@@ -92,10 +113,21 @@ export function Seg<T extends string | number>({
   );
 }
 
-export function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+export function Toggle({
+  label,
+  checked,
+  title,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  /** Hover text for the whole row, saying what the toggle switches. */
+  title?: string;
+  onChange: (v: boolean) => void;
+}) {
   const id = useId();
   return (
-    <label htmlFor={id} className="flex items-center gap-1.5 text-graphite">
+    <label htmlFor={id} title={title} className="flex items-center gap-1.5 text-graphite">
       <input
         id={id}
         type="checkbox"
@@ -112,11 +144,16 @@ export function NumField({
   label,
   value,
   step = 1,
+  min,
+  max,
   onChange,
 }: {
   label: string;
   value: number;
   step?: number;
+  /** The field's range, as native min/max: the spinner stops there and assistive tech reads it. */
+  min?: number;
+  max?: number;
   onChange: (v: number) => void;
 }) {
   const id = useId();
@@ -127,6 +164,8 @@ export function NumField({
         id={id}
         type="number"
         step={step}
+        min={min}
+        max={max}
         value={value}
         onChange={(e) => {
           const v = Number(e.target.value);

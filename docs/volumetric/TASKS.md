@@ -16,6 +16,7 @@ don't collide. The detail goes in `handoffs/<id>.md`.
 | **M1** Review of T1–T6 | Claude Code | T1–T6 | everything volumetric (review fixes), DECISIONS, PROGRESS | `prompts/M1.md` |
 | **T7** Performance | Claude Code | M1 | `targets.ts`, `reproject.glsl.ts`, `tiers.ts`, `vol-tiers.test.ts` | `prompts/T7.md` |
 | **T8** Visual tuning, then the owner's review | Claude Code | T7 | the `*.glsl.ts` constants and shaping, `weather-map.ts` coverage mapping, DECISIONS, PROGRESS | `prompts/T8.md` |
+| **T9** Review tooling for the realism round | GLM | T8 | the `LabState` type in `types.ts`, `lab-state.ts` + tests, `controls/**`, `scripts/probe/lab-*.mts`, BRIEF "Tools" (append) | inline (the conductor's prompt) |
 
 **Order.** T1, T2, T3 and T4 can run in parallel once T0 is merged. T5 needs T4, and T6 needs T3. M1 waits for all
 six. Then T7, then T8. T8 ends with status `needs-human`: the owner reviews the lab before anything reaches the home
@@ -441,3 +442,43 @@ is still OVER").
   wedge.
 - T1 should switch the noise to mipmapped filtering, which would clear C's last spokes.
 <!-- /T8 -->
+
+<!-- T9 -->
+### T9: review tooling for the realism round
+
+**Status:** done (2026-11-27, `vol/T9-review-tools`, from `feat/volumetric-lab` after the T8 merge).
+**The four new params (`scale`, `reproject`, `accum`, `out`) change nothing on screen until T10 (scale, reproject,
+accum) and T11 (out) merge.** T9 parses them, puts them in the panel and measures their absence.
+
+**Files:**
+- `src/components/sky/volumetric/types.ts`: the `LabState` type only. Four optional fields: `scale?: number | null`
+  (0.25..1; null = the tier's), `reproject?: 0 | 1` (default 1), `accum?: number` (integer 0..256, default 0),
+  `out?: "single" | "layered"`. Optional because `LAB_DEFAULTS`, in the same file, is not T9's to edit.
+- `src/lib/sky/volumetric/lab-state.ts`: parse, serialise and clamp for all four, like the earlier params, plus
+  `REVIEW_DEFAULTS`, `LabStateResolved = Required<LabState>`, `SCALE_RANGE` and `ACCUM_MAX`.
+- `src/app/lab/clouds/controls/`: a "review" section (cloud scale slider with "use tier scale", reprojection toggle,
+  accum frames field, output select); the camera-view slider gains a typed "view azimuth" field.
+- `scripts/probe/lab-image.mts`: PNG decode/encode with no image dependency, exact crops, the texel-aligned box
+  resample. `lab-metrics.mts`: the crop geometry and `lattice`, `edgeWidth`, `bodyStd`, `streak`.
+  `lab-url.mts`: `LAB_URL` is required. `lab-shots.mts`: A-away, A-ref, C-ref, `crops/`, `crops.png`, `pair-A.png`,
+  `metrics.json`. `lab-gpu.mts`: only the `LAB_URL` change.
+- Tests: `tests/unit/vol-lab-state.test.ts` (25, was 16), `tests/unit/vol-lab-metrics.test.ts` (34, new).
+- `docs/volumetric/BRIEF.md`: the "Tools" section, appended.
+
+**How to verify:**
+- Gates. The `.mts` probes are outside `tsc`'s include: `lab-image`, `lab-metrics` and `lab-url` are typechecked
+  through the test that imports them; for all of them, `tsc --noEmit` on a tsconfig that includes `scripts/probe/lab-*.mts`.
+- `pnpm lab:shots` or `pnpm lab:gpu` without `LAB_URL` exits 2 with "LAB_URL is not set … no default port".
+- With a lab dev server: `LAB_URL=http://localhost:<port> RUN_DIR=<dir> pnpm lab:shots`, then the same for
+  `pnpm lab:gpu`. Run: `.shots/volumetric-lab/T9-run/` (28 shots, 112 crops, both sheets, `metrics.json`, `gpu.json`).
+- `.shots/volumetric-lab/T9-controls.png`: the panel at 1440×1080 with every new control in use.
+
+**Notes for the next task:**
+- **T10:** read `state.scale ?? TIERS[tier].scale`, `state.reproject !== 0` and `state.accum ?? 0`. A reference render
+  must set `window.__vol.accumReady` (false while averaging, true once N frames are in); `lab:shots` waits on it and,
+  without it, labels the ref shots "NOT a reference render". T10's temporary `scale` (0.1..1) and `az` URL parsing
+  is superseded: `scale` clamps to 0.25..1, and the camera azimuth is `view`.
+- **T11:** `state.out === "layered"`. `crops.png` only needs the single output; `out` is not captured yet.
+- **M2:** fold `REVIEW_DEFAULTS` into `LAB_DEFAULTS` and drop the four `?` (Request 1). `plan.json` has no T9 entry.
+  Detail: `handoffs/T9.md`.
+<!-- /T9 -->

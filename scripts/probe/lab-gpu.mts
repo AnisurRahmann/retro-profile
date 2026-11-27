@@ -4,14 +4,15 @@
  * window.__vol (renderer.ts already runs one query per frame; the probe samples the latest result every 100 ms).
  * Prints a table with the BRIEF §5 targets (GPU_TARGETS) marked, and writes <run>/gpu.json
  * (RUN_DIR points it at an existing lab:shots run, filing it next to the shots).
- * Needs a dev or test build running (LAB_URL, default http://localhost:$VOL_PORT, else 3005).
- * Usage: pnpm lab:gpu [A B C ...]   (states to measure; default all)
+ * Needs a dev or test build running: LAB_URL is required, and there is no default port.
+ * Usage: LAB_URL=http://localhost:<port> pnpm lab:gpu [A B C ...]   (states to measure; default all)
  */
 import fs from "node:fs";
 import { chromium, type Page } from "@playwright/test";
 import { GPU_TARGETS, LAB_PRESETS, QUALITY_TIERS, type QualityTier, type VolDebug } from "../../src/components/sky/volumetric/types";
+import { labUrl } from "./lab-url.mjs";
 
-const BASE = process.env.LAB_URL ?? `http://localhost:${process.env.VOL_PORT ?? 3005}`;
+const BASE = labUrl();
 const ids = (process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(LAB_PRESETS)) as (keyof typeof LAB_PRESETS)[];
 const MEASURE_MS = 5_000;
 const WARMUP_MS = 1_000;

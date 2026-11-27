@@ -165,6 +165,19 @@ export type LabState = {
   view: number | null;
   /** "" or a debug view: a registered JS view (registerDebugView) or one of SHADER_DEBUG_VIEWS. */
   debug: string;
+  /**
+   * The review params (T9). Parsed here; the renderer wires scale, reproject and accum (T10) and out (T11).
+   * Optional only because LAB_DEFAULTS below is T0's and predates them: parseLabState and presetState always set
+   * them (REVIEW_DEFAULTS in lab-state.ts, LabStateResolved = Required<LabState>), so read them with `??`.
+   */
+  /** Cloud target scale, 0.25..1, instead of TIERS[tier].scale; null → the tier's. */
+  scale?: number | null;
+  /** 0: march every pixel every frame, with no checkerboard and no history. Default 1. */
+  reproject?: 0 | 1;
+  /** > 0: the renderer freezes time and averages this many frames (a reference render). Integer 0..256, default 0. */
+  accum?: number;
+  /** "layered": clouds and background as separate outputs. Default "single". */
+  out?: "single" | "layered";
 };
 export type ParseLabState = (search: string) => LabState;
 export type SerialiseLabState = (s: LabState) => string;
