@@ -3,15 +3,8 @@
  * Contract: GLSL_CONTRACT.density. After the Nubis / HZD density model (Schneider 2015, 2017): the shape's
  * Perlin-Worley is remapped by its Worley fbm, multiplied by the type's height gradient, remapped by coverage, then
  * eroded by the detail fbm (wispy at the base, billowy at the top).
- *
- * VOL_TEMP_NOISE (temporary, M1 removes it once T1 and T2 are merged): T0's placeholder textures are flat, so an
- * in-shader 3D value noise stands in for SHAPE and DETAIL, and a 2D one breaks the uniform placeholder coverage into
- * patches with T2's formula. Remove: the `#define VOL_TEMP_NOISE` line, the block between `// ── temp noise` and
- * `// ── /temp noise`, and the three `#ifdef VOL_TEMP_NOISE` blocks (keep each `#else` branch).
  */
 export const densityGlsl = /* glsl */ `
-#define VOL_TEMP_NOISE 1
-
 // One SHAPE tile spans this many km (Worley cells of ~2.5 km at its lowest frequency); one DETAIL tile, this many.
 const float DENSITY_SHAPE_KM = 10.0;
 const float DENSITY_DETAIL_KM = 0.6;
@@ -25,57 +18,6 @@ const float DENSITY_EROSION_STRATUS = 0.22;
 const float DENSITY_DETAIL_DRIFT = 0.012;
 // Tops lean downwind: the shape is sheared by this many km per km of height.
 const float DENSITY_SHEAR = 0.35;
-
-// ── temp noise
-float densityTempHash(vec3 c) {
-  c = mod(c, 64.0);
-  return fract(sin(dot(c, vec3(127.1, 311.7, 74.7))) * 43758.5453);
-}
-
-float densityTempValue(vec3 x) {
-  vec3 i = floor(x);
-  vec3 f = x - i;
-  f = f * f * (3.0 - 2.0 * f);
-  float a = mix(densityTempHash(i), densityTempHash(i + vec3(1, 0, 0)), f.x);
-  float b = mix(densityTempHash(i + vec3(0, 1, 0)), densityTempHash(i + vec3(1, 1, 0)), f.x);
-  float c = mix(densityTempHash(i + vec3(0, 0, 1)), densityTempHash(i + vec3(1, 0, 1)), f.x);
-  float d = mix(densityTempHash(i + vec3(0, 1, 1)), densityTempHash(i + vec3(1, 1, 1)), f.x);
-  return mix(mix(a, b, f.y), mix(c, d, f.y), f.z);
-}
-
-// Billowy (|2n − 1| inverted), like an inverted Worley's rounded cells.
-float densityTempBillow(vec3 x) {
-  return 1.0 - abs(densityTempValue(x) * 2.0 - 1.0);
-}
-
-// SHAPE's channels as T1 builds them: R Perlin-Worley (sparse, cell-shaped), GBA a rising-frequency billow fbm.
-vec4 densityTempShape(vec3 uvw) {
-  float a = densityTempBillow(uvw * 4.0);
-  float b = densityTempBillow(uvw * 8.0 + 3.1);
-  float c = densityTempValue(uvw * 16.0 + 7.3);
-  float fbm = a * 0.625 + b * 0.25 + c * 0.125;
-  float perlin = densityTempValue(uvw * 4.0 + 11.7) * 0.6 + b * 0.4;
-  float r = clamp(remap(perlin, 1.0 - a, 1.0, 0.0, 1.0), 0.0, 1.0);
-  return vec4(r, fbm, fbm, fbm);
-}
-
-vec3 densityTempDetail(vec3 uvw) {
-  float a = densityTempBillow(uvw * 2.0);
-  float b = densityTempBillow(uvw * 4.0 + 5.3);
-  return vec3(a, b, a * b);
-}
-
-// T2's coverage formula, cov = clamp(n·1.4 − (1 − coverage)·1.1, 0, 1), over a patchy 2D field (cumulus) or a
-// near-uniform one (stratus, level 0.75 ± a little).
-float densityTempCoverage(vec2 uv, float coverage, float type) {
-  float env = densityTempValue(vec3(uv * 4.0, 0.0));
-  float patches = densityTempValue(vec3(uv * 11.0, 4.0));
-  float n = clamp((env * 0.45 + patches * 0.55 - 0.5) * 2.2 + 0.5, 0.0, 1.0);
-  n = 1.0 - 0.9 * pow(1.0 - n, 2.15);
-  n = mix(0.75 + (env - 0.5) * 0.25, n, smoothstep(0.1, 0.4, type));
-  return clamp(n * 1.4 - (1.0 - coverage) * 1.1, 0.0, 1.0);
-}
-// ── /temp noise
 
 // Altitude (km above the ground) of p.
 float densityAltitude(vec3 p) {
@@ -93,11 +35,8 @@ float densityHeightFraction(float alt, float type) {
 
 vec3 weatherAt(vec3 p) {
   vec2 uv = p.xz / VOL_WEATHER_MAP_KM - uWeatherOffset;
-  vec3 w = texture(uWeather, uv).rgb;
-#ifdef VOL_TEMP_NOISE
-  w.r = densityTempCoverage(uv, w.r, w.g);
-#endif
-  return w;
+  // Level 0 explicitly: the map has no mips, and this runs in the march's non-uniform loop (no derivatives).
+  return textureLod(uWeather, uv, 0.0).rgb;
 }
 
 float heightFraction(vec3 p) {
@@ -117,19 +56,11 @@ float densityGradient(float h, float type) {
 
 // The SHAPE / DETAIL lookups (world km → texture uvw, with the wind already applied by the caller).
 vec4 densityShape(vec3 q) {
-#ifdef VOL_TEMP_NOISE
-  return densityTempShape(q / DENSITY_SHAPE_KM);
-#else
   return textureLod(uShape, q / DENSITY_SHAPE_KM, 0.0);
-#endif
 }
 
 vec3 densityDetail(vec3 q) {
-#ifdef VOL_TEMP_NOISE
-  return densityTempDetail(q / DENSITY_DETAIL_KM);
-#else
   return textureLod(uDetail, q / DENSITY_DETAIL_KM, 0.0).rgb;
-#endif
 }
 
 float cloudDensity(vec3 p, float lod) {

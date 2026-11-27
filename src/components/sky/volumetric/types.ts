@@ -62,7 +62,8 @@ export const MIN_TRANSMITTANCE = 0.01;
 /**
  * GPU-generated, tileable noise. SHAPE: shapeSize³ RGBA8, R Perlin-Worley, GBA inverted Worley fbm at 3 rising
  * frequencies. DETAIL: 32³ RGB8 (or RGBA8), inverted Worley fbm at 3 frequencies. BLUE: 64×64 R8 blue noise.
- * All REPEAT; SHAPE and DETAIL LINEAR with mipmaps allowed, BLUE NEAREST.
+ * All REPEAT; BLUE NEAREST. SHAPE and DETAIL carry full mip chains (periodic 2×2×2 box means) but MIN_FILTER is
+ * LINEAR, so texture() reads level 0; use textureLod for a coarser level (far steps, the light march).
  */
 export type NoiseTextures = {
   shape: WebGLTexture;

@@ -257,18 +257,56 @@ removes `VOL_TEMP_NOISE`.
 <!-- M1 -->
 ### M1: review of T1–T6
 
-**Status:** todo
+**Status:** done (2026-11-27, `feat/volumetric-lab`). No follow-up blocks T7. **T3 was never delivered** (no branch
+exists): see F1.
 
-**Done when:**
-- Each of T1–T6 has been checked against `types.ts` and BRIEF.md. Small fixes are made; bigger ones are follow-ups
-  with an owner.
-- Requests for M1 are applied or rejected with a reason.
-- The hand-off decisions are carried into `docs/DECISIONS.md`.
-- `VOL_TEMP_NOISE` is removed.
-- `pnpm lab:shots` and `pnpm lab:gpu` have been run and the contact sheet looked at.
-- The status is `needs-human` if a follow-up blocks T7.
+**Merged** (each with `--no-ff`; gates green after each):
+- `vol/T1-noise`
+- `vol/T2-weather-map`
+- `vol/T4-core`
+- T5's commit `20df856` (the `vol/T5-background` ref was stale)
+- `vol/T6-probes`
 
-**Files:** (fill in) · **How to verify:** (fill in) · **Notes for the next task:** (fill in)
+**Fixed:**
+- `VOL_TEMP_NOISE` removed. `weatherAt` uses `textureLod`.
+- `VOL_MIN_TRANSMITTANCE` define (T4).
+- Probes: `load` instead of `networkidle`, and a tier-mismatch flag (T6).
+- `types.ts` documents the mip chains (T1).
+- `.next-dev` ignored by git, ESLint and tsc (T1, T6).
+
+**How to verify:**
+- Gates: `pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm check:bundle`.
+- e2e: `pnpm build:e2e && pnpm e2e:only tests/e2e/lab-cloud-at-sun.spec.ts tests/e2e/lab-smoke.spec.ts` (both pass;
+  cloud-at-sun no longer skips).
+- Shots: `.shots/volumetric-lab/run-20261127-074508/` (20 shots, `sheet.png`). GPU table: `…/gpu.json`.
+
+**GPU after M1** (mean ms, ANGLE Metal on an M2, full-resolution march):
+
+| Viewport | Tier | A | B | C |
+| --- | --- | --- | --- | --- |
+| 1920×1080 DPR 2 | high | 58.4 | 55.9 | 35.6 |
+| 1920×1080 DPR 2 | medium | 39.2 | 38.0 | 25.4 |
+| 1920×1080 DPR 2 | low | 27.5 | 26.4 | 20.2 |
+| 375×812 DPR 3 | high | 21.1 | 19.7 | 12.4 |
+| 375×812 DPR 3 | medium | 14.7 | 13.7 | 10.0 |
+| 375×812 DPR 3 | low | 10.7 | 10.1 | 9.4 |
+
+All four target cells are OVER (high ≤ 2.5, low ≤ 3). That's T7's job. On the temp noise it was 102–412 ms.
+
+**Follow-ups** (detail in `handoffs/M1.md`):
+
+| ID | Owner | Blocks | Task |
+| --- | --- | --- | --- |
+| F1 | GLM (T3) | T8 | Deliver T3 as specified: the controls panel, clamping, `vol-lab-state` tests; accept `cloudAtSun=cover` |
+| F2 | Claude Code (T8) | sign-off | B: the `edge` cell reads as a flat slab on the horizon, and the low sun is always hidden. Add the `forcedCell.clear` gap, shape the cell, extend `lab-cloud-at-sun` to B |
+| F3 | Claude Code (T8) | sign-off | C: the overcast deck streaks and swirls toward the horizon (the rejected look). Needs cellular texture with no smear |
+| F4 | GLM | nothing | `scripts/probe/lab-noise.mts`: GPU-vs-CPU noise readback probe |
+
+**Notes for T7:**
+- `gpuMs` > `rafMs` in heavy cells: check the timer semantics.
+- `WeatherMap.offset` wraps, so reproject with `velocity`.
+- The forced cell regenerates the map once a second (~1.5 ms).
+- Draw `background()` at full resolution.
 <!-- /M1 -->
 
 <!-- T7 -->

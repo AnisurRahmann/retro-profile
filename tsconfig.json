@@ -45,6 +45,7 @@
     "node_modules",
     "out",
     ".next",
-    ".next-e2e"
+    ".next-e2e",
+    ".next-dev"
   ]
 }

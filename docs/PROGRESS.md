@@ -644,8 +644,15 @@ source of context), `TASKS.md` and `plan.json` (the board: T0–T8, M1, owners, 
   - Every later task's file exists as a typed placeholder.
   - Tests: `vol-assembly`, `vol-gate`, `vol-scene` (28 unit tests) and `lab-smoke` (e2e) are green.
   - Hand-off: `docs/volumetric/handoffs/T0.md`. Decisions #180–#186.
-- **Next:** T1, T2, T3 and T4 in parallel (GLM: T1, T2, T3; Claude Code: T4). Then T5 (needs T4) and T6 (needs T3),
-  then M1, T7 and T8. T8 stops at `needs-human` for the owner's review.
+- **T1, T2, T4, T5 and T6 done, and merged by M1** (2026-11-27, `chore(vol): M1 merge T1–T6`):
+  - The lab renders real volumetric clouds on T1's GPU noise and T2's weather map. The temporary noise is gone.
+  - `lab-cloud-at-sun` and `lab-smoke` pass.
+  - GPU, full resolution: 20–58 ms on desktop and 9–21 ms on mobile, against 2.5 and 3 ms targets (T7's job).
+  - Shots: `.shots/volumetric-lab/run-20261127-074508/`.
+  - Hand-off: `docs/volumetric/handoffs/M1.md`. Decisions #187–#193.
+- **T3 was never delivered** (follow-up F1, GLM). It must land before T8.
+- **Next:** T7 (performance). T3 can run in parallel. Then T8, which also owns F2 (state B's cloud-at-sun slab) and
+  F3 (the overcast smear) and stops at `needs-human`. F4 (the noise probe) is optional.
 
 ## Done
 

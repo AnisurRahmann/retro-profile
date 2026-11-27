@@ -262,3 +262,55 @@ Branch `feat/volumetric-lab` from `feat/weather-v6`. Brief, board and contract: 
 184. **Weather-map convention:** the shaders sample at `world.xz / WEATHER_MAP_KM − offset`, so `offset` grows in the direction the clouds move (+u east, +v north; from 270 → +u). One tile spans 40 km. The wind is time-lapsed so drift shows (`WIND_TIMELAPSE`, 6 in the placeholder; T2 sets and documents it).
 185. **`cloudAtSun` has three values: `0`, `1` (a dense cell covers the sun, or the moon at night) and `edge` (the cell's edge on it).** State B needs the sun partly behind a cloud edge, and a random seed can't promise that. T5 places the cell (`sun-cell.ts`); the renderer re-asks once a second because the field drifts.
 186. **The copy scan skips `*.glsl.ts`**, as it already skipped `*shader.ts`: GLSL reads as prose to it. The lab's control labels are developer UI and stay in the controls (each under 40 characters). They never go into `src/content.ts`, which feeds the agent's knowledge base.
+
+## Volumetric clouds lab: M1 merge of T1–T6 (2026-11-27)
+
+The detail is in `docs/volumetric/handoffs/M1.md` and in each task's hand-off.
+
+187. **Noise (T1).**
+     - SHAPE.R is Perlin fbm remapped by inverted Worley with the eroding remap, so 52% of R is clear air. SHAPE.GBA
+       and DETAIL.RGB are Worley fbm at 2/4/8 cells per tile.
+     - The resolution floor is 4 texels per cell, so 64³ and 128³ are the same noise plus one octave.
+     - The GLSL is written out straight from one recipe table that the CPU reference shares. It uses power-of-two
+       masks, never `%`.
+     - `genMs` waits for completion through a 1×1 `readPixels`, because `gl.finish()` returns early on ANGLE Metal.
+     - Full mip chains exist (`textureLod`).
+     - BLUE is void-and-cluster, made on the CPU once.
+     - **The 150 ms budget covers warm loads.** These measure 44–92 ms. A browser's first, cold shader compile is
+       exempt.
+188. **Weather map (T2).**
+     - The coverage param is the map's mean for every seed: the patchy field is percentile-ranked, and the stratus
+       deck z-scored.
+     - The type is per texel: cumulonimbus only in its 1–2 tower cells, and a forced cell is always cumulus.
+     - `WIND_TIMELAPSE` is 15.
+     - A wind-only change never regenerates the map.
+189. **March, density, lighting (T4).**
+     - `MAX_MARCH` caps the marched segment from the shell entry. It isn't an absolute distance.
+     - Steps are spaced geometrically.
+     - A two-stream diffuse term (weight 0.35) sits on top of Beer–Lambert, powder and the octaves.
+     - The light path's extinction is ×0.55 the view path's.
+     - Erosion is 0.22 for stratus and 0.6 for the other types.
+     - Aerial perspective never changes transmittance.
+     - There is one key light: the sun, or the moon at night.
+     - Scales: SHAPE tiles every 10 km, DETAIL every 0.6 km, and extinction is 80/km.
+     - `MIN_TRANSMITTANCE` reaches the GLSL as `VOL_MIN_TRANSMITTANCE`.
+     - `uPrecip` and `uCoverage` stay unused but declared.
+190. **Background (T5).**
+     - The stars, the moon and the sun's disc are laid "over" in gamma space, as the home page's canvas does. The
+       blooms are added in linear.
+     - The horizon glow lives in `skyGradient`. The dither lives only in `background()`.
+     - The star field turns with the sun's hour angle.
+     - The moon is drawn at night only.
+     - The `cloudAtSun` check measures state A's sun in linear luminance, because B's low sun is hidden by the horizon
+       band either way.
+     - The forced cell is 5–8 km at the 2.2 km altitude of the body's ray.
+191. **Probes (T6).**
+     - Shots at DPR 2 and DPR 3.
+     - GPU from the renderer's own timer query through `window.__vol`.
+     - Chromium runs with the GPU flags (ANGLE Metal, not SwiftShader).
+     - The probes wait for `load`, and flag a tier the renderer didn't honour (M1).
+192. **`.next-dev` is ignored by git, ESLint and tsc.** It is the by-hand dev server's dist dir. `next dev` still
+     appends its type paths to the tsconfig `include` on every start; revert that before committing.
+193. **T3 was never delivered.** M1 merged without it, because the T0 placeholder `lab-state.ts` parses every URL key.
+     T3 (follow-up F1) must land before T8. T8 takes over state B's cloud-at-sun and the overcast smear (F2, F3), with
+     ownership of `sun-cell.ts` and `lab-cloud-at-sun.spec.ts`.

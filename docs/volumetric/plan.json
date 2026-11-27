@@ -79,7 +79,7 @@
         "?debug=noise shows slices of the three textures with a z slider (registerDebugView)",
         ".shots/volumetric-lab/T1-noise.png at 1440×900"
       ],
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T2",
@@ -102,7 +102,7 @@
         "offset moves with the wind (from 270 → +u); regenerates only when params change",
         "tests/unit/vol-weather-map.test.ts covers all of the above"
       ],
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T3",
@@ -127,7 +127,8 @@
         "keyboard accessible, every control labelled, tokens only",
         ".shots/volumetric-lab/T3-controls.png at 1440×900"
       ],
-      "status": "todo"
+      "status": "todo",
+      "note": "Never delivered as of M1 (2026-11-27): follow-up F1 in handoffs/M1.md. Must land before T8."
     },
     {
       "id": "T4",
@@ -150,7 +151,7 @@
         "the contract functions per types.ts; tests/unit/vol-assembly.test.ts green",
         ".shots/volumetric-lab/T4-*.png at 1440×900, looked at"
       ],
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T5",
@@ -175,7 +176,7 @@
         "cloudAtSun=1 drops the disc centre's brightness ≥ 85% (tests/e2e/lab-cloud-at-sun.spec.ts)",
         ".shots/volumetric-lab/T5-*.png: B with and without cloudAtSun, and 20:30 with the moon"
       ],
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T6",
@@ -198,7 +199,7 @@
         "pnpm lab:gpu prints and writes the GPU ms table (1920×1080 DPR 2, 375×812 DPR 3)",
         "both ran once against the dev server; BRIEF.md has a Tools section appended"
       ],
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "M1",
@@ -227,7 +228,7 @@
         "VOL_TEMP_NOISE removed; pnpm lab:shots and pnpm lab:gpu run; the contact sheet looked at",
         "status needs-human if a follow-up blocks T7"
       ],
-      "status": "todo"
+      "status": "done"
     },
     {
       "id": "T7",
@@ -259,7 +260,7 @@
       "name": "tuning",
       "title": "Visual tuning, then stop for the owner's review",
       "agent": "claude",
-      "deps": ["T7"],
+      "deps": ["T3", "T7"],
       "branch": "vol/T8-tuning",
       "prompt": "docs/volumetric/prompts/T8.md",
       "commit": "feat(vol): T8 lab tuning",
@@ -270,6 +271,8 @@
         "src/components/sky/volumetric/background.glsl.ts",
         "src/components/sky/volumetric/common.glsl.ts",
         "src/lib/sky/volumetric/weather-map.ts",
+        "src/lib/sky/volumetric/sun-cell.ts",
+        "tests/e2e/lab-cloud-at-sun.spec.ts",
         "docs/volumetric/handoffs/T8.md",
         "docs/volumetric/TASKS.md#T8",
         "docs/DECISIONS.md",
@@ -281,6 +284,20 @@
         "the hand-off lists the 3 lab URLs, the contact sheet, the GPU table and what still doesn't look real",
         "status needs-human; nothing integrated into the home page"
       ],
+      "status": "todo",
+      "note": "M1 follow-ups F2 (state B cloud-at-sun; may change WeatherMapParams.forcedCell in types.ts) and F3 (overcast smear)."
+    },
+    {
+      "id": "F4",
+      "name": "noise-probe",
+      "title": "GPU-vs-CPU noise probe",
+      "agent": "glm",
+      "deps": ["M1"],
+      "branch": "vol/F4-noise-probe",
+      "prompt": "docs/volumetric/handoffs/M1.md (F4)",
+      "commit": "feat(vol): F4 noise probe",
+      "owns": ["scripts/probe/lab-noise.mts", "package.json#scripts", "docs/volumetric/handoffs/F4.md"],
+      "doneWhen": ["reads back SHAPE and DETAIL slices from the lab and reports max/mean error per channel against noise/reference.ts"],
       "status": "todo"
     }
   ]
