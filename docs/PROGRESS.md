@@ -651,8 +651,17 @@ source of context), `TASKS.md` and `plan.json` (the board: T0–T8, M1, owners, 
   - Shots: `.shots/volumetric-lab/run-20261127-074508/`.
   - Hand-off: `docs/volumetric/handoffs/M1.md`. Decisions #187–#193.
 - **T3 was never delivered** (follow-up F1, GLM). It must land before T8.
-- **Next:** T7 (performance). T3 can run in parallel. Then T8, which also owns F2 (state B's cloud-at-sun slab) and
-  F3 (the overcast smear) and stops at `needs-human`. F4 (the noise probe) is optional.
+- **T7 merged into `feat/volumetric-lab`** (`21bc50b`). Mobile meets its GPU target; desktop high is ~4.5 ms against
+  2.5 (an owner decision). Decision #194.
+- **T8 (needs-human, 2026-11-27, `vol/T8-tuning`, worked in the worktree `../retro-profile-t8`):**
+  - Constants and shaping tuned over four shot rounds (`.shots/volumetric-lab/T8-r0` … `T8-r3`).
+  - F2: B's low sun now shows beside a cloud edge.
+  - F3: C is a cellular, luminous grey deck with no smear or blue strip.
+  - Still failing item 2 (edges): A at the 0.35 cloud scale, and C overhead.
+  - GPU unchanged within the noise.
+  - Hand-off: `docs/volumetric/handoffs/T8.md`. Decisions #195–#197.
+  - T3 was being built in parallel in the main folder (`vol/T3-lab-controls`).
+- **Next:** the owner reviews the lab (the three URLs in the T8 hand-off). Nothing reaches the home page before that.
 
 ## Done
 

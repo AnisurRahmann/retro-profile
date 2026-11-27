@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { densityGlsl } from "../../src/components/sky/volumetric/density.glsl";
-import { LAB_DEFAULTS, type LabState } from "../../src/components/sky/volumetric/types";
+import { LAB_DEFAULTS, LAB_PRESETS, type LabState } from "../../src/components/sky/volumetric/types";
 import { sceneFor } from "../../src/lib/sky/volumetric/scene";
 import { generateWeatherMap } from "../../src/lib/sky/volumetric/weather-map";
 
@@ -8,9 +8,10 @@ import { generateWeatherMap } from "../../src/lib/sky/volumetric/weather-map";
  * cloudAtSun (owner T5; docs/volumetric/BRIEF.md §7 item 5): a dense cell forced over the sun hides the disc. The disc
  * centre's brightness (linear luminance of the screenshot) must drop by at least 85%.
  *
- * State A's sun (11:00, 40° up) is used, not B's: B's sun is 3.4° up and its ray crosses ~37 km of the cumulus
- * layer, so the ordinary field already hides it with cloudAtSun off and there is nothing to measure. (A's disc is
- * bright with the cell off: in the clear or glowing through a thin edge.)
+ * State A's sun (11:00, 40° up) is used for "cover": its disc is bright with the cell off (in the clear or glowing
+ * through a thin edge). State B (T8, M1 F2) checks "edge": B's sun is 3.4° up and its ray crosses ~37 km of the
+ * cumulus layer, so the ordinary field hides it with cloudAtSun off; the edge cell's clear wedge must bring the disc
+ * back, with the cell's thin edge in front of part of it.
  *
  * The march is far too slow on software GL (seconds a frame, and screenshots time out), so this file asks Chromium
  * for the GPU (ANGLE Metal on macOS). It reads a small clip around the disc, not the whole canvas.
@@ -34,9 +35,12 @@ const cellMap = generateWeatherMap({ ...sceneFor(STATE).weather, forcedCell: { u
 const centre = (Math.floor(0.5 * 128) * 128 + Math.floor(0.5 * 128)) * 4;
 const mapHonoursCell = cellMap[centre]! >= 0.95 * 255;
 
+const B_QUERY = "t=16:45&type=cumulus&cov=0.4&wind=10&from=300&freeze=1&tier=low";
+const B_STATE: LabState = { ...LAB_DEFAULTS, ...LAB_PRESETS.B, freeze: true, tier: "low" };
+
 /** The sun's pixel (CSS px, y down) for the lab camera. */
-function sunPixel(): [number, number] {
-  const s = sceneFor(STATE);
+function sunPixel(state: LabState = STATE): [number, number] {
+  const s = sceneFor(state);
   const c = s.camera;
   const d = s.sun.dir;
   const dot = (a: readonly number[], b: readonly number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
@@ -70,8 +74,8 @@ async function luminanceAt(page: Page, x: number, y: number): Promise<number> {
   );
 }
 
-async function open(page: Page, cloudAtSun: "0" | "1"): Promise<void> {
-  await page.goto(`/lab/clouds?${QUERY}&cloudAtSun=${cloudAtSun}`);
+async function open(page: Page, cloudAtSun: "0" | "1" | "edge", query = QUERY): Promise<void> {
+  await page.goto(`/lab/clouds?${query}&cloudAtSun=${cloudAtSun}`);
   await page.waitForFunction(() => (window.__vol?.frames ?? 0) > 8 || !!window.__vol?.error, null, { timeout: 60_000 });
   expect(await page.evaluate(() => window.__vol!.error)).toBeNull();
 }
@@ -93,5 +97,33 @@ test("cloudAtSun=1 hides the sun's disc (its centre loses ≥ 85%)", async ({ pa
   await open(page, "1");
   const covered = await luminanceAt(page, x, y);
   expect(covered, `disc centre ${clear.toFixed(3)} → ${covered.toFixed(3)}`).toBeLessThanOrEqual(0.15 * clear);
+  expect(errors).toEqual([]);
+});
+
+test("B: cloudAtSun=edge puts a cloud edge on the low sun, which the field alone hides", async ({ page }) => {
+  test.skip(tempNoise, "needs M1: VOL_TEMP_NOISE still overrides the weather map's coverage");
+  test.skip(!mapHonoursCell, "needs T2's weather map: the placeholder ignores forcedCell");
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const [x, y] = sunPixel(B_STATE);
+  expect(y).toBeGreaterThan(20);
+  // Read the clouds' transmittance itself (the "transmittance" debug view): in display luminance a thin edge's
+  // forward-scattering glow is as bright as the disc, so brightness can't tell covered from clear. T = 1 reads ≈ 0.93
+  // (displayColor's shoulder).
+  const T = "&debug=transmittance";
+  // The disc's radius in CSS px (BACKGROUND_SUN_R at the lab's 60° FOV, 900 px tall).
+  const R = 16;
+
+  await open(page, "0", B_QUERY + T);
+  const off = await luminanceAt(page, x, y);
+  await open(page, "edge", B_QUERY + T);
+  const centre = await luminanceAt(page, x, y);
+  // The side away from the cell (the cell sits to the body's right).
+  const limb = await luminanceAt(page, x - R, y);
+  const msg = `T off ${off.toFixed(3)} · edge centre ${centre.toFixed(3)}, left limb ${limb.toFixed(3)}`;
+  expect(off, msg).toBeLessThan(0.1);
+  expect(limb, msg).toBeGreaterThan(0.5);
+  expect(centre, msg).toBeLessThan(0.85);
   expect(errors).toEqual([]);
 });

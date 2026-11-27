@@ -15,7 +15,7 @@
  * - cumulonimbus: the cumulus field with 1–2 seeded gaussian cells (radius 0.12–0.2 of the map)
  *   that raise coverage to 1 and stamp the cumulonimbus type; the patchy field stays cumulus-grade.
  * A forcedCell overrides coverage (≥ 0.95 at its centre) and type (0.5) at a map uv, wrapped across
- * the edges. Precipitation follows the params, concentrated under high-coverage cells.
+ * the edges; its optional `clear` wedge (cloudAtSun=edge) zeroes coverage along the body's line of sight first. Precipitation follows the params, concentrated under high-coverage cells.
  */
 import {
   CLOUD_TYPE_VALUE,
@@ -183,6 +183,36 @@ function stampCell(cov: Float32Array, type: Float32Array, u: number, v: number, 
   }
 }
 
+/** The clear wedge's soft edge: coverage is kept in full beyond its half-width, removed inside this fraction of it. */
+const CLEAR_SOFT = 0.45;
+
+/**
+ * Clears coverage inside the forced cell's wedge (cloudAtSun=edge): a segment (u0, v0) → (u1, v1) in map uv, half-width
+ * r0 → r1 along it, measured to the nearest wrapped copy of each texel (the segment may be most of the map long).
+ */
+function stampClear(cov: Float32Array, c: NonNullable<NonNullable<WeatherMapParams["forcedCell"]>["clear"]>): void {
+  const su = c.u1 - c.u0;
+  const sv = c.v1 - c.v0;
+  const len2 = su * su + sv * sv || 1e-12;
+  for (let y = 0; y < SIZE; y++) {
+    const row = y * SIZE;
+    for (let x = 0; x < SIZE; x++) {
+      let keep = 1;
+      for (let ku = -1; ku <= 1; ku++) {
+        for (let kv = -1; kv <= 1; kv++) {
+          const pu = (x + 0.5) / SIZE + ku - c.u0;
+          const pv = (y + 0.5) / SIZE + kv - c.v0;
+          const f = Math.min(1, Math.max(0, (pu * su + pv * sv) / len2));
+          const d = Math.hypot(pu - f * su, pv - f * sv);
+          const r = c.r0 + (c.r1 - c.r0) * f;
+          keep = Math.min(keep, smoothstep(r * CLEAR_SOFT, r, d));
+        }
+      }
+      cov[row + x] = cov[row + x]! * keep;
+    }
+  }
+}
+
 /** 1–2 seeded cumulonimbus cells: radius 0.12–0.2 of the map, centres anywhere, type stamped to 1. */
 function stampStormCells(cov: Float32Array, type: Float32Array, seed: number): void {
   const count = hash01(seed, 201, 0) < 0.5 ? 1 : 2;
@@ -206,6 +236,7 @@ export const generateWeatherMap: GenerateWeatherMap = (p) => {
   for (let i = 0; i < texels; i++) cov[i] = clamp01(n[i]! * 1.4 - (1 - p.coverage) * 1.1);
   const type = new Float32Array(texels).fill(fieldType(p.type));
   if (p.type === "cumulonimbus") stampStormCells(cov, type, p.seed);
+  if (p.forcedCell?.clear) stampClear(cov, p.forcedCell.clear);
   if (p.forcedCell) stampCell(cov, type, p.forcedCell.u, p.forcedCell.v, p.forcedCell.radius, CLOUD_TYPE_VALUE.cumulus);
   const out = new Uint8Array(texels * 4);
   for (let i = 0; i < texels; i++) {
@@ -235,7 +266,8 @@ const fieldChanged = (a: WeatherMapParams | null, b: WeatherMapParams): boolean 
   a.seed !== b.seed ||
   a.forcedCell?.u !== b.forcedCell?.u ||
   a.forcedCell?.v !== b.forcedCell?.v ||
-  a.forcedCell?.radius !== b.forcedCell?.radius;
+  a.forcedCell?.radius !== b.forcedCell?.radius ||
+  JSON.stringify(a.forcedCell?.clear) !== JSON.stringify(b.forcedCell?.clear);
 
 export const createWeatherMap: CreateWeatherMap = (gl, initial) => {
   const texture = gl.createTexture()!;

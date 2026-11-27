@@ -31,11 +31,13 @@ export const backgroundGlsl = /* glsl */ `
 const float BACKGROUND_SUN_R = 0.01862;
 const float BACKGROUND_MOON_R = 0.01629;
 const float BACKGROUND_PX = 0.001164;
-// The disc's radiance over its colour (≥ 1 so a thin edge still glows through; the shoulder keeps the hue).
-const float BACKGROUND_SUN_GAIN = 1.25;
+// The disc's radiance over its colour (≥ 1 so a thin edge still glows through). T8: 2.6, so the disc burns out to a
+// hot yellow-white through displayColor's shoulder, as in a photograph, instead of a flat peach disc at sunset.
+const float BACKGROUND_SUN_GAIN = 2.6;
 // The blooms (×R, weight). Weights are the home page's sRGB alphas 0.35 / 0.12 / 0.05 taken to linear (a^2.2).
 const vec3 BACKGROUND_BLOOM_K = vec3(3.0, 8.0, 20.0);
-const vec3 BACKGROUND_BLOOM_W = vec3(0.099, 0.0094, 0.0014);
+// T8: the inner bloom ×2.2 and the middle ×1.6, the glare a lens records around a bright sun.
+const vec3 BACKGROUND_BLOOM_W = vec3(0.22, 0.015, 0.0014);
 // Moon colours (linear): --text for the disc; the home sky shader's glow colour.
 const vec3 BACKGROUND_MOON_COL = vec3(0.791, 0.823, 0.888);
 const vec3 BACKGROUND_MOON_GLOW = vec3(0.342, 0.393, 0.539);
