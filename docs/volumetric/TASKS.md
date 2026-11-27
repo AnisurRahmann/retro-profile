@@ -312,8 +312,6 @@ All four target cells are OVER (high ≤ 2.5, low ≤ 3). That's T7's job. On th
 <!-- T7 -->
 ### T7: performance
 
-**Status:** todo
-
 **Done when:**
 - Clouds render to an RGBA16F target at the tier scale.
 - 2×2 checkerboard reprojection with α 0.25 and a neighbourhood clamp.
@@ -322,7 +320,60 @@ All four target cells are OVER (high ≤ 2.5, low ≤ 3). That's T7's job. On th
 - `pnpm lab:gpu`: high ≤ 2.5 ms (1920×1080 DPR 2) and low ≤ 3 ms (375×812 DPR 3), with a before/after table.
 - Two frames 10 s apart show no ghosting.
 
-**Files:** (fill in) · **How to verify:** (fill in) · **Notes for the next task:** (fill in)
+**Status:** partial (2026-11-27, `vol/T7-perf`). Everything is built. The mobile target is met. The desktop high target
+is **OVER** (4.3–4.5 ms against ≤ 2.5), and closing it needs an owner decision (`handoffs/T7.md`, "Why desktop high
+is still OVER").
+
+**Files:**
+- `targets.ts`: the passes, in order:
+  - march: a quarter of the pixels, Bayer 2×2, into RGBA32F with the distance packed into the alpha.
+  - resolve: into the RGBA16F cloud target at the tier scale, with wind reprojection, the 3×3 clamp and α 0.25.
+  - full-resolution background caches, every 4th march.
+  - the full-resolution composite, every frame.
+  - Plus the ≤ 15 Hz march clock and `invalidate()`.
+- `reproject.glsl.ts`: `cloudsAt` (bilateral only at transmittance edges, and the wind shift since the last resolve),
+  the resolve, velocity and composite helpers, and the `REPROJECT_*` tunables.
+- `tiers.ts`: `auto` starts high, or medium on a coarse pointer, and steps down when the median rAF interval is over
+  20 ms for 3 s (logged).
+- `renderer.ts` (wiring):
+  - The governor gets the rAF interval.
+  - `setState` calls `invalidate()`.
+  - `__vol.gpuMs` = the mean of the last 60 measured frames (it was one frame, which aliased with the 15 Hz march in
+    `lab:gpu`).
+- `tests/unit/vol-tiers.test.ts`: 19 tests.
+
+**GPU, before → after** (`pnpm lab:gpu`, mean ms, ANGLE Metal on an M2):
+
+| Viewport | Tier | A | B | C |
+| --- | --- | --- | --- | --- |
+| 1920×1080 DPR 2 | high | 58.75 → **4.45** | 56.99 → **4.37** | 36.73 → **4.26** |
+| 1920×1080 DPR 2 | medium | 40.19 → 4.15 | 38.92 → 3.85 | 26.22 → 3.63 |
+| 1920×1080 DPR 2 | low | 28.31 → 3.53 | 26.96 → 3.46 | 20.64 → 3.83 |
+| 375×812 DPR 3 | high | 20.48 → 2.15 | 18.65 → 2.01 | 12.62 → 1.64 |
+| 375×812 DPR 3 | medium | 14.21 → 1.94 | 12.80 → 1.71 | 9.58 → 1.37 |
+| 375×812 DPR 3 | low | 10.80 → **1.40** | 9.73 → **1.43** | 8.95 → **1.24** |
+
+- High ≤ 2.5: OVER.
+- Low ≤ 3: met.
+- The desktop floor is a full-resolution pass at 3840×2160: 0.83 ms writing a constant, 1.2–1.6 ms copying a cache.
+
+**How to verify:**
+- Gates; `pnpm vitest run tests/unit/vol-tiers.test.ts`.
+- e2e: `pnpm build:e2e && pnpm e2e:only tests/e2e/lab-cloud-at-sun.spec.ts tests/e2e/lab-smoke.spec.ts`. 2 passed.
+- With the dev server on :3005: `pnpm lab:shots && RUN_DIR=$(ls -td .shots/volumetric-lab/run-* | head -1) pnpm lab:gpu`.
+  - Final run: `.shots/volumetric-lab/run-20261127-090543/`. Before: `.shots/volumetric-lab/T7-before/gpu.json`.
+  - Ghosting: `A-drift-0s.png` vs `A-drift-10s.png`. No trails, no smear, and no stripes on thin cloud.
+
+**Notes for the next task:**
+- **T8:**
+  - The `REPROJECT_*` constants, `HISTORY_ALPHA`, `MARCH_HZ` (≤ 15) and `BG_EVERY` are tunable.
+  - At 0.35 scale, edges are softer than the old full-res march. Judge checklist item 2 with that in mind.
+  - `reprojectWorldVelocity` uses `DENSITY_DETAIL_DRIFT`.
+- **T3:** every `setState` resets the history (four marches), so throttle drags to one call per frame.
+- **M1:**
+  - Requests: `CloudPipeline.invalidate`, the `VolDebug.gpuMs` doc, and, optionally, an `outColor` location and
+    `textureGather` in the assembly test.
+  - The desktop target needs an owner decision.
 <!-- /T7 -->
 
 <!-- T8 -->

@@ -8,15 +8,14 @@ import { createWeatherMap } from "@/lib/sky/volumetric/weather-map";
 import { assembleFragment, VERTEX_SHADER } from "./assemble";
 import { debugView, registerDebugView } from "./debug-views";
 import { createNoiseTextures } from "./noise-gpu";
-import { createPipeline } from "./targets";
-import { createTierGovernor, resolveTier } from "./tiers";
+import { createPipeline, type VolPipeline } from "./targets";
+import { createTierGovernor, resolveTier, STEP_DOWN_MS, STEP_DOWN_WINDOW_MS } from "./tiers";
 import {
   CLOUD_TYPE_VALUE,
   CLOUD_UNIFORMS,
   GEOMETRY,
   SHADER_DEBUG_VIEWS,
   TEXTURE_UNITS,
-  type CloudPipeline,
   type CloudUniformName,
   type CloudUniforms,
   type DebugContext,
@@ -34,6 +33,14 @@ import {
 } from "./types";
 
 const TIMES_KEPT = 120;
+/**
+ * window.__vol.gpuMs is the mean over this many measured frames (T7). The pipeline's cost is periodic (a march every
+ * ~4 frames, at most 15 Hz), so a single frame's time, sampled at a fixed interval (lab:gpu polls every 100 ms),
+ * aliases with it and lands on march frames either half the time or never. Each finished query counts once.
+ */
+const GPU_MEAN_FRAMES = 60;
+/** Queries in flight; enough that every frame is measured while results come back a few frames late. */
+const MAX_PENDING_QUERIES = 8;
 const CELL_REFRESH_MS = 1000;
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLShader {
@@ -123,7 +130,7 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
   let weather: WeatherMap | null = null;
   const weatherParams = (): WeatherMapParams => ({ ...scene.weather, forcedCell: forcedCellFor(state, scene, weather?.offset ?? [0, 0]) });
   weather = createWeatherMap(gl, weatherParams());
-  let pipeline: CloudPipeline = createPipeline(gl, tier);
+  let pipeline: VolPipeline = createPipeline(gl, tier);
   let governor = createTierGovernor(tier, state.tier === "auto");
   let programs = new Map<string, WebGLProgram>();
   const locations = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>();
@@ -192,6 +199,7 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
   const times: FrameTime[] = [];
   const pending: WebGLQuery[] = [];
   let lastGpu: number | null = null;
+  const gpuWindow: number[] = [];
   const debug: VolDebug = { frames: 0, ready: false, tier, gpuMs: null, times, state, noiseMs: noise.genMs, error: null };
   window.__vol = debug;
   console.info(`[vol] tier ${tier}, noise ${noise.genMs.toFixed(1)} ms`);
@@ -248,10 +256,14 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
     // GPU time: one query per frame, read back when the result is available (a few frames later).
     while (timer && pending.length && gl.getQueryParameter(pending[0]!, gl.QUERY_RESULT_AVAILABLE)) {
       const q = pending.shift()!;
-      if (!gl.getParameter(timer.GPU_DISJOINT_EXT)) lastGpu = gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6;
+      if (!gl.getParameter(timer.GPU_DISJOINT_EXT)) {
+        lastGpu = gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6;
+        gpuWindow.push(lastGpu);
+        if (gpuWindow.length > GPU_MEAN_FRAMES) gpuWindow.shift();
+      }
       gl.deleteQuery(q);
     }
-    const q = timer && pending.length < 4 ? gl.createQuery() : null;
+    const q = timer && pending.length < MAX_PENDING_QUERIES ? gl.createQuery() : null;
     if (q) gl.beginQuery(timer!.TIME_ELAPSED_EXT, q);
     try {
       const view = debugView(state.debug);
@@ -279,10 +291,16 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
     if (times.length > TIMES_KEPT) times.shift();
     debug.frames++;
     debug.ready = true;
-    debug.gpuMs = lastGpu;
+    debug.gpuMs = gpuWindow.length ? gpuWindow.reduce((a, b) => a + b, 0) / gpuWindow.length : null;
     listeners.forEach((cb) => cb(ft));
-    const down = governor.sample(lastGpu ?? rafMs, now);
-    if (down) void rebuildForTier(down);
+    // The governor watches the frame time the viewer gets (the rAF interval). Per-frame GPU time is bimodal with the
+    // 15 Hz re-march (most frames only composite), so its median would never see a slow march.
+    const down = governor.sample(rafMs, now);
+    if (down) {
+      // e.g. "[vol] auto → medium: median 20+ ms / 3 s".
+      console.info(`[vol] auto → ${down}: median ${STEP_DOWN_MS}+ ms`, `/ ${STEP_DOWN_WINDOW_MS / 1000} s`);
+      void rebuildForTier(down);
+    }
   };
   syncDebugMount();
   raf = requestAnimationFrame(frame);
@@ -298,6 +316,8 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
       debug.state = next;
       scene = sceneFor(next);
       weather!.setParams(weatherParams());
+      // A new scene: drop the reprojection history and refill the background caches (T7).
+      pipeline.invalidate();
       if (next.tier !== prevTier) {
         governor = createTierGovernor(resolveTier(next.tier, { coarsePointer: coarse }), next.tier === "auto");
         void rebuildForTier(resolveTier(next.tier, { coarsePointer: coarse }));
