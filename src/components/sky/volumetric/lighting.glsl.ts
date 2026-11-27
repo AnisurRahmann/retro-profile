@@ -19,18 +19,29 @@ const float LIGHTING_STEP0 = 0.07;
 const float LIGHTING_GROWTH = 1.75;
 // The light path's extinction relative to the view path's (in-scattering inside the body brightens it; < 1 stands in
 // for the light that multiple scattering carries deeper than the octaves model).
-const float LIGHTING_ABSORB = 0.55;
+const float LIGHTING_ABSORB = 0.65;
 // Multiple-scattering octaves (Hillaire 2016): each adds a × the energy at b × the optical depth, c × the anisotropy.
-const float LIGHTING_MS_A = 0.5;
+const float LIGHTING_MS_A = 0.3;
 const float LIGHTING_MS_B = 0.45;
 const float LIGHTING_MS_C = 0.6;
 // Powder (dark, unlit-looking edges where light enters) and how fast it saturates with local extinction (km).
 const float LIGHTING_POWDER_KM = 0.09;
 // Diffuse transmission through thick cloud (two-stream: T ≈ 1 / (1 + ¾·τ·(1 − g))), beyond what Beer–Lambert keeps.
-const float LIGHTING_DIFFUSE = 0.35;
+const float LIGHTING_DIFFUSE = 0.22;
+// A stratus deck is close to the two-stream model's infinite slab (light can't leak out of its sides), so it keeps far
+// more of the diffuse light: an overcast sky at midday is luminous grey, not storm-dark. Blended by the map's type.
+const float LIGHTING_DIFFUSE_STRATUS = 1.0;
+const float LIGHTING_DIFFUSE_NEUTRAL = 0.5;
 const float LIGHTING_DIFFUSE_G = 0.8;
 // Aerial perspective: e-folding distance (km) of the haze between the camera and the clouds.
-const float LIGHTING_HAZE_KM = 55.0;
+const float LIGHTING_HAZE_KM = 32.0;
+// Under an overcast deck the haze is lit by the deck, not by a blue sky: it greys toward this × the horizon's
+// luminance as the coverage rises from LO to HI.
+const float LIGHTING_OVERCAST_HAZE = 0.85;
+const float LIGHTING_OVERCAST_LO = 0.6;
+const float LIGHTING_OVERCAST_HI = 0.95;
+// The bases see the whole lower sky dome, not only its horizon band: this much of the zenith colour mixes in.
+const float LIGHTING_BASE_ZENITH = 0.7;
 // Precipitation darkens the base by up to this much.
 const float LIGHTING_PRECIP_DARK = 0.65;
 
@@ -95,10 +106,13 @@ vec3 cloudRadiance(vec3 p, vec3 rd, float density) {
   vec3 direct = lightingDirect(tau, cosTheta, lightCol) * mix(0.35, 1.0, powder);
   // Light that diffused through the body: falls off as 1/τ, not exponentially, so thick decks stay luminous.
   float diffuseT = 1.0 / (1.0 + 0.75 * tau * (1.0 - LIGHTING_DIFFUSE_G));
-  direct += lightCol * max(diffuseT - exp(-tau), 0.0) * (0.25 / LIGHTING_PI) * LIGHTING_DIFFUSE;
+  float diffuse = mix(LIGHTING_DIFFUSE_STRATUS, LIGHTING_DIFFUSE, smoothstep(0.0, 0.5, w.g));
+  // Deep inside the body the light has also mixed with skylight, so its tint is half neutral.
+  vec3 diffuseCol = mix(lightCol, vec3(dot(lightCol, vec3(0.2126, 0.7152, 0.0722))), LIGHTING_DIFFUSE_NEUTRAL);
+  direct += diffuseCol * max(diffuseT - exp(-tau), 0.0) * (0.25 / LIGHTING_PI) * diffuse;
 
   // Ambient from the sky: horizon colour on the bases, zenith colour on the tops; it also dims into the body.
-  vec3 sky = mix(uHorizonCol * LIGHTING_AMBIENT_BASE, uZenith * LIGHTING_AMBIENT_TOP + uMid * 0.25, h);
+  vec3 sky = mix(mix(uHorizonCol, uZenith, LIGHTING_BASE_ZENITH) * LIGHTING_AMBIENT_BASE, uZenith * LIGHTING_AMBIENT_TOP + uMid * 0.25, h);
   vec3 ambient = sky * mix(0.55, 1.0, h) * (0.4 + 0.6 * exp(-density * 0.02));
   ambient += vec3(0.75, 0.82, 1.0) * moonW * 0.03;
 
@@ -111,7 +125,10 @@ vec4 applyAerial(vec4 cloud, vec3 rd, float dist) {
   if (dist <= 0.0) return cloud;
   float f = 1.0 - exp(-dist / LIGHTING_HAZE_KM);
   // Haze in front of the cloud fills its covered fraction with the sky's colour in that direction.
-  vec3 haze = skyGradient(rd) * (1.0 - cloud.a);
+  vec3 air = skyGradient(rd);
+  float overcast = smoothstep(LIGHTING_OVERCAST_LO, LIGHTING_OVERCAST_HI, uCoverage);
+  air = mix(air, vec3(dot(air, vec3(0.2126, 0.7152, 0.0722)) * LIGHTING_OVERCAST_HAZE), overcast);
+  vec3 haze = air * (1.0 - cloud.a);
   return vec4(mix(cloud.rgb, haze, f), cloud.a);
 }
 `;

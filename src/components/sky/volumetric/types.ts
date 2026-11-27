@@ -95,8 +95,18 @@ export type WeatherMapParams = {
   /** Meteorological: the bearing the wind blows FROM (270 = from the west, so clouds move east, toward +u). */
   windFromDeg: number;
   seed: number;
-  /** A dense cumulus cell (coverage ≥ 0.95, type 0.5) at map uv (u, v), radius in uv; wraps across the edges. */
-  forcedCell?: { u: number; v: number; radius: number };
+  /**
+   * A dense cumulus cell (coverage ≥ 0.95, type 0.5) at map uv (u, v), radius in uv; wraps across the edges.
+   * `clear` (cloudAtSun=edge, T8): a clear wedge along the body's line of sight through the layer, from map uv
+   * (u0, v0) to (u1, v1) with half-width r0 → r1 (uv), cleared before the cell is stamped, so only the cell's edge
+   * stands in front of the body.
+   */
+  forcedCell?: {
+    u: number;
+    v: number;
+    radius: number;
+    clear?: { u0: number; v0: number; u1: number; v1: number; r0: number; r1: number };
+  };
 };
 
 /** 128×128 RGBA8, LINEAR, REPEAT. R coverage, G type, B precipitation, A unused. */

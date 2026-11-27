@@ -395,8 +395,6 @@ is still OVER").
 <!-- T8 -->
 ### T8: visual tuning, then the owner's review
 
-**Status:** todo
-
 **Done when:**
 - Two review rounds are recorded: PASS/FAIL per checklist item, per state and size, with shot paths.
 - Only constants and shaping functions were changed.
@@ -404,5 +402,42 @@ is still OVER").
 - The hand-off lists the 3 URLs, the contact sheet, the GPU table and an honest list of what still doesn't look real.
 - Status `needs-human`; nothing integrated into the home page.
 
-**Files:** (fill in) · **How to verify:** (fill in) · **Notes for the owner:** (fill in)
+**Status:** needs-human (2026-11-27, `vol/T8-tuning`, branched from `feat/volumetric-lab` after the T7 merge).
+
+**Files:**
+- `density.glsl.ts`: the stratus SHAPE tile, its far fade, erosion, the coverage floor and ragged bases.
+- `lighting.glsl.ts`: diffuse per type with a neutral tint, ambient, light path, octaves, and the haze with its
+  overcast grey.
+- `march.glsl.ts`: the per-type detail LOD.
+- `background.glsl.ts`: sun gain and blooms.
+- `sun-cell.ts`, `weather-map.ts`, and `forcedCell.clear` in `types.ts` (F2).
+- `lab-cloud-at-sun.spec.ts`: B.
+- `vol-sun-cell.test.ts`: one line.
+
+**Review rounds** (full tables in `handoffs/T8.md`; shots in `.shots/volumetric-lab/T8-r{0,1,2,3}/`; sheet
+`T8-r3/sheet.png`). Final round, A / B / C at 1440 and 375, all tiers alike:
+
+| # | Item | A | B | C |
+| --- | --- | --- | --- | --- |
+| 1 | Sunlit tops, darker bases | PASS | PASS | – |
+| 2 | Detailed edges, no smear | FAIL (soft at 0.35 scale) | PASS | FAIL (soft streaks overhead) |
+| 3 | Shrink to horizon, no banding | PASS | PASS | PASS (faint spokes at full res) |
+| 4 | Warm undersides, silver lining (B) | – | PASS | – |
+| 5 | Sun hidden / bleeds through | PASS (e2e, cloudAtSun=1) | PASS (e2e + shots) | – |
+| 6 | Overcast deck, no tiling (C) | – | – | PASS |
+| 7 | Mobile equally real | PASS | PASS | PASS |
+
+**GPU** (`T8-r3/gpu.json`):
+- Desktop high: 4.42–4.70 ms, still OVER 2.5, as after T7.
+- Mobile low: 1.38–1.50 ms, which meets its ≤ 3 target.
+
+**How to verify:**
+- Gates; then `pnpm build:e2e && E2E_PORT=3111 pnpm e2e:only tests/e2e/lab-cloud-at-sun.spec.ts tests/e2e/lab-smoke.spec.ts`.
+- `pnpm lab:shots` / `pnpm lab:gpu` with `LAB_URL` pointing at a lab dev server.
+
+**Notes for the owner:**
+- Review the three URLs in `handoffs/T8.md`.
+- Open decisions: the desktop GPU target (T7), A's soft edges at the 0.35 scale, and the cloudAtSun=edge staging
+  wedge.
+- T1 should switch the noise to mipmapped filtering, which would clear C's last spokes.
 <!-- /T8 -->

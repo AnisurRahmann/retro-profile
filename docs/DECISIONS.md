@@ -314,3 +314,40 @@ The detail is in `docs/volumetric/handoffs/M1.md` and in each task's hand-off.
 193. **T3 was never delivered.** M1 merged without it, because the T0 placeholder `lab-state.ts` parses every URL key.
      T3 (follow-up F1) must land before T8. T8 takes over state B's cloud-at-sun and the overcast smear (F2, F3), with
      ownership of `sun-cell.ts` and `lab-cloud-at-sun.spec.ts`.
+
+## Volumetric clouds lab: T7 performance and T8 tuning (2026-11-27)
+
+194. **Performance (T7, carried by T8; detail in `docs/volumetric/handoffs/T7.md`).**
+     - The march writes a quarter of the pixels (Bayer 2×2) into RGBA32F, with the distance packed into the alpha.
+       It is resolved into the RGBA16F cloud target with wind reprojection, a 3×3 clamp and α 0.25.
+     - It re-marches at ≤ 15 Hz, with a bilateral upsample only at transmittance edges. The background is cached at
+       full resolution and refreshed every 4th march.
+     - `uFrame` steps once per 4-march cycle. Every `setState` resets the history.
+     - The reprojection velocity includes `DENSITY_DETAIL_DRIFT`.
+     - `__vol.gpuMs` is the mean of the last 60 frames.
+     - The tier governor reads the rAF interval.
+     - Desktop high stays OVER its 2.5 ms target (about 4.5 ms). That's the owner's decision.
+195. **cloudAtSun=edge is one cumulus plus a clear wedge (T8, M1 F2).**
+     - The edge cell is 3.2 km across, shifted 0.8 radii sideways, not the 5–8 km "cover" disc that read as a slab
+       edge-on.
+     - A clear wedge runs along the body's line of sight, from the base crossing to the top crossing. Its half-width
+       is 0.8 km + tan 3° × distance. A low sun's ray crosses ~38 km of the layer, so without the wedge the field
+       always hides it.
+     - The wedge is a lab staging device (`WeatherMapParams.forcedCell.clear`).
+     - B's e2e reads the transmittance debug view, because a thin edge's glow is as bright as the disc.
+196. **The overcast deck has its own SHAPE tile (T8, M1 F3).**
+     - Stratus samples SHAPE at 3.2 km on axes turned ~37°, with 20% of the 10-km field mixed in. It fades back to
+       the 10-km field at 12–35 km, and its detail LOD runs 15 → 50 km. Without the fade, the undersampled tile beats
+       into moiré spokes: SHAPE has mips, but `MIN_FILTER` is LINEAR.
+     - Diffuse transmission is per type: a deck keeps 1.0 (the two-stream slab), cumulus 0.22.
+     - Above 60–95% coverage the haze greys to the horizon's luminance.
+197. **T8's lighting and shaping values.**
+     - Erosion 0.7 (cumulus) and 0.4 (stratus).
+     - A coverage floor at 0.07–0.22 (no dust of fragments).
+     - Bases offset by ±0.035 of the low fbm.
+     - Light-path extinction ×0.65; first octave weight 0.3.
+     - Base ambient: 70% zenith colour in the horizon colour.
+     - Haze 32 km.
+     - Sun gain 2.6, blooms 0.22 / 0.015 / 0.0014: the disc burns out like a photograph.
+     - The lab waits for the owner's review: `docs/volumetric/handoffs/T8.md`.
+

@@ -62,14 +62,14 @@ describe("forcedCellFor", () => {
     expect(forcedCellFor(dark, noMoon, [0, 0])).toBeUndefined();
   });
 
-  it("edge moves the centre sideways, perpendicular to the body's bearing, by edgeShift radii", () => {
+  it("edge moves the centre sideways, perpendicular to the body's bearing, by edgeShift of its own radius", () => {
     const cover = at({ t: "16:45", cloudAtSun: "cover" });
     const edge = at({ t: "16:45", cloudAtSun: "edge" });
     const a = forcedCellFor(cover, sceneFor(cover), [0, 0])!;
     const b = forcedCellFor(edge, sceneFor(edge), [0, 0])!;
     const du = (((b.u - a.u + 0.5) % 1) + 1) % 1 - 0.5;
     const dv = (((b.v - a.v + 0.5) % 1) + 1) % 1 - 0.5;
-    expect(Math.hypot(du, dv)).toBeCloseTo(SUN_CELL.edgeShift * a.radius, 9);
+    expect(Math.hypot(du, dv)).toBeCloseTo(SUN_CELL.edgeShift * b.radius, 9);
     const az = sceneFor(cover).sun.azDeg * DEG;
     // Perpendicular to the bearing (sin az, cos az) in (u, v).
     expect(du * Math.sin(az) + dv * Math.cos(az)).toBeCloseTo(0, 9);
