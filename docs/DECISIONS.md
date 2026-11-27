@@ -328,7 +328,7 @@ The detail is in `docs/volumetric/handoffs/M1.md` and in each task's hand-off.
      - The tier governor reads the rAF interval.
      - Desktop high stays OVER its 2.5 ms target (about 4.5 ms). That's the owner's decision.
 195. **cloudAtSun=edge is one cumulus plus a clear wedge (T8, M1 F2).**
-     - The edge cell is 3.2 km across, shifted 0.8 radii sideways, not the 5–8 km "cover" disc that read as a slab
+     - The edge cell is 3.2 km across, shifted 0.7 radii sideways, not the 5–8 km "cover" disc that read as a slab
        edge-on.
      - A clear wedge runs along the body's line of sight, from the base crossing to the top crossing. Its half-width
        is 0.8 km + tan 3° × distance. A low sun's ray crosses ~38 km of the layer, so without the wedge the field

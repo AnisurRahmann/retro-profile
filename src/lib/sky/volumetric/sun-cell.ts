@@ -26,7 +26,7 @@ export const SUN_CELL = {
   /** "edge": the cell's radius (km): one cumulus. */
   edgeRadiusKm: 3.2,
   /** "edge": the centre's sideways shift, in cell radii. */
-  edgeShift: 0.8,
+  edgeShift: 0.7,
   /** "edge": the clear wedge's half-width = minKm + tan(halfAngle) · ground distance. */
   clearMinKm: 0.8,
   clearHalfAngleDeg: 3,
