@@ -124,6 +124,8 @@ test("B: cloudAtSun=edge puts a cloud edge on the low sun, which the field alone
   const msg = `T off ${off.toFixed(3)} · edge centre ${centre.toFixed(3)}, left limb ${limb.toFixed(3)}`;
   expect(off, msg).toBeLessThan(0.1);
   expect(limb, msg).toBeGreaterThan(0.5);
-  expect(centre, msg).toBeLessThan(0.85);
+  // F2: the disc's centre loses 30–85% of its light (T between 0.15 and 0.7; clear reads 0.93).
+  expect(centre, msg).toBeGreaterThan(0.15 * 0.93);
+  expect(centre, msg).toBeLessThan(0.7 * 0.93);
   expect(errors).toEqual([]);
 });
