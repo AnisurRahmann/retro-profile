@@ -139,12 +139,16 @@ function withPassState(gl: WebGL2RenderingContext, work: () => void): void {
   }
 }
 
-/** An empty volume: an RGBA8 3D texture of `size`³ with room for its mip chain, LINEAR, REPEAT on all three axes. */
+/**
+ * An empty volume: an RGBA8 3D texture of `size`³ with room for its mip chain, REPEAT on all three axes. T10:
+ * LINEAR_MIPMAP_LINEAR, so density's textureLod reads the box-filtered levels (RGBA8 is filterable and
+ * colour-renderable, so generateMipmap is legal); with LINEAR, every lod read level 0 and far samples aliased.
+ */
 function volumeTexture(gl: WebGL2RenderingContext, size: number): WebGLTexture {
   const tex = gl.createTexture()!;
   gl.bindTexture(gl.TEXTURE_3D, tex);
   gl.texStorage3D(gl.TEXTURE_3D, mipLevels(size), gl.RGBA8, size, size, size);
-  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
   gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   for (const wrap of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R])
     gl.texParameteri(gl.TEXTURE_3D, wrap, gl.REPEAT);
