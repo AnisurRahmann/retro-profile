@@ -292,3 +292,44 @@ Playwright through tsx, like the other `scripts/probe/` tools.
   (the probe samples the latest finished result every 100 ms). Prints a table (mean / p95 / max, rows over the §5
   targets marked `OVER`) and writes `<run>/gpu.json`. `RUN_DIR=<shots run> pnpm lab:gpu` files the JSON next to
   that run's shots.
+
+**T9: review tooling for the realism round.** `scale`, `reproject`, `accum` and `out` are URL state (`lab-state.ts`)
+and controls in the panel's "review" section. **Until T10 (scale, reproject, accum) and T11 (out) merge, the four
+params change nothing on screen.** The camera azimuth is the existing `view`.
+
+| Param | Values | Default | Meaning |
+| --- | --- | --- | --- |
+| `scale` | 0.25..1 or empty | empty | The cloud target's scale instead of `TIERS[tier].scale` |
+| `reproject` | 0, 1 | 1 | 0: march every pixel every frame, with no checkerboard and no history |
+| `accum` | integer 0..256 | 0 | > 0: the renderer freezes time and averages N frames (a reference render) |
+| `out` | single, layered | single | `layered`: clouds and background as separate outputs |
+
+- **`LAB_URL` is required** by both probes, and there is no default port:
+  `LAB_URL=http://localhost:<port> pnpm lab:shots`. `VOL_PORT` no longer stands in, so a probe can never shoot
+  another session's server.
+- `pnpm lab:shots [A B C A-away A-ref C-ref …]` — the default is all six. A, B and C are unchanged. New:
+  - **A-away**: state A with the camera 180° from the sun (`view=` is the sun's bearing + 180°), captured like A–C.
+  - **A-ref**, **C-ref**: `scale=1&reproject=0&accum=64`, at 1440×900 DPR 2 on the high tier only: every pixel
+    marched, no reprojection, a 64-frame mean. The probe waits for the mean through `window.__vol.accumReady`, which
+    T10 exposes. A renderer without the flag ignores the params, so the probe warns and labels the shots "NOT a
+    reference render": they are ordinary renders of the preset at the tier's scale.
+- `crops/` — a 100% crop of every 1440×900 shot, unscaled device px (byte-exact; no resampling):
+  `<shot>-g0.png` … `<shot>-g5.png`, six 600×600 crops with their centres at 1/6, 1/2 and 5/6 of the width and at
+  25% and 55% of the height (row-major), and `<shot>-band.png`, the 300 device px above the horizon.
+  `crops.png`: one row per shot, the six crops side by side and the band under them.
+  `pair-A.png`: each crop of A-high beside the same crop of A-ref.
+- `metrics.json` — one entry per crop, plus a per-shot `summary`. The numbers are for comparing runs; they are not
+  gates. Luma is Rec.709 luma of the sRGB bytes; saturation is HSV saturation.
+  - `lattice`: the crop box-resampled onto the cloud target's texel grid (texel k covers device px
+    [k/scale, (k+1)/scale), in phase with the frame), then the mean absolute response of [[1, −1], [−1, 1]] on luma
+    over the 2×2 windows whose four texels all have saturation < 0.35. A 2×2 checkerboard of amplitude A on that grid
+    reads 4A. `latticeQuads` is how many windows counted.
+  - `edgeWidth`: the median 10–90% rise width in CSS px of the strongest 1% of Sobel edges, each profiled ±12 device
+    px along its gradient. Within 1% from about 4 to 10 device px of width; a wider edge is cut off by the window and
+    reads narrow (−7% at 15 px).
+  - `bodyStd`: the median standard deviation of luma over the 41×41-pixel boxes whose mean saturation is < 0.2.
+  - `streak` (the band only): Σ(dL/dy)² ÷ Σ(dL/dx)² of the band's Sobel gradients. Above 1: horizontal streaks.
+- The image code is Node-only, with no image dependency: `scripts/probe/lab-image.mts` decodes and encodes PNG
+  (verified byte-exact against Chromium on a lab screenshot) and `lab-metrics.mts` holds the metrics.
+  `tests/unit/vol-lab-metrics.test.ts` checks each one on a 2×2 checkerboard, a step edge blurred with a known
+  sigma, and stripes.
