@@ -8,7 +8,7 @@ import { createWeatherMap } from "@/lib/sky/volumetric/weather-map";
 import { assembleFragment, VERTEX_SHADER } from "./assemble";
 import { debugView, registerDebugView } from "./debug-views";
 import { createNoiseTextures } from "./noise-gpu";
-import { createPipeline, type VolPipeline } from "./targets";
+import { createBackgroundLayer, createPipeline, outputFor, sameOutput, type VolPipeline } from "./targets";
 import { createTierGovernor, resolveTier, STEP_DOWN_MS, STEP_DOWN_WINDOW_MS } from "./tiers";
 import {
   CLOUD_TYPE_VALUE,
@@ -16,7 +16,7 @@ import {
   GEOMETRY,
   SHADER_DEBUG_VIEWS,
   TEXTURE_UNITS,
-  TIERS,
+  type BackgroundLayer,
   type CloudUniformName,
   type CloudUniforms,
   type DebugContext,
@@ -26,6 +26,7 @@ import {
   type LabState,
   type NoiseTextures,
   type PassContext,
+  type PipelineOutput,
   type QualityTier,
   type VolDebug,
   type VolRenderer,
@@ -109,44 +110,34 @@ function uniformsFor(scene: LabScene, s: LabState, w: WeatherMap, frame: FrameIn
   };
 }
 
-/** The hooks applyReviewParams hands the frame loop (T10). Every one is a no-op when no review param is set. */
+/**
+ * The hooks applyReviewParams hands the frame loop (T10; M2 reads them from LabState, T9's fields). Every one is a
+ * no-op for a state with reproject 1 and accum 0. The cloud target's scale is the pipeline's (PipelineOutput.scale).
+ */
 type ReviewHooks = {
-  /** The state with the review's overrides (accum freezes the clock; az sets the camera azimuth). */
+  /** The state the frame loop runs: accum freezes the clock. */
   state(s: LabState): LabState;
-  /** The pipeline for a tier, at the review's cloud target scale. */
-  pipeline(t: QualityTier): VolPipeline;
-  /** Before the pipeline renders: false = skip it (the average is complete and only needs presenting). */
-  before(p: VolPipeline): boolean;
+  /** Before the pipeline renders: false = skip it (the mean is complete and only needs presenting). */
+  before(p: VolPipeline, s: LabState): boolean;
   /** After the pipeline drew the canvas: fold it into the running mean and present the mean. */
-  after(ctx: PassContext): void;
-  /** A new scene or size: restart the average. */
+  after(ctx: PassContext, s: LabState): void;
+  /** VolDebug.accumReady: the N frames are in (always true for accum 0). */
+  ready(s: LabState): boolean;
+  /** A new scene, tier or size: restart the mean. */
   reset(): void;
   dispose(): void;
 };
 
 /**
  * T10's review params, for 100% crops and reference renders (A-ref: scale=1&reproject=0&accum=64):
- * - `scale` (0.1..1): the cloud target's scale instead of TIERS[tier].scale.
  * - `reproject=0`: every pixel is marched every frame and the history is bypassed. The pipeline is invalidated before
  *   each frame (its public API), so it marches all four offsets with α 1 (`historyAlpha` of a reset).
  * - `accum=N` (1..256): the clock freezes, the jitter keeps advancing (uFrame follows the marches), and the canvas shows
- *   the running mean of N frames (display values, RGBA32F ping-pong), then holds it without rendering.
- * - `az` (0..359): the camera azimuth (the same as `view`).
+ *   the running mean of N frames (display values, RGBA32F ping-pong), then holds it without rendering. Single output
+ *   only (outputFor), because the mean is read back from the one opaque canvas.
+ * - `scale` goes to createPipeline through outputFor; the camera azimuth is `view`.
  */
-function applyReviewParams(gl: WebGL2RenderingContext, search: string): ReviewHooks {
-  // TEMP until T9: the params are read here; T9 moves them into LabState and M2 removes this block.
-  const q = new URLSearchParams(search);
-  const num = (k: string, lo: number, hi: number) => {
-    const v = q.get(k);
-    const n = v === null || v === "" ? NaN : Number(v);
-    return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null;
-  };
-  const scale = num("scale", 0.1, 1);
-  const reproject = q.get("reproject") !== "0";
-  const accum = Math.round(num("accum", 1, 256) ?? 0);
-  const az = num("az", 0, 359);
-  // /TEMP
-
+function applyReviewParams(gl: WebGL2RenderingContext): ReviewHooks {
   let acc: { tex: WebGLTexture; fbo: WebGLFramebuffer }[] = [];
   let src: WebGLTexture | null = null;
   let size: [number, number] = [0, 0];
@@ -193,23 +184,14 @@ void main() {
   };
 
   return {
-    state: (s) => ({ ...s, freeze: s.freeze || accum > 0, view: az ?? s.view }),
-    pipeline(t) {
-      if (scale === null) return createPipeline(gl, t);
-      const saved = TIERS[t];
-      TIERS[t] = { ...saved, scale };
-      try {
-        return createPipeline(gl, t);
-      } finally {
-        TIERS[t] = saved;
-      }
-    },
-    before(p) {
-      if (accum > 0 && n >= accum) return false;
-      if (!reproject) p.invalidate();
+    state: (s) => (s.accum > 0 && !s.freeze ? { ...s, freeze: true } : s),
+    before(p, s) {
+      if (s.accum > 0 && n >= s.accum) return false;
+      if (s.reproject === 0) p.invalidate();
       return true;
     },
-    after(ctx) {
+    after(ctx, s) {
+      const accum = s.accum;
       if (accum <= 0) return;
       if (size[0] !== ctx.width || size[1] !== ctx.height) {
         free();
@@ -238,6 +220,7 @@ void main() {
       }
       draw(ctx, acc[0]!.tex, acc[0]!.tex, 0, null);
     },
+    ready: (s) => s.accum <= 0 || n >= s.accum,
     reset() {
       n = 0;
     },
@@ -248,11 +231,23 @@ void main() {
 export type RendererOptions = {
   /** Where a JS debug view mounts its UI. */
   overlay?: HTMLElement | null;
+  /** out=layered (T11): the background canvas under `canvas`, which then becomes the transparent cloud layer. */
+  background?: HTMLCanvasElement | null;
 };
 
 /** Starts the lab renderer on a canvas. Rejects if WebGL2 is unavailable or a shader fails to compile. */
 export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState, opts: RendererOptions = {}): Promise<VolRenderer> {
-  const gl = canvas.getContext("webgl2", { antialias: false, alpha: false, depth: false, stencil: false, premultipliedAlpha: false, powerPreference: "high-performance" });
+  // The output (T11) comes from the state (T9's LabState.out and friends). Its mode is fixed for the context's life
+  // (alpha and premultipliedAlpha are context attributes), so the panel reloads the page to change it; the other
+  // switches rebuild the pipeline (setState). Layered needs the background canvas.
+  const layered = outputFor(initial).mode === "layered" && !!opts.background;
+  /** The output for a state, within this context's mode (a state asking for the other mode gets this one's). */
+  const fitOutput = (s: LabState): PipelineOutput => outputFor(layered ? { ...s, out: "layered", accum: 0 } : { ...s, out: "single" });
+  /** A layered context can't take a reference mean (it needs the single canvas): accum is ignored until the reload. */
+  const fitState = (s: LabState): LabState => (layered && s.accum > 0 ? { ...s, accum: 0 } : s);
+  let output = fitOutput(initial);
+  // The layered cloud canvas is premultiplied over the background canvas (T11).
+  const gl = canvas.getContext("webgl2", { antialias: false, alpha: layered, depth: false, stencil: false, premultipliedAlpha: layered, powerPreference: "high-performance" });
   if (!gl) throw new Error("[vol] WebGL2 unavailable");
   // RGBA16F render targets (T7) need it; enabling it here keeps targets.ts free of context setup.
   gl.getExtension("EXT_color_buffer_float");
@@ -260,19 +255,20 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
   const vao = gl.createVertexArray();
 
   const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
-  const review = applyReviewParams(gl, typeof location === "undefined" ? "" : location.search);
-  let state = review.state(initial);
+  const review = applyReviewParams(gl);
+  let state = review.state(fitState(initial));
   let tier: QualityTier = resolveTier(state.tier, { coarsePointer: coarse });
   let scene = sceneFor(state);
   let noise: NoiseTextures = await createNoiseTextures(gl, tier);
   let weather: WeatherMap | null = null;
   const weatherParams = (): WeatherMapParams => ({ ...scene.weather, forcedCell: forcedCellFor(state, scene, weather?.offset ?? [0, 0]) });
   weather = createWeatherMap(gl, weatherParams());
-  let pipeline: VolPipeline = review.pipeline(tier);
+  let uniforms: CloudUniforms | null = null;
+  const bgLayer: BackgroundLayer | null = layered ? createBackgroundLayer(opts.background!, tier, () => uniforms) : null;
+  let pipeline: VolPipeline = createPipeline(gl, tier, output, bgLayer);
   let governor = createTierGovernor(tier, state.tier === "auto");
   let programs = new Map<string, WebGLProgram>();
   const locations = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>();
-  let uniforms: CloudUniforms | null = null;
 
   let width = 1;
   let height = 1;
@@ -281,9 +277,12 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
     const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
     const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
     if (w === width && h === height) return;
-    width = canvas.width = w;
-    height = canvas.height = h;
+    width = w;
+    height = h;
+    // Layered: the pipeline sizes the cloud canvas (s_out × this) and the background canvas.
+    if (!layered) [canvas.width, canvas.height] = [w, h];
     pipeline.resize(w, h);
+    review.reset();
   };
   resize();
   const ro = new ResizeObserver(resize);
@@ -338,7 +337,20 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
   const pending: WebGLQuery[] = [];
   let lastGpu: number | null = null;
   const gpuWindow: number[] = [];
-  const debug: VolDebug = { frames: 0, ready: false, tier, gpuMs: null, times, state, noiseMs: noise.genMs, error: null };
+  const debug: VolDebug = {
+    frames: 0,
+    ready: false,
+    tier,
+    gpuMs: null,
+    times,
+    state,
+    noiseMs: noise.genMs,
+    error: null,
+    accumReady: review.ready(state),
+    out: output.mode,
+    bgGpuMs: null,
+    bgDrawMs: [],
+  };
   window.__vol = debug;
   console.info(`[vol] tier ${tier}, noise ${noise.genMs.toFixed(1)} ms`);
 
@@ -359,7 +371,7 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
     noise.dispose();
     noise = fresh;
     pipeline.dispose();
-    pipeline = review.pipeline(tier);
+    pipeline = createPipeline(gl, tier, output, bgLayer);
     review.reset();
     pipeline.resize(width, height);
     programs.forEach((p) => gl.deleteProgram(p));
@@ -411,8 +423,8 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
         view.draw(ctx);
       } else {
         const ctx: PassContext = { gl, tier, width, height, frame: info, weather: weather!, program, apply, fullscreen };
-        if (review.before(pipeline)) pipeline.render(ctx);
-        review.after(ctx);
+        if (review.before(pipeline, state)) pipeline.render(ctx);
+        review.after(ctx, state);
       }
     } catch (e) {
       debug.error = e instanceof Error ? e.message : String(e);
@@ -431,7 +443,9 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
     if (times.length > TIMES_KEPT) times.shift();
     debug.frames++;
     debug.ready = true;
+    debug.accumReady = review.ready(state);
     debug.gpuMs = gpuWindow.length ? gpuWindow.reduce((a, b) => a + b, 0) / gpuWindow.length : null;
+    if (bgLayer) ({ gpuMs: debug.bgGpuMs, drawMs: debug.bgDrawMs } = bgLayer.stats());
     listeners.forEach((cb) => cb(ft));
     // The governor watches the frame time the viewer gets (the rAF interval). Per-frame GPU time is bimodal with the
     // 15 Hz re-march (most frames only composite), so its median would never see a slow march.
@@ -452,9 +466,19 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
     },
     setState(next) {
       const prevTier = state.tier;
-      state = next = review.state(next);
+      if (outputFor(next).mode !== output.mode) console.info(`[vol] out=${next.out}, accum=${next.accum}: needs a reload (a new context)`);
+      state = next = review.state(fitState(next));
       review.reset();
+      debug.accumReady = review.ready(next);
       debug.state = next;
+      const nextOutput = fitOutput(next);
+      if (!sameOutput(nextOutput, output)) {
+        // scale, sout, lift, clampviz or hold changed: the same context, a new pipeline.
+        output = nextOutput;
+        pipeline.dispose();
+        pipeline = createPipeline(gl, tier, output, bgLayer);
+        pipeline.resize(width, height);
+      }
       scene = sceneFor(next);
       weather!.setParams(weatherParams());
       // A new scene: drop the reprojection history and refill the background caches (T7).
@@ -480,6 +504,7 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
       mounted?.unmount?.();
       pipeline.dispose();
       review.dispose();
+      bgLayer?.dispose();
       noise.dispose();
       weather!.dispose();
       programs.forEach((p) => gl.deleteProgram(p));

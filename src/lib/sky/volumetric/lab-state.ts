@@ -4,10 +4,8 @@
  * ranges BRIEF.md documents, and malformed values fall back to the default. cloudAtSun also accepts "cover" as a
  * synonym for "1" (M1 follow-up F1).
  *
- * T9 adds the review params scale, reproject, accum and out. They are optional on LabState only because LAB_DEFAULTS
- * is T0's and predates them: REVIEW_DEFAULTS holds their defaults, and every parsed or preset state carries them
- * (LabStateResolved). M2 folds them into LAB_DEFAULTS and drops the `?` (handoffs/T9.md). T9 only parses them; the
- * renderer wires scale, reproject and accum (T10) and out (T11), so until then they change nothing on screen.
+ * The review params: scale, reproject, accum and out (T9), and T11's output switches sout, hold, lift and clampviz
+ * (M2). Their defaults are in LAB_DEFAULTS like every other field's.
  */
 import {
   CLOUD_TYPES,
@@ -16,6 +14,7 @@ import {
   QUALITY_TIERS,
   type CloudAtSun,
   type CloudType,
+  type LabOutput,
   type LabState,
   type ParseLabState,
   type QualityTier,
@@ -37,20 +36,15 @@ const oneOf = <T extends string>(v: string | null, all: readonly T[], d: T): T =
 const TIERS_AND_AUTO = [...QUALITY_TIERS, "auto" as const] satisfies readonly (QualityTier | "auto")[];
 const AT_SUN: Record<string, CloudAtSun> = { "0": "off", "1": "cover", cover: "cover", edge: "edge" };
 
-type LabOutput = NonNullable<LabState["out"]>;
 /** scale: the cloud target's scale, a fraction of the drawing buffer. */
 export const SCALE_RANGE = { min: 0.25, max: 1 } as const;
 /** accum: the most frames a reference render averages. */
 export const ACCUM_MAX = 256;
+/** sout: the layered cloud canvas's scale, a fraction of the drawing buffer (T11). */
+export const SOUT_RANGE = { min: 0.2, max: 1 } as const;
 const OUTPUTS: readonly LabOutput[] = ["single", "layered"];
-
-/**
- * The review params' defaults (T9): scale null (the tier's), reprojection on, no averaging, one output. Spread after
- * LAB_DEFAULTS and before a preset: { ...LAB_DEFAULTS, ...REVIEW_DEFAULTS, ...LAB_PRESETS.A } is the default state.
- */
-export const REVIEW_DEFAULTS = { scale: null, reproject: 1, accum: 0, out: "single" } as const satisfies Partial<LabState>;
-/** LabState with the review params present: what parseLabState and presetState return. */
-export type LabStateResolved = Required<LabState>;
+/** A 0 | 1 switch: "0" or "1", anything else → the default. */
+const bit = (v: string | null, d: 0 | 1): 0 | 1 => (v === "1" ? 1 : v === "0" ? 0 : d);
 
 /** "2026-12-15" only when it is a real calendar day (not 2026-02-30). */
 const validDate = (v: string): boolean => {
@@ -69,7 +63,7 @@ const validTime = (v: string): boolean => {
   return h <= 23 && mi <= 59;
 };
 
-export const parseLabState = ((search: string): LabStateResolved => {
+export const parseLabState: ParseLabState = (search) => {
   const q = new URLSearchParams(search);
   const d = LAB_DEFAULTS;
   const date = q.get("date") ?? "";
@@ -92,11 +86,15 @@ export const parseLabState = ((search: string): LabStateResolved => {
     debug: q.get("debug") ?? d.debug,
     // Absent, empty or malformed → the default (scale: the tier's own).
     scale: nullable(q.get("scale"), SCALE_RANGE.min, SCALE_RANGE.max),
-    reproject: q.get("reproject") === "0" ? 0 : 1,
-    accum: Math.trunc(clamped(q.get("accum"), 0, ACCUM_MAX, 0)),
-    out: oneOf<LabOutput>(q.get("out"), OUTPUTS, "single"),
+    reproject: bit(q.get("reproject"), d.reproject),
+    accum: Math.trunc(clamped(q.get("accum"), 0, ACCUM_MAX, d.accum)),
+    out: oneOf<LabOutput>(q.get("out"), OUTPUTS, d.out),
+    sout: nullable(q.get("sout"), SOUT_RANGE.min, SOUT_RANGE.max),
+    hold: bit(q.get("hold"), d.hold),
+    lift: bit(q.get("lift"), d.lift),
+    clampviz: bit(q.get("clampviz"), d.clampviz),
   };
-}) satisfies ParseLabState;
+};
 
 export const serialiseLabState: SerialiseLabState = (s) => {
   const q = new URLSearchParams();
@@ -115,13 +113,16 @@ export const serialiseLabState: SerialiseLabState = (s) => {
   q.set("seed", String(s.seed));
   q.set("view", s.view === null ? "" : String(s.view));
   q.set("debug", s.debug);
-  // A review param left out of a literal (they are optional on LabState) serialises as its default.
-  q.set("scale", s.scale === null || s.scale === undefined ? "" : String(s.scale));
-  q.set("reproject", String(s.reproject ?? 1));
-  q.set("accum", String(s.accum ?? 0));
-  q.set("out", s.out ?? "single");
+  q.set("scale", s.scale === null ? "" : String(s.scale));
+  q.set("reproject", String(s.reproject));
+  q.set("accum", String(s.accum));
+  q.set("out", s.out);
+  q.set("sout", s.sout === null ? "" : String(s.sout));
+  q.set("hold", String(s.hold));
+  q.set("lift", String(s.lift));
+  q.set("clampviz", String(s.clampviz));
   return q.toString();
 };
 
 /** The state a preset button applies: the acceptance URLs of BRIEF.md §7 (fields not given take the defaults). */
-export const presetState = (p: keyof typeof LAB_PRESETS): LabStateResolved => ({ ...LAB_DEFAULTS, ...REVIEW_DEFAULTS, ...LAB_PRESETS[p] });
+export const presetState = (p: keyof typeof LAB_PRESETS): LabState => ({ ...LAB_DEFAULTS, ...LAB_PRESETS[p] });

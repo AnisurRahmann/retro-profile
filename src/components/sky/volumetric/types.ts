@@ -62,8 +62,8 @@ export const MIN_TRANSMITTANCE = 0.01;
 /**
  * GPU-generated, tileable noise. SHAPE: shapeSize³ RGBA8, R Perlin-Worley, GBA inverted Worley fbm at 3 rising
  * frequencies. DETAIL: 32³ RGB8 (or RGBA8), inverted Worley fbm at 3 frequencies. BLUE: 64×64 R8 blue noise.
- * All REPEAT; BLUE NEAREST. SHAPE and DETAIL carry full mip chains (periodic 2×2×2 box means) but MIN_FILTER is
- * LINEAR, so texture() reads level 0; use textureLod for a coarser level (far steps, the light march).
+ * All REPEAT; BLUE NEAREST. SHAPE and DETAIL carry full mip chains (periodic 2×2×2 box means) and MIN_FILTER is
+ * LINEAR_MIPMAP_LINEAR (T10), so density reads them with textureLod at its own footprint LOD.
  */
 export type NoiseTextures = {
   shape: WebGLTexture;
@@ -165,20 +165,32 @@ export type LabState = {
   view: number | null;
   /** "" or a debug view: a registered JS view (registerDebugView) or one of SHADER_DEBUG_VIEWS. */
   debug: string;
-  /**
-   * The review params (T9). Parsed here; the renderer wires scale, reproject and accum (T10) and out (T11).
-   * Optional only because LAB_DEFAULTS below is T0's and predates them: parseLabState and presetState always set
-   * them (REVIEW_DEFAULTS in lab-state.ts, LabStateResolved = Required<LabState>), so read them with `??`.
-   */
+  // The review params (T9; wired by T10 and T11, folded in by M2).
   /** Cloud target scale, 0.25..1, instead of TIERS[tier].scale; null → the tier's. */
-  scale?: number | null;
-  /** 0: march every pixel every frame, with no checkerboard and no history. Default 1. */
-  reproject?: 0 | 1;
-  /** > 0: the renderer freezes time and averages this many frames (a reference render). Integer 0..256, default 0. */
-  accum?: number;
-  /** "layered": clouds and background as separate outputs. Default "single". */
-  out?: "single" | "layered";
+  scale: number | null;
+  /** 0: march every pixel every frame, with no checkerboard and no history. */
+  reproject: 0 | 1;
+  /**
+   * > 0: the renderer freezes time and shows the mean of this many frames (a reference render); integer 0..256.
+   * A reference is always drawn with the single output (the mean is taken of the one opaque canvas).
+   */
+  accum: number;
+  /**
+   * "layered" (T11, the default since M2): the background on its own full-resolution canvas, the clouds premultiplied
+   * on a canvas at sout × the drawing buffer above it. "single": one canvas, composited at full resolution. Changing
+   * it needs a new WebGL context, so the panel reloads the page.
+   */
+  out: LabOutput;
+  /** layered: the cloud canvas's scale, 0.2..1; null → the cloud target's scale (T11's recommendation). */
+  sout: number | null;
+  /** 1: draw the clouds only on march frames (T7 option 1; a lab switch, judders ~3 px per step). */
+  hold: 0 | 1;
+  /** layered: 1 lifts the alpha so C ≤ A holds exactly (T11 D3); 0 clamps C instead (the original brief). */
+  lift: 0 | 1;
+  /** layered: 1 paints where the C ≤ A clamp would bind (a diagnostic). */
+  clampviz: 0 | 1;
 };
+export type LabOutput = "single" | "layered";
 export type ParseLabState = (search: string) => LabState;
 export type SerialiseLabState = (s: LabState) => string;
 
@@ -199,6 +211,14 @@ export const LAB_DEFAULTS: LabState = {
   seed: 1,
   view: null,
   debug: "",
+  scale: null,
+  reproject: 1,
+  accum: 0,
+  out: "layered",
+  sout: null,
+  hold: 0,
+  lift: 1,
+  clampviz: 0,
 };
 export const LAB_PRESETS: Record<"A" | "B" | "C", Partial<LabState>> = {
   A: { t: "11:00", type: "cumulus", cov: 0.38, wind: 15, from: 270 },
@@ -345,7 +365,8 @@ export const GLSL_CONTRACT: Record<GlslModuleName, { owner: string; file: string
     owner: "T4",
     file: "src/components/sky/volumetric/density.glsl.ts",
     functions: [
-      // Extinction density (per km) at world point p; lod 0 = full detail, 1 = shape only (light march, far steps).
+      // Extinction density (per km) at world point p; lod 0 = full detail at density's own footprint LOD, ≥ 1 = shape
+      // only, read (lod − 1) mip levels coarser (T10: the light march's last step passes 3).
       "float cloudDensity(vec3 p, float lod)",
       // 0 at the cloud base → 1 at the type's top, for p.
       "float heightFraction(vec3 p)",
@@ -419,9 +440,39 @@ export type CloudPipeline = {
   render(ctx: PassContext): void;
   /** The drawing buffer changed size (also called once before the first render). */
   resize(width: number, height: number): void;
+  /** The scene changed (setState): drop the reprojection history and refill the background caches (T7, T11). */
+  invalidate(): void;
   dispose(): void;
 };
-export type CreatePipeline = (gl: WebGL2RenderingContext, tier: QualityTier) => CloudPipeline;
+/** How the pipeline presents (T11) and at what scale it marches (T10's review scale). targets.ts outputFor(state). */
+export type PipelineOutput = {
+  mode: LabOutput;
+  /** The cloud target's scale; null = TIERS[tier].scale. */
+  scale: number | null;
+  /** layered: the cloud canvas's drawing buffer as a fraction of the full one (s_out); null = the cloud target's. */
+  sOut: number | null;
+  /** layered: raise A to the least alpha that keeps C ≤ A, instead of clamping C (reprojectLayered). */
+  lift: boolean;
+  /** layered: paint where the C ≤ A clamp binds (reprojectLayered). */
+  clampViz: boolean;
+  /** T7's option 1: draw the clouds only on march frames (and resets, background refreshes). */
+  hold: boolean;
+};
+/** out=layered: the background canvas, drawn when asked on its own context; the browser keeps showing it between. */
+export type BackgroundLayer = {
+  resize(width: number, height: number): void;
+  /** Once per frame: draw now (the BG cadence or a reset) or leave the canvas as it is. */
+  present(draw: boolean): void;
+  /** Amortised GPU ms per frame (per-draw ms × draws per frame), and the last measured draws (ms). */
+  stats(): { gpuMs: number | null; drawMs: number[] };
+  dispose(): void;
+};
+export type CreatePipeline = (
+  gl: WebGL2RenderingContext,
+  tier: QualityTier,
+  output?: PipelineOutput,
+  background?: BackgroundLayer | null,
+) => CloudPipeline;
 
 // ─── Tiers (T7, tiers.ts) ─────────────────────────────────────────────────────────────────────────────────────────
 
@@ -482,6 +533,16 @@ export type VolDebug = {
   state: LabState;
   noiseMs: number;
   error: string | null;
+  /**
+   * A reference render (state.accum > 0) is complete: false while the N frames are averaging, true once they are in,
+   * and always true when accum is 0. Reset by anything that restarts the mean (setState, a resize, a tier change).
+   */
+  accumReady: boolean;
+  /** The output the renderer runs (T11). */
+  out: LabOutput;
+  /** out=layered: the background context's amortised GPU ms per frame, and its last measured draws (ms). */
+  bgGpuMs: number | null;
+  bgDrawMs: number[];
 };
 
 declare global {

@@ -401,3 +401,40 @@ The detail is in `docs/volumetric/handoffs/M1.md` and in each task's hand-off.
        is fully covered on medium and high.
      - The fix belongs to the spec and `sun-cell.ts` owners: read transmittance for A, as D3 did for B, and re-solve
        the edge shift.
+## Volumetric clouds lab: T11 checkerboard reconstruction and layered output (2026-11-27)
+
+205. **The resolve follows the brief's structure, with a different box (T11 D1).**
+     - The structure: a spatial estimate (bilateral by `gCloudDist`), a clipped history, and
+       out = mix(spatial, history, w).
+     - The box is min/max in YCoCg plus T, not μ ± γσ. For a non-fresh pixel it covers only the samples it
+       interpolates, padded by 0.5 × the 3×3 range.
+     - Each extent has a floor (3% of Y in Y, Co and Cg; 0.01 in T), and the history is sampled with Catmull-Rom.
+     - Why:
+       - The dot lattice was reprojection lag, which the running mean grows about 4/α times, not the clamp.
+       - A 3×3 box of samples two texels apart can't see sub-texel lag.
+       - A σ box clips wisps out of their own history (16% class asymmetry, against 6% for min/max).
+       - A 4-D clip with no floor collapses on grey cloud.
+     - Measured: class asymmetry 21% (T8-r3) and 15% (T7) → 11%. The drift pair shows no ghosting.
+206. **T9's lattice metric isn't a gate for state A (T11 D2).**
+     - A per-pixel full-resolution reference reads the same 0.006–0.010 as T8-r3: the metric reads A's real cloud
+       detail at the texel grid.
+     - Use the per-Bayer-class asymmetry (reference 1.5%) and the residual against a frozen reference.
+207. **The layered output's alpha is lifted, not clamped (T11 D3).**
+     - A = max(1 − T, maxᵢ (Xᵢ − Yᵢ)/(1 − Yᵢ)), with X = D(c + T·b) and Y = D(b), is the least alpha that keeps C ≤ A.
+       It stays exact for b.
+     - The brief's clamp binds on 12.6% of A's cloud pixels (2.3% of B's), mostly by more than 8 levels.
+       ΔL p99 31% at 1440 and 45% at 375, and it greys B's silver lining.
+     - Lifted, ΔL is at the single-vs-single noise floor.
+208. **The background layer refreshes on the frame after the march (T11 D4).**
+     - It runs at the BG cadence (every 4th march) and on a reset, and draws nothing in between.
+     - The cloud context's s_out cache refreshes on the same frame, so b matches the canvas under it.
+209. **hold (T7's option 1) stays a lab switch (T11 D5).**
+     - It saves about 0.6 ms on desktop.
+     - The cost is a drift step of 3.25 device px per 15 Hz step at the top of A's view (0.16 px near the horizon).
+210. **The recommended architecture: layered, lifted, s_out = the tier's scale (T11 D6).**
+     - Desktop high 4.7–5.3 → 3.3–3.6 ms. The extra layer costs the compositor 0.24 ms per frame.
+     - Mobile low 0.7–0.8 ms.
+     - Desktop is still over 2.5 ms: the march and resolve are now the cost, about 2.5 ms.
+     - On the M2, per-frame GPU timer peaks (11–15 ms in every mode) are a clock-scaling artefact, so the 8 ms frame
+       rule needs the trace or another device. With tracing on, every mode held 60 fps.
+

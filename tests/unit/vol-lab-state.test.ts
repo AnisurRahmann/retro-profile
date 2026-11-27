@@ -1,20 +1,18 @@
-/** The lab's URL state (owner T3, review params T9): defaults, clamping and the parse ↔ serialise round trip. */
+/** The lab's URL state (owner T3, review params T9, output switches M2): defaults, clamping, the round trip. */
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { LAB_DEFAULTS, LAB_PRESETS, type LabState } from "@/components/sky/volumetric/types";
 import {
   ACCUM_MAX,
   SCALE_RANGE,
-  REVIEW_DEFAULTS,
-  type LabStateResolved,
+  SOUT_RANGE,
   parseLabState,
   presetState,
   serialiseLabState,
 } from "@/lib/sky/volumetric/lab-state";
 
-/** The complete default state: LAB_DEFAULTS plus the review params' defaults (they are optional on the type). */
-const DEFAULTS = { ...LAB_DEFAULTS, ...REVIEW_DEFAULTS };
+const DEFAULTS = LAB_DEFAULTS;
 const roundTrip = (s: LabState) => parseLabState(serialiseLabState(s));
-const parseOne = (query: string): Partial<LabStateResolved> =>
+const parseOne = (query: string): Partial<LabState> =>
   Object.fromEntries(Object.entries(parseLabState(query)).filter(([k, v]) => v !== DEFAULTS[k as keyof LabState]));
 
 describe("parseLabState", () => {
@@ -27,7 +25,7 @@ describe("parseLabState", () => {
     const s = parseLabState(
       "?date=2026-12-21&t=16:45&cov=0.4&type=stratus&wind=10&from=300&precip=0.25&tier=auto" +
         "&sunAz=250&sunEl=3&cloudAtSun=edge&freeze=1&seed=7&view=190&debug=density" +
-        "&scale=0.6&reproject=0&accum=64&out=layered",
+        "&scale=0.6&reproject=0&accum=64&out=single&sout=0.5&hold=1&lift=0&clampviz=1",
     );
     expect(s).toEqual({
       ...DEFAULTS,
@@ -49,7 +47,11 @@ describe("parseLabState", () => {
       scale: 0.6,
       reproject: 0,
       accum: 64,
-      out: "layered",
+      out: "single",
+      sout: 0.5,
+      hold: 1,
+      lift: 0,
+      clampviz: 1,
     });
   });
 
@@ -130,11 +132,23 @@ describe("parseLabState", () => {
     expect(parseOne("reproject=0&reproject=1")).toEqual({ reproject: 0 });
   });
 
-  it("out is single or layered, single by default", () => {
-    expect(parseOne("out=layered")).toEqual({ out: "layered" });
-    expect(parseOne("out=single")).toEqual({});
+  it("out is single or layered, layered by default (T11's recommendation, M2)", () => {
+    expect(LAB_DEFAULTS.out).toBe("layered");
+    expect(parseOne("out=single")).toEqual({ out: "single" });
+    expect(parseOne("out=layered")).toEqual({});
     expect(parseOne("out=Layered")).toEqual({}); // case-sensitive, like the other enums
     expect(parseOne("out=")).toEqual({});
+  });
+
+  it("the output switches: sout 0.2–1 or empty, hold / lift / clampviz 0 or 1 (M2)", () => {
+    expect(parseOne("sout=0.5")).toEqual({ sout: 0.5 });
+    expect(parseOne("sout=5")).toEqual({ sout: 1 });
+    expect(parseOne("sout=0.01")).toEqual({ sout: 0.2 });
+    expect(parseOne("sout=abc&sout=")).toEqual({});
+    expect(SOUT_RANGE).toEqual({ min: 0.2, max: 1 });
+    expect(parseOne("hold=1&lift=0&clampviz=1")).toEqual({ hold: 1, lift: 0, clampviz: 1 });
+    expect(parseOne("hold=0&lift=1&clampviz=0")).toEqual({}); // the defaults
+    expect(parseOne("hold=yes&lift=&clampviz=2")).toEqual({});
   });
 
   it("ignores unknown parameters", () => {
@@ -143,15 +157,14 @@ describe("parseLabState", () => {
   });
 
   it("presetState is the acceptance URL of each state", () => {
-    expect(presetState("A")).toEqual({ ...LAB_DEFAULTS, ...REVIEW_DEFAULTS, ...LAB_PRESETS.A });
-    expect(presetState("B")).toEqual({ ...LAB_DEFAULTS, ...REVIEW_DEFAULTS, ...LAB_PRESETS.B });
-    expect(presetState("C")).toEqual({ ...LAB_DEFAULTS, ...REVIEW_DEFAULTS, ...LAB_PRESETS.C });
+    expect(presetState("A")).toEqual({ ...LAB_DEFAULTS, ...LAB_PRESETS.A });
+    expect(presetState("B")).toEqual({ ...LAB_DEFAULTS, ...LAB_PRESETS.B });
+    expect(presetState("C")).toEqual({ ...LAB_DEFAULTS, ...LAB_PRESETS.C });
     expect(presetState("B").cloudAtSun).toBe("edge");
-    for (const p of ["A", "B", "C"] as const) expect(presetState(p)).toMatchObject(REVIEW_DEFAULTS);
   });
 
-  it("always sets the review params (they are optional on the type only)", () => {
-    expectTypeOf(parseLabState("")).toEqualTypeOf<LabStateResolved>();
+  it("always sets every field", () => {
+    expectTypeOf(parseLabState("")).toEqualTypeOf<LabState>();
     expectTypeOf(parseLabState("").scale).toEqualTypeOf<number | null>();
     expectTypeOf(parseLabState("").reproject).toEqualTypeOf<0 | 1>();
     expectTypeOf(presetState("A").out).toEqualTypeOf<"single" | "layered">();
@@ -164,13 +177,8 @@ describe("serialiseLabState", () => {
     expect(serialiseLabState(DEFAULTS)).toBe(
       "date=2026-12-15&t=11%3A00&cov=0.38&type=cumulus&wind=15&from=270&precip=0" +
         "&tier=high&sunAz=&sunEl=&cloudAtSun=0&freeze=0&seed=1&view=&debug=" +
-        "&scale=&reproject=1&accum=0&out=single",
+        "&scale=&reproject=1&accum=0&out=layered&sout=&hold=0&lift=1&clampviz=0",
     );
-  });
-
-  it("writes a literal without the review params exactly like the defaults", () => {
-    // LAB_DEFAULTS predates them, so the fields may be absent: that serialises as the default.
-    expect(serialiseLabState(LAB_DEFAULTS)).toBe(serialiseLabState(DEFAULTS));
   });
 
   it("encodes cloudAtSun as 0/1/edge", () => {
@@ -179,15 +187,17 @@ describe("serialiseLabState", () => {
   });
 
   it("encodes the review params", () => {
-    expect(serialiseLabState({ ...DEFAULTS, scale: 1, reproject: 0, accum: 64, out: "layered" })).toContain(
-      "&scale=1&reproject=0&accum=64&out=layered",
+    expect(serialiseLabState({ ...DEFAULTS, scale: 1, reproject: 0, accum: 64, out: "single" })).toContain(
+      "&scale=1&reproject=0&accum=64&out=single",
     );
-    expect(serialiseLabState({ ...DEFAULTS, scale: null })).toContain("&scale=&reproject=1&accum=0&out=single");
+    expect(serialiseLabState({ ...DEFAULTS, scale: null })).toContain("&scale=&reproject=1&accum=0&out=layered");
+    expect(serialiseLabState({ ...DEFAULTS, sout: 0.5, hold: 1, lift: 0, clampviz: 1 })).toContain(
+      "&sout=0.5&hold=1&lift=0&clampviz=1",
+    );
   });
 
   it("round-trips the defaults", () => {
     expect(roundTrip(DEFAULTS)).toEqual(DEFAULTS);
-    expect(roundTrip(LAB_DEFAULTS)).toEqual(DEFAULTS);
   });
 
   it("round-trips a fully-set state", () => {
@@ -210,7 +220,11 @@ describe("serialiseLabState", () => {
       scale: 0.25,
       reproject: 0,
       accum: 256,
-      out: "layered",
+      out: "single",
+      sout: 0.2,
+      hold: 1,
+      lift: 0,
+      clampviz: 1,
     };
     expect(roundTrip(s)).toEqual(s);
   });
@@ -224,7 +238,7 @@ describe("serialiseLabState", () => {
       for (const reproject of [0, 1] as const) {
         for (const accum of [0, 1, 64, 256]) {
           for (const out of ["single", "layered"] as const) {
-            const s: LabStateResolved = { ...presetState("A"), scale, reproject, accum, out };
+            const s: LabState = { ...presetState("A"), scale, reproject, accum, out };
             expect(roundTrip(s)).toEqual(s);
           }
         }

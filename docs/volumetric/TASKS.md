@@ -17,6 +17,9 @@ don't collide. The detail goes in `handoffs/<id>.md`.
 | **T7** Performance | Claude Code | M1 | `targets.ts`, `reproject.glsl.ts`, `tiers.ts`, `vol-tiers.test.ts` | `prompts/T7.md` |
 | **T8** Visual tuning, then the owner's review | Claude Code | T7 | the `*.glsl.ts` constants and shaping, `weather-map.ts` coverage mapping, DECISIONS, PROGRESS | `prompts/T8.md` |
 | **T9** Review tooling for the realism round | GLM | T8 | the `LabState` type in `types.ts`, `lab-state.ts` + tests, `controls/**`, `scripts/probe/lab-*.mts`, BRIEF "Tools" (append) | inline (the conductor's prompt) |
+| **T10** Realism: LOD, scattering, aureole | Claude Code | T8 | `density`, `lighting`, `march`, `background` `.glsl.ts`, `noise-gpu.ts` filtering, `applyReviewParams` in `renderer.ts` | (session brief) |
+| **T11** Checkerboard reconstruction, layered output | Claude Code | T8 | `reproject.glsl.ts`, `targets.ts`, `tiers.ts`, `CloudPipeline` in `types.ts`, the lab page shell, the output wiring in `renderer.ts` | (session brief) |
+| **M2** Merge and review of T9–T11 | Claude Code | T9–T11 | everything volumetric (review fixes), BRIEF, DECISIONS | inline |
 
 **Order.** T1, T2, T3 and T4 can run in parallel once T0 is merged. T5 needs T4, and T6 needs T3. M1 waits for all
 six. Then T7, then T8. T8 ends with status `needs-human`: the owner reviews the lab before anything reaches the home
@@ -522,3 +525,35 @@ the review params sit behind `// TEMP until T9` in `renderer.ts`).
   sample of a 95% deck is lit cloud.
 - Cheaper AO (shape only, or one sample) is the first lever. It costs some lobe contrast in backlit bodies.
 <!-- /T10 -->
+<!-- T11 -->
+### T11: checkerboard reconstruction, layered output
+
+**Status:** partial (2026-11-27, `vol/T11-pipeline`). The lattice is gone, and layered output is built and recommended.
+Three pass lines are not met: T9's lattice number (it reads cloud detail, see the hand-off), A's p99 ΔL (it sits at
+A's run-to-run noise floor), and desktop high ≤ 2.5 ms (the best is 2.7–2.9; the march now dominates).
+
+**Files:**
+- `reproject.glsl.ts`: the new resolve and `reprojectLayered`.
+  - The resolve has a spatial estimate (bilateral by depth) and a min/max box (tight for non-fresh pixels, with an
+    extent floor). The history is Catmull-Rom, clipped, and mixed with w = 1 − off/τ.
+  - `reprojectLayered` gives A = 1 − T, lifted so that C ≤ A, and C = D(c + T·b) − (1 − A)·D(b).
+- `targets.ts`:
+  - `readOutput` (`out`, `sout`, `lift`, `clampviz`, `hold`; TEMP until T9), `layeredSize`, `createBackgroundLayer`.
+  - The layered branch and `hold` in `createPipeline`.
+- `types.ts`: `CloudPipeline.invalidate`.
+- `renderer.ts`: the output wiring.
+- `LabClient.tsx`: the background canvas.
+- `tests/unit/vol-output.test.ts`.
+
+**How to verify:**
+- `/lab/clouds?…&out=layered`. Add `&clampviz=1&lift=0` to see where the brief's clamp binds.
+- Review sheets: `.shots/volumetric-lab/T11/review/`.
+- Probes: `.scratch/t11/` (listed in the hand-off).
+
+**Recommendation:** layered, lifted alpha, s_out = the tier's scale, no hold. Desktop is −30% GPU (about 3.4 ms), with
+no visible difference from single. The decision table is in `handoffs/T11.md`.
+
+**Notes for the next task:**
+- The remaining desktop cost is the march and resolve (about 2.5 ms amortised).
+- The remaining motion artefact is reprojection lag across the wind (cause not found).
+<!-- /T11 -->

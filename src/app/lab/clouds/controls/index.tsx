@@ -13,7 +13,8 @@ import {
   type VolRenderer,
 } from "@/components/sky/volumetric/types";
 import { moon as moonAt, sun as sunAt } from "@/lib/sky/astro";
-import { ACCUM_MAX, SCALE_RANGE, presetState, serialiseLabState } from "@/lib/sky/volumetric/lab-state";
+import { outputFor } from "@/components/sky/volumetric/targets";
+import { ACCUM_MAX, SCALE_RANGE, SOUT_RANGE, presetState, serialiseLabState } from "@/lib/sky/volumetric/lab-state";
 import { labDate } from "@/lib/sky/volumetric/scene";
 import { DateField, FrameReadout, NumField, Section, Seg, SelectField, Slider, Toggle } from "./widgets";
 
@@ -69,6 +70,7 @@ export function Controls({ initial, renderer }: ControlsProps) {
   }, [renderer]);
 
   const pending = useRef<LabState | null>(null);
+  const applied = useRef<LabState>(initial);
   const raf = useRef(0);
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
   const commit = useCallback((next: LabState) => {
@@ -80,8 +82,13 @@ export function Controls({ initial, renderer }: ControlsProps) {
       const s = pending.current;
       pending.current = null;
       if (!s) return;
-      rendererRef.current?.setState(s);
+      const prev = applied.current;
+      applied.current = s;
       history.replaceState(null, "", `?${serialiseLabState(s)}`);
+      // The output mode is a context attribute (T11): a change, including a reference (accum > 0, single only),
+      // needs a fresh page.
+      if (outputFor(s).mode !== outputFor(prev).mode) return location.reload();
+      rendererRef.current?.setState(s);
     });
   }, []);
 
@@ -117,11 +124,8 @@ export function Controls({ initial, renderer }: ControlsProps) {
   const el = state.sunEl ?? Math.round(real.elevationDeg);
   const viewAz = state.view ?? (el > -2 ? az : lum.altitudeDeg > 0 ? Math.round(lum.azimuthDeg) : 180);
 
-  // The review params (T9). They are optional on LabState only because LAB_DEFAULTS predates them; absent = default.
-  const scale = state.scale ?? null;
-  const reproject = state.reproject ?? 1;
-  const accum = state.accum ?? 0;
-  const out = state.out ?? "single";
+  // The review params (T9) and the output switches (T11).
+  const { scale, reproject, accum, out, sout } = state;
   // scale null → the live tier's scale (with tier=auto that is the tier the renderer settled on).
   const liveTier: QualityTier = state.tier === "auto" ? (renderer?.tier ?? ft?.tier ?? "high") : state.tier;
   const tierScale = TIERS[liveTier].scale;
@@ -345,6 +349,48 @@ export function Controls({ initial, renderer }: ControlsProps) {
                 { value: "layered", text: "layered" },
               ]}
               onChange={(v) => set("out", v === "layered" ? "layered" : "single")}
+            />
+            {out === "layered" && (
+              <>
+                <Slider
+                  label="layer scale"
+                  min={SOUT_RANGE.min}
+                  max={SOUT_RANGE.max}
+                  step={0.05}
+                  value={sout ?? scale ?? tierScale}
+                  format={(v) => v.toFixed(2)}
+                  onInput={(v) => set("sout", Math.round(v * 100) / 100)}
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-graphite">{sout === null ? "cloud scale" : "override"}</span>
+                  <button
+                    type="button"
+                    onClick={() => set("sout", null)}
+                    disabled={sout === null}
+                    className="rounded border border-hairline px-1.5 py-0.5 hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    use cloud scale
+                  </button>
+                </div>
+                <Toggle
+                  label="lift alpha"
+                  title="off: clamp C to A (the original brief)"
+                  checked={state.lift === 1}
+                  onChange={(v) => set("lift", v ? 1 : 0)}
+                />
+                <Toggle
+                  label="show clamp"
+                  title="paint where the C ≤ A clamp binds"
+                  checked={state.clampviz === 1}
+                  onChange={(v) => set("clampviz", v ? 1 : 0)}
+                />
+              </>
+            )}
+            <Toggle
+              label="hold"
+              title="draw clouds on march frames only"
+              checked={state.hold === 1}
+              onChange={(v) => set("hold", v ? 1 : 0)}
             />
           </Section>
         </div>
