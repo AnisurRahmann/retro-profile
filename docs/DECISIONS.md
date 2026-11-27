@@ -181,3 +181,296 @@ Format: decision · rejected alternative · why.
 119. **The backing of large text and of the hero's text (T10).** (a) *Large text* (a computed font size of 24px or more, or 18.66px or more at weight 700 or more: WCAG 1.4.3) is held to 3:1 instead of the 7:1 of `--text` and the 4.8:1 of secondary text. The model aims at 3.2:1, which keeps the same margin over the gate as 4.8 does for 4.5. (b) *The pixel gate asks the same*: 3:1 of large text, 4.5:1 of everything else. Left at 4.5 for all, it would have failed the heading exactly where the module now lets it stand at 3:1. Its result did not move: the worst measurement is 4.82:1 at 375 and 4.75:1 at 1440, as before. (c) *The hero's text* (the name, the status line, the one-liner, the label: `data-on-sky` ids in `backing-runner.ts`) takes a halo up to alpha 0.9 before a chip, and while a scrub, a drag or the time-lapse runs it never gets a chip: the strongest halo instead, so no box pops in or out of the animation. A chip that is already showing when a scrub starts still leaves then: it fades over its 600 ms. (d) *Chips have no border.* They had none since v4; a test now holds the CSS to it. (e) On a phone the four read without any backing at every hour that was tried (nine states, at rest and while dragging): T3 put the text block at the top of the stage, where the sky is dark. The rules are there for the day the layout or the sky changes. No heading measured near 3:1: at either size the gate's worst five are all small labels above 4.75:1.
 
 120. **A release build carries no e2e hooks and no debug-only code (found by the final `pnpm check:bundle`).** After T1–T10 the idle renderer was 26.6 kB gzip against its 26 kB budget (#101). The new features were only part of it: `TEST` and `SKY_DEBUG` compare `process.env.NEXT_PUBLIC_E2E` and `NEXT_PUBLIC_SKY_DEBUG` with "1", and where a variable is not set at build time Next leaves a runtime lookup (`"1"===process.env.NEXT_PUBLIC_E2E`), which the minifier cannot fold. Every release bundle shipped `window.__sky` with its hooks, the backing report, `?bolt` and `?life`, the GPU timer and `?skyscale`. (a) `next.config.ts` `env` gives both variables the build's value, or `""`, so the comparison folds. (b) What `SKY_DEBUG` guards in `SkyRenderer.tsx` and `atmosphere.ts` now sits behind a constant of its own module: the minifier works per module, so an imported constant or a function parameter is never folded. A test holds the three definitions identical. (c) `check:bundle` fails if `__sky` is in a release bundle. Result: up-front 10.6 kB (budget 13), renderer 25.6 kB, 25,554 B (budget 26,000). The budget stands. The test build is as before: there both variables are "1".
+
+## Weather v6: clouds, rain, lightning, fog (2026-11-26)
+
+Each entry is a place the work departs from the brief or from v5.1, with what was measured. Tasks W1–W7 in order; the evidence is in `.shots/v6/<task>/` and the log in docs/PROGRESS.md.
+
+121. **Cloud sheets are read in log depth, not on the brief's flat plane.** The distance is as briefed (`planeZ = h / max(v, 0.02)`, heights 9 / 4 / 1.6, focal 0.9·W, haze over the last 4% above the horizon). The depth along the view is `s = h·k·ln(z / h)` with `k = cloudHz / (0.9·vw)` (`clouds.ts` `planePoint`). On a flat plane a cloud's height on screen falls as v² and its width only as v, so above about 20° every distant cloud is a line six times wider than it is tall: the first build drew lozenges and scratches. In log depth one pixel spans the same noise along both axes (unit test), so a cloud keeps its proportions at every distance.
+122. **Worley is a texture, and the puff's normal comes with it.** F1 / F2 is a precomputed tiling 256² texture (`clouds.ts` `cellData`): one filtered fetch instead of nine hashes, on the GPU and in the CPU mirror. Its G and B hold the vector to the cell's centre, so F1 is its length and the puff's Lambert normal is its direction plus the first octave's slope (two more samples). The brief's normal from three density samples costs three times that, which the 2 ms budget doesn't pay for. MID is a low-frequency patch mask × the cell domes, not a literal 60/40 fbm blend: that read as specks at 1440×900. Octaves: LOW 4 (brief 5: the fifth is under 2 px everywhere but overhead), HIGH 3 (brief 4), SCUD 2. An octave whose wavelength is under about two pixels of the footprint is not sampled (`lod`).
+123. **The clouds' horizon is the far hills' skyline**, not the viewport bottom: with the fixed band (from 1100px) the land covers the bottom of the viewport, so `cloudHz = vh − 0.66 × bandHeight`, and v runs 0…1 over the sky that is actually open. At the viewport bottom only v 0.82…1 was ever visible, which is no perspective at all. In scene mode it is the visible ground.
+124. **Coverage is a quantile, and its soft edge is centred on it.** The density a coverage means is solved on the CPU from 1,024 samples of the sheet's own noise (`cloud-field.ts` `threshold`). Each sheet's edge (0.045 of density, a stratus deck 0.18, cirrus 0.25) starts half an edge under that density. Starting it at the density took 7 points off a 45% partly sky (measured 38%): the edge is half the noise's spread. `sky-clouds.test.ts` holds a 45% sky at 0.40–0.50 and a 98% deck above 0.95, averaged over where the wind has left the sheet.
+125. **A stratus deck is thick everywhere.** Overcast and drizzle at LOW 0.98 are not a cumulus field with holes. Their thin patches keep 0.45 of the density and at least 0.86 opacity (`STRATUS`), so a thin patch is a little brighter (more light comes through it) and soft-edged. As plain LOW they were sharp holes rimmed with the Beer–Lambert bright edge, which read as torn paper (zoomed: the first overcast shot, since re-taken).
+126. **Cloud light follows the sun after sunset (`uTwilight`).** The brief's cloud colours are daylight's. Unmodulated, clouds at 17:45 (sun near −5°) were 5–13× brighter than the dark sky (measured p50 Y 0.036 against a sky of 0.007; 2.7× at 11:00), pale grey-blue on navy, where v5.1's clouds were tinted from the sky and went dark with it. From 2° above the horizon to 6° under, the daylight fades out of the cloud to the sky's own light (horizon colour × 1.2 on its lit side, mid colour × 0.6 on its shaded side), and golden hour ends with it. The 16:45 evidence (sun at +3.5°) is unchanged.
+127. **The backing model's cloud is re-mirrored; `decide()` is untouched.** `skyAt`'s cloud estimate (`backing.ts` `cloudLit`, `cloudLight`, `cloudOver`) now follows the shader: the lit colour with the twilight fade of #126, lit at most by the light's strength × (Lambert + the phase 45° from the light; nearer than that is the sun's or the moon's own neighbourhood), through the LOW sheet's thickness. The first mirror let every cloud be fully lit through the thinnest sheet: at night it estimated Y 0.19 where the sky measures 0.035 (47× the base model's), picked a chip behind 97% of the sweep and ran the sweep into its own timeout. Now the worst of the sweep is 4.72:1 and it takes 20 s (14 s on the base branch; timeout raised to 60 s). It still picks 614k chips against the base's 269k, and those are real: v6's cloud tops are brighter than the deep-blue daytime sky where v5.1's were darker than it, so light text over them needs backing. Two test examples are re-stated for the new sky (a moonlit cloud with the moon up; a cloudless night).
+128. **The sun under a deck.** `sunDiscAlpha = exp(−1.8·τ)` as briefed, τ from the CPU field (LOW + MID at the disc), and the deck conditions cap it at 0. The diffuse patch is `0.12·exp(−τ/3)` over a 22% vw radius. With the brief's `exp(−τ)` it is 1.2% of 0.12 under the overcast deck (τ ≈ 2.3) and measured as nothing: rgb(72,80,93) at the sun against rgb(71,78,91) beside it.
+129. **A cloud's speed is 0.0014 scene units per km/h**, not the brief's 0.035. At 0.035 a LOW cloud in the upper third of 1440×900 travels about 3,000 px in 10 s against the brief's own 60–120 px. At 0.0014 it travels 65–106 px (unit test, and measured on screen in W2: docs/PROGRESS.md).
+130. **Debug hooks.** `?sheet=low|mid|high|scud` isolates one sheet (GPU attribution). `window.__sky` exists in dev as well as test builds (`TEST = SKY_DEBUG`); the evidence script reads the sun's τ from it. Neither is in a production build.
+131. **Removed.** The phone's cirrus floor (`uCirrus`: HIGH is a sheet now). `model.ts` `driftVector` / `MIN_DRIFT` and their test: dead since the sheets drift on their planes (#93's screen-space drift is replaced in W2).
+132. **A sheet's drift is never wrapped.** The first build wrapped each sheet's offset to "the noise period" (256 units) to keep it small. Only the first octave is periodic there: the rotated octaves (R turns 36.9°), the warp field (half frequency) and the Worley cells (102.4 units) are not, so every wrap would have jumped the whole cloud field: after 40 hours at 15 km/h, one hour at 40 km/h. The offsets are integrated as doubles and sent as they are. A float32 places the fastest sheet (SCUD at 40 km/h) to a texel for a day of continuous play, and LOW, MID and HIGH for days (unit test).
+133. **The idle renderer's bundle budget is raised, 26 → 31 kB gzip, and the gate stays enforced.** The brief's W1 alone measures 30.1 kB against a budget the base branch already exceeded (26.1 kB): the shader's GLSL went from 1.4 to 2.9 kB gzip, and the cloud model, its CPU mirror (the quantile solver, the 64×36 grid) and the wiring are the rest. It does not fit 26 kB without dropping briefed features (a sheet, the Worley billow, or the mirror that the sun's occlusion and the backing read). The up-front sky JS is unchanged at 10.7 kB of 13.0, so first paint and Lighthouse are untouched; the cost is 4 kB on a chunk that loads when the browser is idle. **Open for veto:** to hold 26 kB instead, say which to cut. Each later task that outgrows 31 kB raises it again by the smallest amount and logs it here.
+134. **The pixel-contrast gate is not green, in W1 and on the base branch, and neither failure is left hidden or patched over.** `tests/e2e/sky-backing.spec.ts` on a W1 test build fails 6 rows. (a) Five are the desktop footer icons (`footer-linkedin`, `footer-github`) at the "closer" scroll, 2.29–4.11:1: the same five fail on cd5feaf, so T6 ("the footer ends above the landscape band") put them over open sky without the gate being re-run. The gate takes an icon's filled body as its glyph and measures the sky outside the icon's chip (inset 1px top and bottom) as the glyph's surround; on the chip the icon is about 5.9:1. (b) One is the phone's `receipts-note` at "closer" (3.23:1 in the gate's run, 5.07:1 re-run): its chip's interior is 5.2:1, and the gate caught the chip's antialiased top edge blended with a v6 cumulus top beside it. Both are the gate sampling a chip's edge or what is outside it, which never mattered while nothing bright sat there. The fix for either is in the backing's CSS or the gate, which this brief says not to touch, so both are reported instead (docs/PROGRESS.md) for a decision.
+135. **A north wind makes the clouds recede, although the brief's W2 evidence says "wind 40 from 0° (north): clouds visibly come toward the viewer".** The viewer faces south (the codebase's own convention: `windVector`, the windsock), so a north wind blows from behind them toward the horizon: the clouds sink and get smaller. From 180° (a south wind) they come on. Evidence was taken for both. The first build had it the brief's way by accident, a sign error in `planeWind`'s depth term that the brief's evidence frames exposed (0 s and 10 s: the clouds rose), and the unit test had encoded the same assumption.
+136. **Evolution is a drifting warp field, not a third noise dimension.** A 3D noise is two texture fetches and a mix per sample, which doubles the cloud pass. LOW's two warp fields already move (v3's #93): 0.02/s as briefed. HIGH's cirrus gets one warp of its own (one more fetch): 0.008/s. MID and SCUD only drift. Evolution wraps at 2,560 units, a whole number of noise lattices on every warp input, so it never jumps (36 hours of LOW at a time).
+137. **W2's calibration.** 0.0014 scene units per km/h (revises #129's 0.0011, under which the bottom of the upper third moved 51 px): 65–106 px in 10 s by the unit test, 100 px measured on screen in the upper third at 15 km/h. The gust averages 0.93–1.07 over any 10 s, so the measurement is stable within that.
+138. **Rain: slant and depths.** θ = atan((km/h ÷ 3.6) ÷ 7.5), at most 35°, signed by the east–west wind (`src/lib/sky/rain.ts` `rainSlant`): a west wind leans the streaks toward screen-left, which is east. (Revised in #163: the sign only, not a projected size.) The three depths are one pool, and a streak's depth follows the count (50 / 35 / 15), so the near streaks are there at any density. They are drawn per depth and per alpha half: 12 strokes at most, whatever the count.
+139. **Splashes are drawn from the clock, on the water.** No state: each mark comes from its birth tick (1/12 s) and its index, a ring 1.5 → 5 px over 0.3 s, at 30 (rain) and 70 (heavy rain and thunder) a second per 1,000 px of width. None in a drizzle, none in a still frame (reduced motion), none on a phone whose mean frame time is over 1/30 s. They are in the landscape layer, above the ground: the particle layer is behind it.
+140. **Rain in the lamps' light**: five short streaks above each lamp head at night, in `WINDOW_LIT` (the brief's #FFD9A0), at 0.5 × the lamps' strength.
+141. **The lights follow the sky, not the clock.** Lamps and windows come on when the mid sky's relative luminance is under 0.04 and go off above 0.048 (`LAMPS_AT`). On a clear sky that is the sun at about −1.5° and +0.5°, as before; under a storm at noon the sky is 0.033, as dark as a clear sunset, and they are on in the afternoon (`heavy-rain-1300-lights-1440x900.png`).
+142. **Heavy rain's atmosphere.** The far hills fade 60% and the tea hills 35% into the sky's colour (`landscape.ts` `VEIL`; in over the last fifth of the rain's darkening, so only heavy rain and thunder have it). The whole sky, this layer's clouds and curtains and the CSS gradient behind them, darkens 10%. The curtains are a vertically stretched noise drifting with the wind at 0.3 × the darkening, in the atmosphere layer: behind the landscape, where over its dark silhouettes a dark curtain would be invisible anyway.
+143. **Idle bundle budget 31 → 32 kB gzip.** W3 measures 31.1 kB (#133).
+144. **What counts as a flash, and the photosafety rule.** The brief's stepped leader, return stroke and up to two re-strokes are four changes of brightness in half a second. Counted are the bright ones (the return stroke, the re-strokes, a sheet flash's pulses): at most three in a strike, all within 400 ms of its beginning, and no two strikes begin within 1.4 s. So any one second holds at most three bright pulses (WCAG 2.3.1). The stepped leader is a thin line at 0.35 and is not counted. `sky-lightning.test.ts` runs 10,000 simulated seconds in each of three storm states: the peak is ≤ 3 in every second, and a natural minute on screen counted 6 bolts and 13 sheet flashes (4–10 and 8–16 asked).
+145. **A strike that falls due inside another's second waits for it.** Its due time is computed before the strikes before it have begun. It is tried again every frame until the second has passed, and its next is dated from when it does begin. The first build held it in a slot and dated its next from the stale time: bolts came in pairs 1.4 s apart, 12 in a minute.
+146. **A bolt starts below what is written in its column.** Placement rejects `[data-on-sky]` and card rects (`.card`, `.glass`) with a margin of 12% of the bolt's height (how far a channel wanders), six tries, else a sheet flash. On a phone the hero spans the width, so no column is clear: a bolt with 70 px of sky or more below the text starts under it, and without that it is a sheet flash. At the top of 1440×900 about a quarter of the width is clear beside the hero and the cards, so about one natural bolt in five becomes a sheet flash. The debug hook's strike gets sixty tries, so evidence can rely on it.
+147. **Where each part is drawn.** The bolt is in the particle layer, in front of the clouds and behind the landscape, so it strikes to the horizon behind the hills: three passes (#9FB4FF at 10 px and 0.22, #C9D6FF at 4 px and 0.6, #F5F8FF at 1.6 px), the branches 0.55 as wide and 0.7 as bright, its paths built once per strike. The landscape's rim (#DDE6FF at 0.6): a layer's strip minus itself a pixel lower is its top edge; it is tinted and drawn back over the layer, only while a bolt is up. The bolt's light on the water is a broken column under it in the slow life. The scene lifts are one expression at the end of the shader, +5% L for a bolt and +25% L over a soft disc of 18–35% of the width for a sheet flash, the gradient behind included. v5.1's lift of the cloud layer alone (+12% L) is gone.
+148. **Timing.** The first bolt is 1.2–2.5 s after the first frame, again within 1.5 s of the stage (the top half of the viewport) coming back, at most once in 20 s; the first sheet flash is never at the first frame, and never before the first bolt's second has passed. Under heavy rain without thunder there is no bolt and a sheet flash every 25 s.
+149. **Debug hooks** (dev and test builds): `window.__sky.strike("cg" | "ic")`, at once and past the guard; `window.__sky.lightningLog`, the last 20 with where each bolt fell; `window.__sky.lightningCount`. Under reduced motion the hook does nothing and nothing is scheduled or drawn. The old `lightningEnvelope` (a double pulse every 18–45 s with nothing to see) and its test are gone; `?bolt=1` still forces bolts for the GPU probes.
+150. **The GPU gate measures the steady state, and the first steady-state measurement failed.** W1–W3 read the timer's first four lines after load, which span the weather's 4 s ease-in. Six seconds in, partly cloudy at 1920×1080 DPR 2 measured 2.17 ms median (over 2.0), overcast 1.87. The gate script now waits 6 s and takes six samples. The timer is also noisy on a shared GPU (single samples from 0.84 to 2.79 ms for one state while the desktop was busy): so numbers are read as a minimum, a median and a maximum, and remedies are judged on interleaved runs.
+151. **Remedies, in the brief's order.** Octaves first: LOW 4 → 3 and HIGH 3 → 2 (MID and SCUD were already at two fetches and two octaves). The backing scale is already at the brief's minimum of 0.4, so there was nothing to take there; the high cloud layer's resolution was not needed. With three sheets isolated and interleaved the cost is additive: base 0.96 ms, LOW +0.66, MID +0.33, HIGH +0.25. Also taken: the logarithm of the depth once a pixel instead of once per sheet, and one slope sample for LOW's normal instead of two (across, the Worley cell carries the side-shade). After the remedies, on a quiet machine: partly 1.79 ms median (min 1.71), overcast 1.66, thunder at dusk 1.83 (max 1.98), clear 0.98. On a loaded desktop the same code reads partly 1.96–2.17 and thunder at dusk 1.71–2.18. At dusk every sheet reads about a third slower than at noon, the base shader with no sheets included (0.99 → 1.30 ms): the page's night canvases (window and lamp lights) share the GPU with the pass, and the timer reads the sharing. That is not the atmosphere's own cost and the brief's remedies cannot reach it (HIGH is not drawn in a storm). The final gate passes on the median in all 18 states with no margin in partly and overcast; its three largest samples are 2.01–2.11 ms. A cheaper normal was tried and rejected: reading a cloud's slope from its density's screen-space derivative (dFdx / dFdy) instead of two more samples saved the fetches but flattened every cloud (no lit tops or shaded bases, golden hour lost its orange), and at four times the strength only added a quad-sized grain.
+152. **Idle bundle budget 32 → 34 kB gzip.** W4 measures 33.3 kB (#133, #143).
+153. **The storm's atmosphere (W5).** "A darker lower base band, top 35%" is read as the cloud base overhead: the top of the viewport, eased from 55% up to 20% of its height, takes half the light out of the LOW sheet's lit colour and 30% out of its shadow. A thunderstorm's rain is taken at 30 km/h or more whatever the forecast wind says, so it falls at the full 35° (`rain.ts` `slantWind`); the slant's direction still follows the wind. The dusk horizon glow is halved under thunder, in the shader and in the backing model, which also counts the darker base. The evidence "between strikes" uses a dev-only `lightning=off`.
+154. **Fog with depth (W6).** The land fades toward the foggy sky at the horizon: the far hills 85%, the tea hills 60%, the town 30%, the near ground 8%. The shader's fog over the sky now rises from 55% of its colour to 85% where the land begins (it was 55% everywhere, and that only at the very bottom of the viewport, behind the landscape): the first build had a foggy land meeting a much darker sky along a hard line, and the land fading to a colour matched in the wrong space (a perceptual +7% L where the shader lifts × 1.19 in linear light). The backing model follows the shader's fog.
+155. **A rayless pale sun is for fog, not haze.** From 90% fog: no corona, no crepuscular rays, a diffuse patch and a disc at most 0.6. A hazy sky (humidity and visibility give up to 75%) keeps the disc and corona it had; a unit test holds that, and caught the first build switching haze over too. Stars are hidden in fog (alpha × (1 − fog); it was × 0.8). The moon is blurred (`ctx.filter`, 2.5 px × fog) and 40% paler.
+156. **Ground fog is subtle at the briefed alpha.** Three bands (30, 60 and 110 px) of a noise stretched 12:1, drifting at 2.2, 3.4 and 5 px/s (never under 2, even in calm air), denser toward the ground, each in .18–.32 of the fog's colour. Over land that the distance fade has already brought to that colour, the wisps are low in contrast: two frames 10 s apart differ by 0.25% of a pixel on average over the open land (0.11% before the noise was steepened into wisps). They read best over the river and the near ground. They are built as half-resolution strips (one period plus the viewport wide), rebuilt when the size or the fog's colour changes.
+157. **Idle bundle budget 34 → 35 kB gzip.** W6 measures 34.5 kB (#133, #143, #152): the ground fog's noise and its three half-resolution strips in the landscape, and the longer shader (fog rising to 85% at the horizon, the rain curtains). The up-front sky JS is unchanged at 10.7 kB of 13.0.
+158. **Fog and the rain veil stay on the land: they no longer fill the landscape's headroom.** W3's veil and W6's distance fade were drawn as a rectangle over the whole landscape canvas, its transparent headroom above the band included. So in every fog, heavy-rain and thunder state a lighter, flat band began on a straight line across the sky (1440×900 at y ≈ 610, 375×812 at y ≈ 522), found in W7's first review round. Both are now baked into each layer's strip as it is rendered, on the strip's own pixels (`source-atop`), in steps of 0.05 so a veil easing in re-renders the strips at most twenty times. Above the hills there is only the shader's sky now, where the fog already rises to 85% at the skyline (#154).
+159. **The town's glow on clouds at night is an even tint, warm toward the horizon.** W1 had it inside the lit colour, × 0.35 × the cloud's downward slope: it showed only where a cloud faced the moon, so every cloudy night was near-black marbled with rust (rgb 53,37,28 beside 8,11,17; `overcast-2200-1440x900.png` before the fix). `shade()` now takes a `city` term that is added to the lit and the shaded sides alike: every underside is lit from below. It is CITY_GLOW 40% of the way to its own grey in linear light (`palette.ts` `CITY_ON_CLOUD`: the amber alone read as rust), × 0.02 under cumulus and 0.05 under a low deck, and × 1.4 at the horizon to 0.5 at the top of the viewport. The backing model counts it at its most (0.07). A crisper cloud edge was tried the same round (`clouds.ts` `EDGE` 0.045 → 0.03) and rejected: it shows the backing's 2.5 px texels on the far clouds' edges, for little gain on the near ones.
+160. **No stars under a stratus deck.** Stars were dimmed by the cloud cover only (× 0.13 at 97%), and on the phone, where they are larger and never fainter than 0.35, they still read as dots through the overcast night (`overcast-2200-375x812.png`, W7's second round). The particle state takes the LOW sheet's stratus flag and stars are × (1 − deck). A unit test holds it (only the moon's fills are left).
+161. **W7's matrix** (`scripts/weather-v6-shots.ts matrix`): all eight conditions at 06:30, 11:00, 16:45 and 22:00 on 2026-11-26, the four rain conditions again on 2026-07-15 at 15:00, at 375×812 and 1440×900, with a typical wind per condition; 72 shots, a contact sheet per size and larger review sheets. Thunder is shot between strikes (the dev-only `lightning=off`) so its colours are judged undisturbed, and the last cell of its row is a forced bolt. `--sheets` rebuilds the sheets from the shots on disk.
+162. **`main` is merged into the branch before its pull request, and everything is measured again on that tree.** `fix/sky-v5.1` grew from T6 to T10 and was merged as PR #7 while W1–W7 were being done, so the v6 decisions are renumbered after #120 (they are #121–#161 here), and the v6 debug hooks sit behind the build-time `DEBUG` of #120. On the merged tree the pixel-contrast gate is green and one of `main`'s tests is red: T10's "the hero's text wears no chip on a phone". **T10 and v6 pull against each other.** T10 could promise no stacked boxes because v5.1's clouds were dim; a sunlit cumulus behind the hero needs a chip to be read, and the backing model gives it one. The test is left red rather than weakened, and nothing is dimmed behind the text. Open for a decision: a chip under bright cloud (T10's test restated), a softer backing than a box for the hero, or dimmer clouds on phones. The numbers on the merged tree are in docs/PROGRESS.md, "On top of `main`".
+163. **PR #8 review fixes.** (a) **Rain slant: the east–west wind signs θ, it doesn't scale it.** The first cut projected the angle onto the screen (tan θ × the east–west share), which is defensible physics but fails the brief twice: 13.4° where W3 asks for about 35° (30 km/h from 200°), and vertical rain in a north or south wind, which W7 lists as a fail. A wind along the view would really show rain converging toward a vanishing point; a fixed lean reads closer to that than vertical streaks. A wind exactly from the north or south leans right. Gusts swing it ±4°. (b) **Streaks wrap sideways** at 40 px past either edge, so a 35° slant leaves no dry corner. (c) **Drizzle** has far and mid streaks only, 0.6 long and 0.6 fast; near streaks fade toward the tail (two strokes). (d) **Lightning:** no CG outside thunder (one fired on every heavy-rain load); heavy rain's sheet flashes keyed to the condition, not the eased darkening; re-strokes after a 50–90 ms dark gap from the end of the stroke before, dark in between, afterglow after the last (pulses end within 450 ms; SEPARATION 1400 still holds the 3-a-second rule, tested); a steady leader at 0.35 revealed down from the cloud; a CG lights the cloud round its top through the sheet-flash uniform at 0.8 of its brightness, radius 24% of the width. (e) **Fog:** the drift clock takes `groundFogX`'s clamped wind factor (≥ 2 px/s in calm air); each ground-fog strip has its own cache key. Bundle after: renderer 34.2 kB of 35.
+
+## Flat clouds (replace W1/W2's noise clouds, 2026-11-27)
+
+A browser review of PR #8 found the noise clouds read as smeared paint and marble, covered about 65% of a "partly" sky, banded near the horizon on desktop, blotched on phones, and pushed every header and hero text into a chip. Flat, paper-cut clouds replace them; the rest of v6 stays. Evidence: `.shots/flat-clouds/` (`manifest.json`), the log in docs/PROGRESS.md.
+
+164. **Clouds are flat shapes on their own Canvas 2D layer** (`src/lib/sky/flat-clouds.ts`, `src/components/sky/flat-cloud-layer.ts`), z −3 after the atmosphere, under the particles. Three tones per cloud (BODY, a crisp CAP crescent toward the light, a flat BASE band) and a 1px moonlit RIM at night, drawn source-atop so every edge is the silhouette's own anti-aliased edge: no blur, gradient or texture. Each cloud is a sprite at min(2, DPR), placed on whole device pixels; it is drawn again when its tones or light change, when its puffs have breathed (every 0.5 s, staggered), and never in a still frame. The shader keeps fog, moon glow, horizon glow, rain curtains, the rain darkening, the storm base and the lightning lifts; the sheets, both noise textures, `cloud-field.ts` and `clouds.ts` are gone (`gust` moved to `flat-clouds.ts`).
+165. **A deck is 4–6 bands, each a stack of 28–70px strips.** The brief's 4–6 bands at 28–70px cover at most 420px, about half of a 793px desktop sky against 80–92%. So each band (thick overhead, thin toward the horizon, 70 → 28 in proportion) is cut into strips 28–70px thick, 60–140% of the viewport long (on a phone at least five times their thickness, or their round ends eat the coverage), meeting end to end on a shared base, 86–100% of the band's thickness, about a third of their ends leaving a thin gap of sky. Strips never overlap: a thinned strip would show the overlap. A rain deck is closed (no gaps; ends rounded 4px) and hangs its ragged underside from its lowest strip.
+166. **Coverage is solved on the rasterised model and aimed inside its band**, 35% in from each edge (partly 21.5–24.5%, 0.6+ cover 45–50%, overcast 84–88%), because the sky on screen drifts a few points either way. Puffs: a size factor, from the mean coverage over three drifts; a deck: its bands' total height (on a 160×90 grid, which counts the thin gaps; a closed rain deck on 64×36). A clear sky keeps one or two small far clouds (0–1.5%). **Short skies miss the deck bands**: the deck starts under the header (#167), so on the 1024×768 scene sky (393px) overcast reaches 77–84% and rain 86–87%; on 375×812 rain is 90–92%.
+167. **Decks start under the header's text** (`deckTop` = the lowest header text box + 4px): the header's text is always over open sky. The near layer's band (45–85%) already ends below it.
+168. **Text clearing is per cloud, and its factor is solved.** The brief's mask (alpha × 0.30 over the text boxes grown by 28px, 36px feather) was built and rejected after the first review: on puffs it left soft, smeared windows, and on a deck dark boxes around every text. Now a cloud within 28px of a loose text's box is drawn whole but thinner, by that box's factor, easing back over 36px as it drifts away, so its edges stay crisp. The factor is the most of the cloud the text can take without a chip (`backing.ts clearingFor`, to 0.01 on the backing model): 1 where no cloud can reach the box, about 0.1–0.5 behind the hero's light text under white cumulus, 0.3 when even no cloud leaves the text a chip (the clouds are not the cause there). A cloud is never held at 0.30 where it doesn't need to be: a whole rain deck behind the hero needs no thinning.
+169. **The backing model reads the flat model**: each puff layer's band and each deck strip row (where a cloud can be, full width, because they drift), the storm's tower (its box), the lightest tone mixed toward the gradient as the layer is, at the clearing factor and the haze alpha. It is the worst case, so a decision doesn't flip as clouds pass.
+170. **The header's nav links are `--on-sky`, not `--graphite`.** At 1440 DPR 1 a 14px graphite link over the bare noon zenith (#11284d, no cloud) is 4.91:1 before and 3.96:1 after the model's anti-aliasing (#45 ff.), and no halo makes up that much: every nav link wore a chip on a cloudless desktop sky, before any of this work. CLAUDE.md already defines `--on-sky` as "the hero's and header's secondary text over the open sky"; the links now use it (8.0:1 bare). Hover still goes to `--text`.
+171. **"Shipped" at 16:45 is a chip from the dusk sky, not from clouds**: its background with no cloud at all is #856144 at 1440 (the horizon glow) and #665651 at 375, which `--text` at 16px can't reach 7:1 on with any halo. Left, and reported. The same holds wherever else it chips in the matrix (06:20, 17:20 and thunder on a phone, fog at both sizes): no cloud span reaches it there (on a phone it sits below the clouds' horizon; fog has no clouds).
+172. **Stars are behind the clouds**: right after the stars the particle layer cuts out the cloud layer's silhouettes (destination-out), and the arc is drawn after that, so it stays on top. **The sun and the moon are occluded by the exact geometry**: a disc inside a near or mid cloud keeps 0.08, linear across its radius, a far cloud counts half, the clearing counted; bodies.ts gets it as τ = −ln(1 − 0.92 · cover) / 1.8. Drizzle joins the deck conditions (no disc, the diffuse patch).
+173. **Lightning on flat clouds**: when a strike begins each visible cloud gets a lifted sprite (BODY and CAP +0.25 OKLab L, a thunder cap #8E9AC2), drawn over it at the sheet flash's strength × exp(−(d / r)² · 2.2), plus 0.32 × the bolt's (+8% L on every cloud). The ≤ 3 pulses per second rule is the scheduler's, unchanged.
+174. **The cumulonimbus**: static, in a gutter on a desktop (≤ 85% of its width), base on the near band's bottom; on a phone it rises from behind the land at 58% of the width. A solid core under four tiers of puffs and a flat anvil downwind. Its tones are the deck's own, lifted (+0.07 L body, +0.18 L cap): it reads against the dark thunder deck without a new colour.
+175. **A deck's tones follow the light**: the weather's tone × (the time of day's body L / the day's body L), its hue half-way to the time of day's away from full day (OKLab), so overcast is mauve-grey at dusk and dark at night, and thunder at 18:30 darker than at noon. Puffs take the time of day's tones (night, civil twilight, golden hour, day at −10°, −4°, 2.5°, 10°), interpolated in OKLab.
+176. **Haze thins the layer as one** (the canvas's opacity, 1 − 0.6 · fog), never cloud by cloud: overlapping clouds would show their overlap. Fog itself has no clouds.
+177. **Rain curtains**: heavy rain and thunder only (smoothstep 0.8–1 of the rain darkening), alpha ≤ 0.12, a hashed two-octave value noise (no texture). **The storm base** darkens the sky itself (the top of the viewport, 55% → 20% of its height, −30%), since there is no LOW sheet to darken.
+178. **Bundle: the idle renderer is 34.8 kB gzip, so neither 26 nor 30 kB fits without dropping v6.** Measured on the production build: up-front 10.6 kB (budget 13), renderer 34.8 kB (34.2 before this work). Gone: the shader's sheets, both textures and their generators, the CPU mirror. Added: the model (4.4 kB minified + gzip on its own, most of it the coverage solver, the deck and the tones) and the layer (2.0 kB). What took the renderer from 26.1 to 34 kB is W3–W6 as much as W1 (#133, #143, #152, #157), and the brief keeps lightning, rain, splashes and fog. Reaching 30 kB means taking about 5 kB of those out or splitting them into a chunk loaded only when the weather needs it; neither was done here. `check-bundle.ts` stays at 35 kB, CLAUDE.md is unchanged. **Open for a decision.**
+179. **GPU** (1920×1080 DPR 2, the renderer's timer, medians of six 60-frame samples after the 4 s ease): the atmosphere pass alone (`?clouds=off`, dev and test builds) is 0.74 ms in overcast, from 1.81 before; with the cloud layer on, the timer, which also catches the canvas compositing on the same GPU, reads partly 0.66 ms (1.66 before), overcast 1.49 (1.81), heavy rain 1.60 (1.02): a 93% rain deck is many full-width sprites at 4K. Scrolling partly at 1440×900: 59.8 fps, no task over 50 ms. The first frame (plan + every sprite) is a 50–55 ms task at load, not while scrolling.
+
+## Volumetric clouds lab (T0, 2026-11-27)
+
+Branch `feat/volumetric-lab` from `feat/weather-v6`. Brief, board and contract: `docs/volumetric/`.
+
+180. **The volumetric clouds are built in an isolated lab, `/lab/clouds`, before anything touches the home page.** Both earlier cloud designs were rejected: the noise sheets (smeared, marble swirls, banding at the horizon) and the flat puffs (clip-art). The target is photographic realism with the sun, moon and stars behind the clouds. That calls for real volumetric rendering (Schneider/Guerrilla "Nubis", Hillaire), built from the papers, with no Shadertoy code (CC BY-NC-SA). The lab exists in dev and test builds only; a production build returns 404 unless `NEXT_PUBLIC_SKY_DEBUG=1` (`gate.ts`, the #120 module constant). The page is `noindex`. Two shared files change, and the home page is unaffected: `SkyMount` doesn't load the home renderer on `/lab/` (its GPU would skew the lab's timings), and `globals.css` hides the header while `[data-vol-lab]` is on the page. On the test build, `sky.spec` and `sky-firstpaint` stay green (35/35).
+181. **Many unattended sessions and two agents (Claude Code, and GLM through the same CLI) under a conductor.** `docs/volumetric/plan.json` lists, per task, its `owns` globs (binding: the conductor rejects a commit outside them), its dependencies, branch, prompt, commit message and done-when checks. `TASKS.md` mirrors it for people, with one marked section per task so parallel merges don't collide. A task that needs an interface change writes it under "Requests for M1" in its hand-off rather than editing another task's file. Only T0, M1 and T8 edit `docs/DECISIONS.md` and `docs/PROGRESS.md`, because the parallel tasks would conflict there; their decisions travel in their hand-offs.
+182. **One shader assembly for every pass.** `assemble.ts` builds a header (the tier and `GEOMETRY` as `VOL_*` defines, plus every `CLOUD_UNIFORMS` declaration), then the modules in a fixed order (common → background → density → lighting → march → reproject), then the pass's own main. Each module defines exactly its contract functions (`GLSL_CONTRACT`), prefixes its helpers with its own name and never re-declares a shared uniform; `tests/unit/vol-assembly.test.ts` enforces this without a GPU. Unused functions cost nothing after compilation, so T7 can write any pass, such as march-only or composite, as just a main in `targets.ts`, and the pass structure stays T7's (`CreatePipeline`). The renderer (T0) owns the context, the uniforms, the timer query and the frame loop.
+183. **Lab camera.** The camera stands at ground level, with a 60° vertical FOV and a pitch of 20.3° that puts the horizon at 82% of the height. By default it faces the sun (the moon at night, otherwise south), so states A, B and C all have the sun in frame. `view=<az>` overrides the direction. World axes: +x east, +y up, +z north. Colours are linear in the shaders: `scene.ts` converts `gradient.ts`'s OKLab and the palette's hex, and `displayColor` applies the exact sRGB curve, so the lab's gradient matches the home page's.
+184. **Weather-map convention:** the shaders sample at `world.xz / WEATHER_MAP_KM − offset`, so `offset` grows in the direction the clouds move (+u east, +v north; from 270 → +u). One tile spans 40 km. The wind is time-lapsed so drift shows (`WIND_TIMELAPSE`, 6 in the placeholder; T2 sets and documents it).
+185. **`cloudAtSun` has three values: `0`, `1` (a dense cell covers the sun, or the moon at night) and `edge` (the cell's edge on it).** State B needs the sun partly behind a cloud edge, and a random seed can't promise that. T5 places the cell (`sun-cell.ts`); the renderer re-asks once a second because the field drifts.
+186. **The copy scan skips `*.glsl.ts`**, as it already skipped `*shader.ts`: GLSL reads as prose to it. The lab's control labels are developer UI and stay in the controls (each under 40 characters). They never go into `src/content.ts`, which feeds the agent's knowledge base.
+
+## Volumetric clouds lab: M1 merge of T1–T6 (2026-11-27)
+
+The detail is in `docs/volumetric/handoffs/M1.md` and in each task's hand-off.
+
+187. **Noise (T1).**
+     - SHAPE.R is Perlin fbm remapped by inverted Worley with the eroding remap, so 52% of R is clear air. SHAPE.GBA
+       and DETAIL.RGB are Worley fbm at 2/4/8 cells per tile.
+     - The resolution floor is 4 texels per cell, so 64³ and 128³ are the same noise plus one octave.
+     - The GLSL is written out straight from one recipe table that the CPU reference shares. It uses power-of-two
+       masks, never `%`.
+     - `genMs` waits for completion through a 1×1 `readPixels`, because `gl.finish()` returns early on ANGLE Metal.
+     - Full mip chains exist (`textureLod`).
+     - BLUE is void-and-cluster, made on the CPU once.
+     - **The 150 ms budget covers warm loads.** These measure 44–92 ms. A browser's first, cold shader compile is
+       exempt.
+188. **Weather map (T2).**
+     - The coverage param is the map's mean for every seed: the patchy field is percentile-ranked, and the stratus
+       deck z-scored.
+     - The type is per texel: cumulonimbus only in its 1–2 tower cells, and a forced cell is always cumulus.
+     - `WIND_TIMELAPSE` is 15.
+     - A wind-only change never regenerates the map.
+189. **March, density, lighting (T4).**
+     - `MAX_MARCH` caps the marched segment from the shell entry. It isn't an absolute distance.
+     - Steps are spaced geometrically.
+     - A two-stream diffuse term (weight 0.35) sits on top of Beer–Lambert, powder and the octaves.
+     - The light path's extinction is ×0.55 the view path's.
+     - Erosion is 0.22 for stratus and 0.6 for the other types.
+     - Aerial perspective never changes transmittance.
+     - There is one key light: the sun, or the moon at night.
+     - Scales: SHAPE tiles every 10 km, DETAIL every 0.6 km, and extinction is 80/km.
+     - `MIN_TRANSMITTANCE` reaches the GLSL as `VOL_MIN_TRANSMITTANCE`.
+     - `uPrecip` and `uCoverage` stay unused but declared.
+190. **Background (T5).**
+     - The stars, the moon and the sun's disc are laid "over" in gamma space, as the home page's canvas does. The
+       blooms are added in linear.
+     - The horizon glow lives in `skyGradient`. The dither lives only in `background()`.
+     - The star field turns with the sun's hour angle.
+     - The moon is drawn at night only.
+     - The `cloudAtSun` check measures state A's sun in linear luminance, because B's low sun is hidden by the horizon
+       band either way.
+     - The forced cell is 5–8 km at the 2.2 km altitude of the body's ray.
+191. **Probes (T6).**
+     - Shots at DPR 2 and DPR 3.
+     - GPU from the renderer's own timer query through `window.__vol`.
+     - Chromium runs with the GPU flags (ANGLE Metal, not SwiftShader).
+     - The probes wait for `load`, and flag a tier the renderer didn't honour (M1).
+192. **`.next-dev` is ignored by git, ESLint and tsc.** It is the by-hand dev server's dist dir. `next dev` still
+     appends its type paths to the tsconfig `include` on every start; revert that before committing.
+193. **T3 was never delivered.** M1 merged without it, because the T0 placeholder `lab-state.ts` parses every URL key.
+     T3 (follow-up F1) must land before T8. T8 takes over state B's cloud-at-sun and the overcast smear (F2, F3), with
+     ownership of `sun-cell.ts` and `lab-cloud-at-sun.spec.ts`.
+
+## Volumetric clouds lab: T7 performance and T8 tuning (2026-11-27)
+
+194. **Performance (T7, carried by T8; detail in `docs/volumetric/handoffs/T7.md`).**
+     - The march writes a quarter of the pixels (Bayer 2×2) into RGBA32F, with the distance packed into the alpha.
+       It is resolved into the RGBA16F cloud target with wind reprojection, a 3×3 clamp and α 0.25.
+     - It re-marches at ≤ 15 Hz, with a bilateral upsample only at transmittance edges. The background is cached at
+       full resolution and refreshed every 4th march.
+     - `uFrame` steps once per 4-march cycle. Every `setState` resets the history.
+     - The reprojection velocity includes `DENSITY_DETAIL_DRIFT`.
+     - `__vol.gpuMs` is the mean of the last 60 frames.
+     - The tier governor reads the rAF interval.
+     - Desktop high stays OVER its 2.5 ms target (about 4.5 ms). That's the owner's decision.
+195. **cloudAtSun=edge is one cumulus plus a clear wedge (T8, M1 F2).**
+     - The edge cell is 3.2 km across, shifted 0.7 radii sideways, not the 5–8 km "cover" disc that read as a slab
+       edge-on.
+     - A clear wedge runs along the body's line of sight, from the base crossing to the top crossing. Its half-width
+       is 0.8 km + tan 3° × distance. A low sun's ray crosses ~38 km of the layer, so without the wedge the field
+       always hides it.
+     - The wedge is a lab staging device (`WeatherMapParams.forcedCell.clear`).
+     - B's e2e reads the transmittance debug view, because a thin edge's glow is as bright as the disc.
+196. **The overcast deck has its own SHAPE tile (T8, M1 F3).**
+     - Stratus samples SHAPE at 3.2 km on axes turned ~37°, with 20% of the 10-km field mixed in. It fades back to
+       the 10-km field at 12–35 km, and its detail LOD runs 15 → 50 km. Without the fade, the undersampled tile beats
+       into moiré spokes: SHAPE has mips, but `MIN_FILTER` is LINEAR.
+     - Diffuse transmission is per type: a deck keeps 1.0 (the two-stream slab), cumulus 0.22.
+     - Above 60–95% coverage the haze greys to the horizon's luminance.
+197. **T8's lighting and shaping values.**
+     - Erosion 0.7 (cumulus) and 0.4 (stratus).
+     - A coverage floor at 0.07–0.22 (no dust of fragments).
+     - Bases offset by ±0.035 of the low fbm.
+     - Light-path extinction ×0.65; first octave weight 0.3.
+     - Base ambient: 70% zenith colour in the horizon colour.
+     - Haze 32 km.
+     - Sun gain 2.6, blooms 0.22 / 0.015 / 0.0014: the disc burns out like a photograph.
+     - The lab waits for the owner's review: `docs/volumetric/handoffs/T8.md`.
+
+
+## Volumetric clouds lab: T10 realism (2026-11-27)
+
+198. **The noise is mipmapped and density picks its own LOD (T10; detail in `docs/volumetric/handoffs/T10.md`).**
+     - SHAPE and DETAIL use `LINEAR_MIPMAP_LINEAR`. Their box-filtered chains still tile, measured on the GPU: the wrap
+       seam over the interior difference is 1.00 at every level of 32³, 64³ and 128³.
+     - LOD = log2(max(1, footprint / texel)) per texture, with footprint = distance × vertical FOV / the cloud target's
+       height. The isotropic formula stays: stretching the footprint toward the horizon (1/sin el) doubled A's horizon
+       streak metric.
+     - DETAIL fades to its mean (0.45) as its LOD runs 2 → 4, instead of to no erosion. That replaces T8's fixed-km
+       fades (cumulus 25 → 90 km, stratus 15 → 50 km). Fading to no erosion swells far clouds.
+199. **A's softness was in density and lighting, not the pipeline.** A-ref (scale 1, every pixel marched, 64-frame mean)
+     matched A-high: bodyStd 12.2 vs 12.4, edge width 19.6 vs 19.9 px. The horizon slices were in the field too: A-ref
+     horizon anisotropy 2.36, A-high 2.15. Nothing was handed to T11.
+200. **Cumulus are surfaces.**
+     - σt = 66 km⁻¹ at density 1, a mean free path of 15 m. The density is no longer × coverage, so a body's core
+       reaches 1. Before, the MFP was 33 m at best and 50–125 m in most of A.
+     - The eroded cumulus density goes through ((d − 0.04) / 0.96)^0.35; stratus stays linear.
+     - The DETAIL tile is 0.32 km. The wispy (fbm) to billowy (1 − fbm) blend now runs over height 0.05–0.5; it used to
+       saturate at 0.125.
+201. **Lighting:**
+     - Three Wrenninge octaves, a = 0.5, b = 0.35, c = 0.5. Light-path extinction × 1, up from 0.65.
+     - The light march steps 40 m × 2 (2.5 km). Every step reads detail except the last, which reads SHAPE only, two
+       mip levels coarser.
+     - Ambient × exp(−0.14 · D), where D is the cloud above from samples at +100 m and +400 m, with detail.
+     - Cumulus diffuse transmission 0.5, up from 0.22.
+202. **A Mie aureole in `skyGradient`, so the aerial perspective inherits it.**
+     - Cornette–Shanks, g 0.76, k 0.05 × (0.35 → 1 by 12° of elevation) × (1 − overcast 0.6 → 0.95).
+     - Its colour runs from the sky's hue to the sun's within ~0.22 rad of the sun.
+     - The moon gets the same term at night, × 0.056 × its illuminated fraction.
+     - A: 5° from the sun is now 2.63× the sky 90° away (was 1.27×), and the sky beyond 30° stays blue.
+     - A brighter sky near the sun changes stage 2's text-backing solver (`backing.ts` estimates the sky behind
+       text). Re-solve it there, don't tune by eye.
+203. **Review params, TEMP until T9 (`applyReviewParams` in `renderer.ts`).**
+     - `scale` swaps `TIERS[tier].scale` only while `createPipeline` runs.
+     - `reproject=0` calls `pipeline.invalidate()` every frame, which marches all four offsets at α 1.
+     - `accum=N` freezes the clock and keeps a running mean of the canvas (an RGB8 copy into RGBA32F ping-pong
+       targets).
+     - `az` sets the camera azimuth.
+     - T9 moves these into `LabState`, and M2 removes the block.
+204. **`lab-cloud-at-sun.spec.ts` no longer matches the field. This is an owner decision, still open.**
+     - A, cover: the disc loses ≥ 99% (T 0.001–0.006), but the spec reads display luminance. With the stronger
+       scattering, a covered sun's cloud glows at 0.08–0.09: it passes at low by a 0.007 margin and fails on medium
+       and high.
+     - A, clear: a cumulus now sits over A's sun (T ≈ 0.002 against T8's 0.90). The clear check passes only through
+       that cloud's glow (0.64 at low).
+     - B: the edge shift tuned for T8's soft fringe (`sun-cell.ts`, 0.7) passes at low, where T is 0.20, but the disc
+       is fully covered on medium and high.
+     - The fix belongs to the spec and `sun-cell.ts` owners: read transmittance for A, as D3 did for B, and re-solve
+       the edge shift.
+## Volumetric clouds lab: T11 checkerboard reconstruction and layered output (2026-11-27)
+
+205. **The resolve follows the brief's structure, with a different box (T11 D1).**
+     - The structure: a spatial estimate (bilateral by `gCloudDist`), a clipped history, and
+       out = mix(spatial, history, w).
+     - The box is min/max in YCoCg plus T, not μ ± γσ. For a non-fresh pixel it covers only the samples it
+       interpolates, padded by 0.5 × the 3×3 range.
+     - Each extent has a floor (3% of Y in Y, Co and Cg; 0.01 in T), and the history is sampled with Catmull-Rom.
+     - Why:
+       - The dot lattice was reprojection lag, which the running mean grows about 4/α times, not the clamp.
+       - A 3×3 box of samples two texels apart can't see sub-texel lag.
+       - A σ box clips wisps out of their own history (16% class asymmetry, against 6% for min/max).
+       - A 4-D clip with no floor collapses on grey cloud.
+     - Measured: class asymmetry 21% (T8-r3) and 15% (T7) → 11%. The drift pair shows no ghosting.
+206. **T9's lattice metric isn't a gate for state A (T11 D2).**
+     - A per-pixel full-resolution reference reads the same 0.006–0.010 as T8-r3: the metric reads A's real cloud
+       detail at the texel grid.
+     - Use the per-Bayer-class asymmetry (reference 1.5%) and the residual against a frozen reference.
+207. **The layered output's alpha is lifted, not clamped (T11 D3).**
+     - A = max(1 − T, maxᵢ (Xᵢ − Yᵢ)/(1 − Yᵢ)), with X = D(c + T·b) and Y = D(b), is the least alpha that keeps C ≤ A.
+       It stays exact for b.
+     - The brief's clamp binds on 12.6% of A's cloud pixels (2.3% of B's), mostly by more than 8 levels.
+       ΔL p99 31% at 1440 and 45% at 375, and it greys B's silver lining.
+     - Lifted, ΔL is at the single-vs-single noise floor.
+208. **The background layer refreshes on the frame after the march (T11 D4).**
+     - It runs at the BG cadence (every 4th march) and on a reset, and draws nothing in between.
+     - The cloud context's s_out cache refreshes on the same frame, so b matches the canvas under it.
+209. **hold (T7's option 1) stays a lab switch (T11 D5).**
+     - It saves about 0.6 ms on desktop.
+     - The cost is a drift step of 3.25 device px per 15 Hz step at the top of A's view (0.16 px near the horizon).
+210. **The recommended architecture: layered, lifted, s_out = the tier's scale (T11 D6).**
+     - Desktop high 4.7–5.3 → 3.3–3.6 ms. The extra layer costs the compositor 0.24 ms per frame.
+     - Mobile low 0.7–0.8 ms.
+     - Desktop is still over 2.5 ms: the march and resolve are now the cost, about 2.5 ms.
+     - On the M2, per-frame GPU timer peaks (11–15 ms in every mode) are a clock-scaling artefact, so the 8 ms frame
+       rule needs the trace or another device. With tracing on, every mode held 60 fps.
+
+## Volumetric clouds lab: M2, the realism round merged (2026-11-27)
+
+The detail is in `docs/volumetric/TASKS.md` (M2) and the T9, T10 and T11 hand-offs.
+
+211. **T8's requests approved.** `WeatherMapParams.forcedCell.clear` stays (optional, used by `cloudAtSun=edge` only),
+     and so does the `vol-sun-cell.test.ts` edit: the edge cell's shift is measured against its own 3.2-km radius. M2
+     added the wedge's missing unit test (`vol-weather-map.test.ts`).
+212. **Merge bookkeeping.**
+     - T10 left its work uncommitted in its worktree. M2 committed it there (`fa2d141`, without the dev server's
+       `tsconfig.json` include) so it could merge `--no-ff` like the others.
+     - T10 and T11 both numbered their decisions from #198. T10 keeps #198–#204; T11's became #205–#210.
+     - T9 decided (its D1–D8, `handoffs/T9.md`): `LAB_URL` is required with no default port; the lattice resample is
+       phase-locked to the cloud target; the metric definitions; no image dependency; probes import as `./x.mjs`.
+213. **The review params and the output come from `LabState`; every `TEMP until T9` block is gone.**
+     - `LabState` gains `scale`, `reproject`, `accum`, `out` (T9) and T11's `sout`, `hold`, `lift`, `clampviz`, all in
+       `LAB_DEFAULTS`; `REVIEW_DEFAULTS` and `LabStateResolved` are gone.
+     - `applyReviewParams` reads the state each frame. `createPipeline` takes the review scale through
+       `PipelineOutput.scale` instead of swapping `TIERS[tier]` (T10 Request 4). `outputFor(state)` replaces T11's
+       URL reader.
+     - Reference renders (`accum` > 0) and debug views always draw with the single output: the mean is taken of the one
+       opaque canvas, and a debug view is a raw readout. With layered, the transmittance view read 0.050 at the disc
+       for the first ~10 frames after load (0.18–0.25 once settled), which failed `lab-cloud-at-sun`'s B at frame 8.
+     - The output mode is a context attribute, so the panel reloads the page when it changes; the other switches
+       rebuild the pipeline. `VolDebug` gains `accumReady` (T9 Request 2), `out`, `bgGpuMs` and `bgDrawMs`.
+214. **The lab defaults to `out=layered`** (T11's recommendation: lifted alpha, s_out = the cloud scale, no hold).
+     - Measured in M2: desktop high 3.5–3.9 ms GPU (both contexts) against 4.8–5.2 single; mobile low 0.74–0.78
+       against 1.41–1.54.
+     - Single and layered show the same staircase edges on the same frozen frame (`.shots/volumetric-lab/M2/attr/`):
+       the blockiness comes from the 0.35/0.25 cloud scale, not from the layered stretch.
+215. **The budget is GPU ms summed over the contexts, amortised, plus the compositor.**
+     - Σ over the WebGL contexts of the timer-query mean over ≥ 5 s, plus `VizCompositorThread` busy ms per frame from
+       a 3 s Chrome trace. `pnpm lab:gpu` measures both outputs and traces the two target cells.
+     - Desktop high layered: 4.1–4.5 ms, OVER 2.5. Mobile low layered: 1.3–1.6 ms, under 3.
+216. **`.next-*/` is ignored by git, ESLint and tsc** (T9 Request 4, T10 Request 5), so each worktree's dev server can
+     use its own dist dir.
+

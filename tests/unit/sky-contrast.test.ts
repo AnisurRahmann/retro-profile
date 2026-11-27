@@ -47,7 +47,7 @@ const COVER: Record<Condition, number> = {
   thunder: 1,
 };
 
-function model(e: number, phase: Phase, c: Condition) {
+function model(e: number, phase: Phase, c: Condition, moon?: { fraction: number; altitudeDeg: number }) {
   // Worst-case haze: saturated humidity and 1 km visibility unless it's fog (which is 1 anyway).
   const fog = fogAmount({ condition: c, humidity: 100, visibilityM: 1000 });
   return {
@@ -55,7 +55,7 @@ function model(e: number, phase: Phase, c: Condition) {
     glow: smoothstep(-8, -2, e) * (1 - smoothstep(4, 10, e)),
     cloudCover: COVER[c],
     fog,
-    astro: { elevation: e } as never,
+    astro: { elevation: e, ...(moon ? { moon } : {}) } as never,
   };
 }
 
@@ -117,7 +117,8 @@ describe("per-element backing", () => {
       `[backing] worst ${worst.c.toFixed(2)}:1 at ${worst.where}; modes ${JSON.stringify(count)}`,
     );
     expect(fails.slice(0, 20)).toEqual([]);
-  }, 30_000);
+    // 14 s on the base branch; v6's brighter cloud tops solve twice as many chips (about 20 s).
+  }, 60_000);
 
   it("keeps text readable with the sun's disc or bloom and the moon behind it", () => {
     const fails: string[] = [];
@@ -127,7 +128,7 @@ describe("per-element backing", () => {
           m: model(e, "evening", c),
           vw: 1440,
           vh: 900,
-          sun: { x: 700, y: 500, r: 16, alt: e, cloud: 0, fog: 0 },
+          sun: { x: 700, y: 500, r: 16, alt: e, tau: 0, deck: false, fog: 0 },
           moon: { x: 300, y: 300, r: 14, visible: 1, glow: 1 },
           glows: [],
         };
@@ -152,8 +153,13 @@ describe("per-element backing", () => {
     expect(fails).toEqual([]);
   });
 
-  it("picks none on a clear night, a halo for a small deficit, and a chip for graphite low over dusk", () => {
-    expect(decide(skyAt(model(-30, "evening", "clear"), 0.5), GRAPHITE, 14).mode).toBe("none");
+  it("picks none on a cloudless night, a halo for a small deficit, and a chip for graphite low over dusk", () => {
+    expect(decide(skyAt(model(-30, "evening", "clear"), 0.5, 0), GRAPHITE, 14).mode).toBe("none");
+    // A moonlit flat cloud's rim and cap are brighter than the night sky, so graphite over one needs backing. With
+    // the moon down a night cloud is darker than the sky, and takes none.
+    const moonUp = model(-30, "evening", "clear", { fraction: 0.93, altitudeDeg: 40 });
+    expect(decide(skyAt(moonUp, 0.5, 0.5), GRAPHITE, 14).mode).toBe("chip");
+    expect(decide(skyAt(model(-30, "evening", "clear"), 0.5, 0.5), GRAPHITE, 14).mode).toBe("none");
     // A grey just too light for --graphite at 4.8:1: the halo covers it.
     let t = 0;
     while (contrast(GRAPHITE, over(INK, [1, 1, 1], t + 0.001)) >= 4.79) t += 0.001;
@@ -187,7 +193,7 @@ describe("per-element backing", () => {
       m: model(5, "evening", "clear"),
       vw: 1440,
       vh: 900,
-      sun: { x: 100, y: 100, r: 16, alt: 5, cloud: 0, fog: 0 },
+      sun: { x: 100, y: 100, r: 16, alt: 5, tau: 0, deck: false, fog: 0 },
       moon: null,
       glows: [],
     };

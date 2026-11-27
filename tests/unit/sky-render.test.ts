@@ -1,29 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { lightningEnvelope } from "@/components/sky/SkyRenderer";
 import * as bodies from "@/components/sky/bodies";
 import { createParticles, mulberry32, skyRotation } from "@/components/sky/particles";
 import { bearingToX, fogAmount, skyModel, windVector } from "@/lib/sky/model";
 import { dhakaDate } from "@/lib/sky/time";
 import { UNKNOWN_WEATHER } from "@/lib/sky/weather";
 
-describe("lightning", () => {
-  it("is a double pulse: 80 ms on, 60 ms off, 120 ms on", () => {
-    expect(lightningEnvelope(0.04)).toBe(1);
-    expect(lightningEnvelope(0.1)).toBe(0);
-    expect(lightningEnvelope(0.2)).toBeGreaterThan(0);
-    expect(lightningEnvelope(0.3)).toBe(0);
-  });
-  it("never flashes more than 3 times in any second (WCAG 2.3.1), even with the shortest 18 s gap", () => {
-    let flashes = 0;
-    let on = false;
-    for (let ms = 0; ms < 1000; ms++) {
-      const now = lightningEnvelope(ms / 1000) > 0;
-      if (now && !on) flashes++;
-      on = now;
-    }
-    expect(flashes).toBeLessThanOrEqual(3);
-  });
-});
+// Lightning is src/lib/sky/lightning.ts now (Weather v6): tests/unit/sky-lightning.test.ts.
 
 describe("wind", () => {
   it("drifts 0.6 px/s per km/h, away from where it blows from; east is screen-left", () => {
@@ -88,6 +70,8 @@ describe("the moon", () => {
     });
     const canvas = { getContext: () => ctx, clientWidth: 375, clientHeight: 812, width: 0, height: 0 };
     vi.stubGlobal("window", { devicePixelRatio: 2 });
+    let stars = 0;
+    let decked = 0;
     try {
       const pts = createParticles(canvas as unknown as HTMLCanvasElement, [0.9, 0.92, 0.95])!;
       pts.resize(330);
@@ -98,9 +82,12 @@ describe("the moon", () => {
         {
           night: 1,
           cloudCover: 0.04,
+          deck: 0,
           fog: 0,
           rainDensity: 0,
           rainSlant: 0,
+          drizzle: false,
+          flash: 0,
           moon: { x: 0.76, y: 0.31, up: true, fraction: 1, waxing: true },
           moonVisible: 1,
           moonR: 12,
@@ -110,10 +97,40 @@ describe("the moon", () => {
         {},
         null,
       );
+      // Under a stratus deck no star is drawn: only the moon's fills are left (a small star is a fillRect).
+      const fills = (deck: number) => {
+        const from = calls.length;
+        pts.draw(
+          1,
+          Date.UTC(2026, 10, 25, 21, 30),
+          {
+            night: 1,
+            cloudCover: 0.97,
+            deck,
+            fog: 0,
+            rainDensity: 0,
+            rainSlant: 0,
+            drizzle: false,
+            flash: 0,
+            moon: { x: 0.76, y: 0.31, up: true, fraction: 1, waxing: true },
+            moonVisible: 1,
+            moonR: 12,
+            moonDim: 1,
+          },
+          true,
+          {},
+          null,
+        );
+        return calls.slice(from).filter((c) => c === "fill" || c === "fillRect").length;
+      };
+      stars = fills(0);
+      decked = fills(1);
     } finally {
       vi.unstubAllGlobals();
     }
     expect(calls).toContain("fill");
+    expect(stars).toBeGreaterThan(50);
+    expect(decked).toBeLessThan(stars / 10);
     // A 22° halo was two stroked circles around the disc. Nothing strokes here.
     expect(calls).not.toContain("stroke");
     expect("drawHalo" in bodies).toBe(false);

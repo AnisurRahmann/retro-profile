@@ -23,7 +23,7 @@ function looksLikeCopy(s: string): boolean {
 describe("copy lives in src/content.ts", () => {
   it("has no long string literals in src/components or src/app", () => {
     const offenders: string[] = [];
-    for (const f of [...files("src/components"), ...files("src/app")].filter((x) => !x.endsWith("shader.ts"))) {
+    for (const f of [...files("src/components"), ...files("src/app")].filter((x) => !x.endsWith("shader.ts") && !x.endsWith(".glsl.ts"))) {
       const src = fs.readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
       const literals = [...src.matchAll(/"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`|>([^<>{}]+)</g)].map(
         (m) => m[1] ?? m[2] ?? m[3] ?? m[4] ?? "",

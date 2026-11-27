@@ -7,6 +7,7 @@
 import { arcPoint, DEFAULT_GEOM, moonPass, sunPass, type ArcGeom, type Pass } from "./arc";
 import { astro, type Astro } from "./astro";
 import { toCss, skyColors, smoothstep, type SkyColors } from "./gradient";
+import { RAIN_DENSITY, rainSlant, slantWind } from "./rain";
 import type { Condition, SylhetWeather } from "./weather";
 
 export type SkyModel = {
@@ -45,12 +46,8 @@ export type SkyModel = {
 /** Compass bearing → screen x (E 0, S 0.5, W 1). */
 export const bearingToX = (deg: number) => (deg - 90) / 180;
 
-const RAIN: Partial<Record<Condition, { density: number; dark: number }>> = {
-  drizzle: { density: 6, dark: 0.3 },
-  rain: { density: 18, dark: 0.6 },
-  "heavy-rain": { density: 40, dark: 1 },
-  thunder: { density: 40, dark: 1 },
-};
+/** How much each rainy condition darkens the sky and the land (0.3 drizzle … 1 heavy rain). Density and slant: rain.ts. */
+const RAIN_DARK: Partial<Record<Condition, number>> = { drizzle: 0.3, rain: 0.6, "heavy-rain": 1, thunder: 1 };
 
 export function fogAmount(w: Pick<SylhetWeather, "condition" | "humidity" | "visibilityM">): number {
   if (w.condition === "fog") return 1;
@@ -68,22 +65,6 @@ export function windVector(kmh: number, fromDeg: number): [number, number] {
   return [-east * speed, -north * speed * 0.25];
 }
 
-/** Minimum cloud drift (px/s) even in calm air: 5 desktop, 3 mobile. */
-export const MIN_DRIFT = { desktop: 5, mobile: 3 };
-
-/**
- * Cloud drift on screen (px/s): max(min, 0.6 × km/h) in the real wind direction (N–S foreshortened × 0.25), with
- * at least 60% of the minimum sideways so a north or south wind still reads as moving.
- */
-export function driftVector(kmh: number, fromDeg: number, min: number): [number, number] {
-  const speed = Math.max(min, 0.6 * kmh);
-  const to = ((fromDeg + 180) * Math.PI) / 180;
-  let vx = -Math.sin(to) * speed;
-  const vy = -Math.cos(to) * speed * 0.25;
-  if (Math.abs(vx) < 0.6 * min) vx = (vx < 0 || Object.is(vx, -0) ? -1 : 1) * 0.6 * min;
-  return [vx, vy];
-}
-
 export function skyModel(date: Date, w: SylhetWeather, g: ArcGeom = DEFAULT_GEOM): SkyModel {
   const a = astro(date);
   const sp = sunPass(date);
@@ -91,9 +72,8 @@ export function skyModel(date: Date, w: SylhetWeather, g: ArcGeom = DEFAULT_GEOM
   const sunPt = arcPoint(sp.u, sp.alt, sp.maxAlt, g);
   const moonPt = arcPoint(mp.u, mp.alt, mp.maxAlt, g);
   const colors = skyColors(a.elevation, a.phase, w.condition);
-  const rain = RAIN[w.condition];
+  const rainDark = RAIN_DARK[w.condition] ?? 0;
   const moonUp = mp.up && a.moon.altitudeDeg > 0;
-  const toward = ((w.windFromDeg + 180) * Math.PI) / 180;
   return {
     astro: a,
     condition: w.condition,
@@ -108,10 +88,10 @@ export function skyModel(date: Date, w: SylhetWeather, g: ArcGeom = DEFAULT_GEOM
     cloudCover: w.cloudCover,
     wind: windVector(w.windKmh, w.windFromDeg),
     fog: fogAmount(w),
-    rainDark: rain?.dark ?? 0,
-    rainDensity: rain?.density ?? 0,
+    rainDark,
+    rainDensity: RAIN_DENSITY[w.condition] ?? 0,
     windKmh: w.windKmh,
-    rainSlant: Math.atan((0.6 * w.windKmh) / 1100) * -Math.sign(Math.sin(toward) || 0),
+    rainSlant: rainSlant(slantWind(w.windKmh, w.condition === "thunder"), w.windFromDeg),
     thunder: w.condition === "thunder",
     moon: {
       x: moonPt.cx / g.w,

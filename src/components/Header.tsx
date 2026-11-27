@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ui } from "@/site";
 
-const navLink = "text-sm text-graphite transition-colors duration-150 hover:text-text";
+const navLink = "text-sm text-on-sky transition-colors duration-150 hover:text-text";
 
 export function Header() {
   return (

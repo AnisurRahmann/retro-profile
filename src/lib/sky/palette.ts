@@ -40,6 +40,32 @@ export const LAND_L3 = "#171D2A";
 export const LAND_L4 = "#0C1018";
 /** Moonlight: the 1px rim along the top of the hills and the bridge while the moon is up (landscape.ts). */
 export const MOON_RIM = "#C9D4E8";
+/** Lightning: a bolt's halo, body and core, and the rim it puts on the landscape (Weather v6). */
+export const LIGHTNING_HALO = "#9FB4FF";
+export const LIGHTNING_MID = "#C9D6FF";
+export const LIGHTNING_CORE = "#F5F8FF";
+export const LIGHTNING_RIM = "#DDE6FF";
+
+/**
+ * Flat clouds (src/lib/sky/flat-clouds.ts, drawn by src/components/sky/flat-cloud-layer.ts): three flat tones per
+ * cloud, like the paper-cut landscape. BODY is the silhouette, CAP the crisp crescent on its lit side, BASE the flat
+ * band along its bottom. By the time of day (interpolated in OKLab by sun elevation), then the weather's decks.
+ * backing.ts reads the same tones to judge text over them. Retune only with the contrast sweep and the pixel gate green.
+ */
+export type FlatTones = { body: string; cap: string; base: string };
+export const FLAT_CLOUD_DAY: FlatTones = { body: "#C7D1E4", cap: "#EDF1F8", base: "#8D99B4" };
+export const FLAT_CLOUD_GOLDEN: FlatTones = { body: "#B7A2B9", cap: "#FFC9A2", base: "#6C5A7D" };
+export const FLAT_CLOUD_TWILIGHT: FlatTones = { body: "#5E5F82", cap: "#C98C8A", base: "#3B3C5C" };
+/** Night: the cap only while the moon is up (scaled by its illumination), and a 1px moonlit rim. */
+export const FLAT_CLOUD_NIGHT: FlatTones = { body: "#1A2238", cap: "#2A3552", base: "#10172A" };
+export const FLAT_CLOUD_RIM = "#9FB0CC";
+/** The weather's decks: a band's body and its base. */
+export const FLAT_CLOUD_OVERCAST = { body: "#8B94A7", base: "#6B7489" } as const;
+export const FLAT_CLOUD_DRIZZLE = { body: "#7A8396", base: "#5E6679" } as const;
+export const FLAT_CLOUD_RAIN = { body: "#565F73", base: "#3D4558" } as const;
+export const FLAT_CLOUD_THUNDER = { body: "#3B4153", base: "#262B3A" } as const;
+/** A thunder cloud's cap while a flash lasts. */
+export const FLAT_CLOUD_FLASH_CAP = "#8E9AC2";
 /** Runway lights: the threshold (green) and the far end (red); the plane's red beacon uses the same red. */
 export const RWY_GREEN = "#62E08E";
 export const RWY_RED = "#FF5A4E";

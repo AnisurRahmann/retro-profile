@@ -1,0 +1,669 @@
+# Volumetric clouds lab: task board
+
+Read `BRIEF.md` first. `plan.json` is the machine-readable copy of this board, and its `owns` globs are binding. The
+table below is static. Each task updates only its own section, between its `<!-- Tn -->` markers, so parallel merges
+don't collide. The detail goes in `handoffs/<id>.md`.
+
+| Task | Agent | Depends on | Owns (summary) | Prompt |
+| --- | --- | --- | --- | --- |
+| **T0** Brief, interfaces, lab skeleton | Claude Code | none | `types.ts`, `renderer.ts`, `assemble.ts`, `debug-views.ts`, `common.glsl.ts`, `scene.ts`, `gate.ts`, the lab page shell, docs | `prompts/T0.md` |
+| **T1** Noise textures on the GPU | GLM | T0 | `src/lib/sky/volumetric/noise/**`, `noise-gpu.ts`, `vol-noise.test.ts` | `prompts/T1.md` |
+| **T2** Weather map | GLM | T0 | `src/lib/sky/volumetric/weather-map.ts`, `vol-weather-map.test.ts` | `prompts/T2.md` |
+| **T3** Lab controls and URL state | GLM | T0 | `src/app/lab/clouds/controls/**`, `lab-state.ts`, `vol-lab-state.test.ts` | `prompts/T3.md` |
+| **T4** March, density, lighting | Claude Code | T0 | `march.glsl.ts`, `density.glsl.ts`, `lighting.glsl.ts` | `prompts/T4.md` |
+| **T5** Sun, moon, stars behind the clouds | Claude Code | T0, T4 | `background.glsl.ts`, `sun-cell.ts`, `lab-cloud-at-sun.spec.ts` | `prompts/T5.md` |
+| **T6** Lab screenshots and GPU probe | GLM | T0, T3 | `scripts/probe/lab-*.mts`, `package.json` scripts, BRIEF "Tools" (append) | `prompts/T6.md` |
+| **M1** Review of T1–T6 | Claude Code | T1–T6 | everything volumetric (review fixes), DECISIONS, PROGRESS | `prompts/M1.md` |
+| **T7** Performance | Claude Code | M1 | `targets.ts`, `reproject.glsl.ts`, `tiers.ts`, `vol-tiers.test.ts` | `prompts/T7.md` |
+| **T8** Visual tuning, then the owner's review | Claude Code | T7 | the `*.glsl.ts` constants and shaping, `weather-map.ts` coverage mapping, DECISIONS, PROGRESS | `prompts/T8.md` |
+| **T9** Review tooling for the realism round | GLM | T8 | the `LabState` type in `types.ts`, `lab-state.ts` + tests, `controls/**`, `scripts/probe/lab-*.mts`, BRIEF "Tools" (append) | inline (the conductor's prompt) |
+| **T10** Realism: LOD, scattering, aureole | Claude Code | T8 | `density`, `lighting`, `march`, `background` `.glsl.ts`, `noise-gpu.ts` filtering, `applyReviewParams` in `renderer.ts` | (session brief) |
+| **T11** Checkerboard reconstruction, layered output | Claude Code | T8 | `reproject.glsl.ts`, `targets.ts`, `tiers.ts`, `CloudPipeline` in `types.ts`, the lab page shell, the output wiring in `renderer.ts` | (session brief) |
+| **M2** Merge and review of T9–T11 | Claude Code | T9–T11 | everything volumetric (review fixes), BRIEF, DECISIONS | inline |
+
+**Order.** T1, T2, T3 and T4 can run in parallel once T0 is merged. T5 needs T4, and T6 needs T3. M1 waits for all
+six. Then T7, then T8. T8 ends with status `needs-human`: the owner reviews the lab before anything reaches the home
+page.
+
+**Statuses:** `todo` · `in-progress` · `done` · `partial` · `blocked` · `needs-human`.
+
+---
+
+<!-- T0 -->
+### T0: brief, interfaces, lab skeleton
+
+**Status:** done (2026-11-27, `feat/volumetric-lab`)
+
+**Files:**
+- `docs/volumetric/{BRIEF.md, TASKS.md, plan.json, handoffs/T0.md}`
+- `src/components/sky/volumetric/{types, renderer, assemble, debug-views, common.glsl}.ts`
+- `src/lib/sky/volumetric/{scene, gate}.ts`
+- `src/app/lab/clouds/{page, LabClient}.tsx`
+- Typed placeholders in every later task's file
+- Tests: `tests/unit/vol-{assembly, gate, scene}.test.ts`, `tests/e2e/lab-smoke.spec.ts`
+
+**Done when:**
+- The gates are green.
+- `/lab/clouds` draws the gradient with a placeholder sun.
+- `lab-smoke` passes.
+- Every later task's file exists as a typed placeholder.
+- The assembly test enforces the GLSL contract.
+
+**How to verify:**
+- `pnpm vitest run tests/unit/vol-*.test.ts`
+- `pnpm e2e:only tests/e2e/lab-smoke.spec.ts` after `pnpm build:e2e`
+- Open `http://localhost:<port>/lab/clouds`
+
+**Notes for the next tasks:**
+- Contract and placeholder notes: see `handoffs/T0.md`.
+- The gradient bands in 8 bits until T5 dithers it.
+- T4 starts on flat noise, so it needs `VOL_TEMP_NOISE`.
+<!-- /T0 -->
+
+<!-- T1 -->
+### T1: noise textures on the GPU
+
+**Status:** done (2026-11-27, `vol/T1-noise`)
+
+**Files:**
+- `src/lib/sky/volumetric/noise/recipes.ts`: the octave tables and two contrast constants; one table drives GPU and CPU
+- `src/lib/sky/volumetric/noise/reference.ts`: the CPU reference (hash, Perlin, Worley, the channel recipes)
+- `src/lib/sky/volumetric/noise/glsl.ts`: the fragment sources, written out from the recipes; the slice viewer's main
+- `src/lib/sky/volumetric/noise/blue.ts`: void-and-cluster blue noise, made once per session
+- `src/lib/sky/volumetric/noise/layout.ts`: the slice viewer's tile layout (pure)
+- `src/lib/sky/volumetric/noise/index.ts`: the barrel
+- `src/components/sky/volumetric/noise-gpu.ts`: `createNoiseTextures` (slices through a framebuffer, mipmaps, timing,
+  a per-context cache) and the `noise` debug view
+- Tests: `tests/unit/vol-noise.test.ts` (59)
+- `docs/volumetric/handoffs/T1.md`
+
+**How to verify:**
+- `pnpm vitest run tests/unit/vol-noise.test.ts`: tileability, range, hash quality, recipes, GLSL, blue noise, layout
+- With a dev server: `http://localhost:<port>/lab/clouds?debug=noise` (add `&tier=medium` or `&tier=low`). Eight labelled
+  slices and a z slider (keyboard: Home, End, arrows). The console has one `[vol] noise <tier>: … ms` line per load.
+- `.shots/volumetric-lab/T1-noise.png` (1440×900).
+- GPU against CPU: 0.5/255 apart, the numbers are in `handoffs/T1.md`.
+
+**Notes for the next task:**
+- T4: `texture(uShape, p).r` is Perlin-Worley, `.gba` Worley fbm from 2, 4 and 8 cells per tile; `texture(uDetail, p).rgb`
+  is Worley fbm from 2, 4 and 8. Every channel spans 0..1. R is 0 in 52% of the volume (clear air) and reaches 1 in
+  its dense cores; the Worley fbm channels have their median at 0.45.
+- Mip chains exist, for `textureLod` on far steps. MIN_FILTER stays LINEAR, so `texture()` reads level 0.
+- 64³ and 128³ are the same noise; 128³ adds one octave each to SHAPE's R (Perlin at 32) and A.
+- A browser's first load compiles the shaders, which took 160–900 ms here; every load after is under 100 ms. See
+  "Known issues" in the hand-off.
+<!-- /T1 -->
+
+<!-- T2 -->
+### T2: weather map
+
+**Status:** done (2026-11-27, `vol/T2-weather-map`)
+
+**Files:**
+- `src/lib/sky/volumetric/weather-map.ts`: `generateWeatherMap` (pure, seeded, tileable), `windVelocity` +
+  `WIND_TIMELAPSE` (15, documented), `createWeatherMap` (LINEAR/REPEAT upload; regenerates only when the field
+  params change — the wind only scrolls)
+- Tests: `tests/unit/vol-weather-map.test.ts` (30)
+- `docs/volumetric/handoffs/T2.md`
+
+**How to verify:**
+- `pnpm vitest run tests/unit/vol-weather-map.test.ts`: determinism, the mean windows (cumulus@0.38, stratus@0.95),
+  the cumulonimbus cells, the forcedCell wrap, precipitation concentration, the wind scroll, regeneration
+- All five gates green, plus `pnpm build:e2e` + `pnpm e2e:only tests/e2e/lab-smoke.spec.ts` (the real WebGL path)
+- No lab screenshot: `?debug=weather` is T4's in-shader view, so T2 ships no JS view of its own
+
+**Notes for the next task:**
+- T4: `weatherAt` gives (coverage, type, precipitation) per texel, and the type channel varies per texel: stratus 0,
+  cumulus 0.5; a cumulonimbus sky is a cumulus-grade field with its 1–2 seeded cells stamped to type 1, and a
+  forcedCell stamps type 0.5. Read the map's G, not just `uCloudType`.
+- Measured statistics (bytes, every seed): cumulus@0.38 → mean 0.377, 24% clear (< 0.02), 44% cores (> 0.5), ceiling
+  0.718; stratus@0.95 → mean 0.94–0.95, deck 0.66–1.0, no holes. Precipitation = param × smoothstep(0.45, 0.95, cov).
+- The generator calibrates the noise per map (percentile rank for the patchy field, z-score for stratus), so
+  `coverage` is the map's mean target for every seed — which is what types.ts documents the param to be.
+- `WIND_TIMELAPSE` went 6 → 15: 15 km/h crosses the 40-km tile in ~10.7 min, so T6's frames 10 s apart drift ~2 texels.
+<!-- /T2 -->
+
+<!-- T3 -->
+### T3: lab controls and URL state
+
+**Status:** done (2026-11-27, `vol/T3-lab-controls`, M1 follow-up F1)
+
+**Files:**
+- `src/lib/sky/volumetric/lab-state.ts`: parse/serialise with clamping to the documented ranges, real calendar dates,
+  strict `HH:MM`, integer seeds; `cloudAtSun` accepts `cover` as a synonym for `1` (F1); `presetState` = defaults +
+  `LAB_PRESETS`, i.e. the §7 acceptance URLs.
+- `src/app/lab/clouds/controls/index.tsx`: the panel — presets A–C and every `LabState` field, the real sun's
+  elevation (Asia/Dhaka, `astro.ts`), the frame-time readout (timer-query GPU ms, else rAF ms, plus tier), collapse
+  remembered per session. Every change → one `renderer.setState` + `history.replaceState` per animation frame (T7's
+  throttle note).
+- `src/app/lab/clouds/controls/widgets.tsx`: the labelled primitives (Section, Slider, Seg, Toggle, NumField,
+  SelectField, DateField, FrameReadout).
+- Tests: `tests/unit/vol-lab-state.test.ts` (16).
+- `docs/volumetric/handoffs/T3.md`
+
+**How to verify:**
+- `pnpm vitest run tests/unit/vol-lab-state.test.ts`; all five gates green.
+- Open the lab, click "controls +": drag a slider, click a preset — the URL and the render follow (`window.__vol.state`).
+- `.shots/volumetric-lab/T3-controls.png` (1440×900, panel expanded over state A).
+
+**Notes for the next task:**
+- The panel starts **collapsed** (sessionStorage) so `lab:shots` / `lab:gpu` keep a clean corner; only the small
+  "controls +" pill and the ms readout show.
+- Preset buttons apply the §7 acceptance states exactly, so `debug`, `view` and `tier` reset with them.
+- The type group abbreviates cumulonimbus as "cb" (title has the full word); the debug select lists
+  `SHADER_DEBUG_VIEWS` + "noise".
+- Keyboard: native inputs and buttons throughout; sliders arrow-step (time 5 min, coverage 0.01).
+<!-- /T3 -->
+
+<!-- T4 -->
+### T4: march, density, lighting
+
+**Status:** done (2026-11-27, `vol/T4-core`)
+
+**Done when:**
+- State A shows lit tops, darker bases, clouds shrinking to the horizon and no banding. Use `VOL_TEMP_NOISE` (in
+  `density.glsl.ts`, helpers prefixed `density`) until T1 and T2 are merged.
+- The contract functions are implemented and the assembly test is green.
+- `.shots/volumetric-lab/T4-*.png` at 1440×900 have been looked at.
+- The hand-off lists the uniforms used and where `VOL_TEMP_NOISE` must be removed.
+
+**Files:**
+- `march.glsl.ts`: shell span, geometric steps, blue-noise jitter, early exit, debug views.
+- `density.glsl.ts`: per-type gradient, anvil, coverage remap, erosion, wind and shear, temporary noise.
+- `lighting.glsl.ts`: 6-step light march, multi-scatter octaves, dual-lobe HG, powder, two-stream diffuse term,
+  ambient, aerial perspective.
+
+**How to verify:**
+- `pnpm vitest run tests/unit/vol-assembly.test.ts`
+- `/lab/clouds?t=11:00&type=cumulus&cov=0.38&freeze=1`, with `&view=345` or `&debug=weather|density|transmittance|light|depth`
+- Shots, from `.shots/volumetric-lab/`:
+  - `T4-{A,A-away,A-side,B,C,night}.png`: temporary noise.
+  - `T4-real-*.png`: on T1's and T2's real textures, overlaid temporarily and not committed.
+  - `T4-debug-views.png`.
+
+**Known issues:**
+- Per-frame jitter grain until T7's reprojection.
+- GPU at full resolution: 6–11 ms on the real textures, 32–95 ms on the temporary noise.
+- Dusk shadow sides are a little brown, and night clouds are a little bright (T8).
+
+**Uniforms per module:**
+- density: `uWeather`, `uWeatherOffset`, `uWindVel`, `uTime`, `uShape`, `uDetail`.
+- lighting: `uSunDir`, `uSunColor`, `uSunVisible`, `uMoonDir`, `uMoonVisible`, `uMoonFraction`, `uZenith`, `uMid`,
+  `uHorizonCol` (and `skyGradient`).
+- march: `uCloudType`, `uDebug`, `uBlue` and `uFrame` (through `blueNoise`).
+- Unused: `uPrecip` and `uCoverage` (map channels instead).
+
+**Notes for the next task:**
+- M1 removes `VOL_TEMP_NOISE`. The exact lines are in `handoffs/T4.md`.
+- T5: transmittance hides the sun, and `applyAerial` calls `skyGradient`.
+- T7: reproject with `gCloudDist`.
+- Requests for M1: emit `VOL_MIN_TRANSMITTANCE`, and decide on `uPrecip` and `uCoverage`.
+<!-- /T4 -->
+
+<!-- T5 -->
+### T5: sun, moon and stars behind the clouds
+
+**Status:** done (2026-11-27, `vol/T5-background`). The e2e check skips, with the reason, until M1 merges T2 and
+removes `VOL_TEMP_NOISE`.
+
+**Done when:**
+- The sun (limb darkening, bloom at 3 radii), the moon (phase, terminator, earthshine, glow) and the seeded,
+  twinkling stars match the look of `bodies.ts` and `particles.ts`.
+- The gradient is dithered.
+- `final = cloud.rgb + cloud.a × background`.
+- `forcedCellFor` (in `sun-cell.ts`) handles `cover` and `edge`.
+- `tests/e2e/lab-cloud-at-sun.spec.ts` passes: the disc centre loses at least 85% of its brightness.
+- Screenshots in `.shots/volumetric-lab/T5-*.png`: B with and without `cloudAtSun`, and 20:30 with the moon.
+
+**Files:**
+- `background.glsl.ts`:
+  - The gradient, with the horizon glow and a blue-noise dither (in `background()` only).
+  - Stars: a cube-mapped field seeded per day that twinkles and turns with the sun's hour angle.
+  - The moon: a sphere lit from the sun's side, with `uMoonFraction`, earthshine and glow.
+  - The sun: a limb-darkened disc with three blooms.
+- `sun-cell.ts`: `forcedCellFor`, with the cell on the sun's (or the moon's) ray at 2.2 km, 5–8 km in radius, and
+  `edge` shifted 0.4 radii sideways.
+- Tests: `tests/unit/vol-sun-cell.test.ts` and `tests/e2e/lab-cloud-at-sun.spec.ts`.
+- `renderer.ts` is unchanged: T0 already calls `forcedCellFor`.
+
+**How to verify:**
+- `pnpm vitest run tests/unit/vol-sun-cell.test.ts tests/unit/vol-assembly.test.ts`
+- `pnpm build:e2e && pnpm e2e:only tests/e2e/lab-cloud-at-sun.spec.ts`. It asks for the GPU, and skips until T2 and
+  M1 are in.
+- Shots: `.shots/volumetric-lab/T5-{B,B-edge,B-cover,A,A-edge,A-cover,night,night-cover,night-clear,sun-clear-1100,sun-clear-1645}.png`
+  and `T5-sheet.png`.
+- Disc centre with cloudAtSun 0 → 1, in linear luminance: A goes from 1.00 to 0.099 (−90%).
+
+**Notes for the next task:**
+- **M1:** once T2 and the `VOL_TEMP_NOISE` removal are in, the cloud-at-sun check runs.
+  - With T1 and T2 overlaid and the define off, it was run with GPU args. Result: it passed in 1.0 s, with the disc at −90%.
+  - `lab-smoke` (T0) times out in `locator.screenshot` on the e2e build. Playwright's default Chromium uses software
+    GL, on which the march takes seconds per frame. It needs GPU args, as `lab-cloud-at-sun` has, or T7's cost
+    cuts.
+- **B can't show the sun.** B's 3.4° sun is hidden by the horizon cloud band whatever `cloudAtSun` says. See the
+  hand-off's request: a forced clear gap.
+- **T7:** draw `background()` in the full-resolution composite.
+- **T8:** the tunables are `BACKGROUND_*` and `SUN_CELL`.
+<!-- /T5 -->
+
+<!-- T6 -->
+### T6: lab screenshots and GPU probe
+
+**Status:** done (2026-11-27, `vol/T6-probes`)
+
+**Files:**
+- `scripts/probe/lab-shots.mts`: states A–C (from `LAB_PRESETS`) × tiers high/medium/low × 1440×900 DPR 2 and
+  375×812 DPR 3, plus two frames of A 10 s apart, into `.shots/volumetric-lab/run-<ts>/`, with a `sheet.png`
+  contact sheet (an HTML grid screenshotted by Playwright).
+- `scripts/probe/lab-gpu.mts`: GPU ms/frame per state × tier at 1920×1080 DPR 2 and 375×812 DPR 3, 5 s per cell,
+  from `window.__vol` (the renderer's per-frame EXT_disjoint_timer_query_webgl2 query); prints a table with the
+  §5 targets marked `OVER` and writes `<run>/gpu.json` (`RUN_DIR` files it beside a shots run).
+- `package.json`: `lab:shots`, `lab:gpu`. `docs/volumetric/BRIEF.md`: §11 "Tools" (appended).
+
+**How to verify:**
+- With the dev server up (`WEATHER_MOCK=1 CHAT_MOCK=1 NEXT_DIST_DIR=.next-dev pnpm dev -p 3005`):
+  `pnpm lab:shots && RUN_DIR=$(ls -td .shots/volumetric-lab/run-* | head -1) pnpm lab:gpu`.
+- Full run against the T1–T5 code: `.shots/volumetric-lab/run-20261127-072009/` (20 shots, sheet.png, gpu.json).
+
+**Notes for the next task:**
+- Pre-T7 numbers are far over the §5 targets (100–400 ms desktop, 33–124 ms mobile) on the real GPU (verified
+  ANGLE Metal, Apple M2) — expected: the placeholder pipeline marches at full resolution every frame. `OVER`
+  marks the two target cells.
+- In several cells `gpuMs` exceeds `rafMs`; the timer-query semantics are T7's to interpret before trusting the
+  absolute values (see the hand-off).
+- Details and the tsx `__name` pitfall for `page.evaluate`: `handoffs/T6.md`.
+<!-- /T6 -->
+
+<!-- M1 -->
+### M1: review of T1–T6
+
+**Status:** done (2026-11-27, `feat/volumetric-lab`). No follow-up blocks T7. **T3 was never delivered** (no branch
+exists): see F1.
+
+**Merged** (each with `--no-ff`; gates green after each):
+- `vol/T1-noise`
+- `vol/T2-weather-map`
+- `vol/T4-core`
+- T5's commit `20df856` (the `vol/T5-background` ref was stale)
+- `vol/T6-probes`
+
+**Fixed:**
+- `VOL_TEMP_NOISE` removed. `weatherAt` uses `textureLod`.
+- `VOL_MIN_TRANSMITTANCE` define (T4).
+- Probes: `load` instead of `networkidle`, and a tier-mismatch flag (T6).
+- `types.ts` documents the mip chains (T1).
+- `.next-dev` ignored by git, ESLint and tsc (T1, T6).
+
+**How to verify:**
+- Gates: `pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm check:bundle`.
+- e2e: `pnpm build:e2e && pnpm e2e:only tests/e2e/lab-cloud-at-sun.spec.ts tests/e2e/lab-smoke.spec.ts` (both pass;
+  cloud-at-sun no longer skips).
+- Shots: `.shots/volumetric-lab/run-20261127-074508/` (20 shots, `sheet.png`). GPU table: `…/gpu.json`.
+
+**GPU after M1** (mean ms, ANGLE Metal on an M2, full-resolution march):
+
+| Viewport | Tier | A | B | C |
+| --- | --- | --- | --- | --- |
+| 1920×1080 DPR 2 | high | 58.4 | 55.9 | 35.6 |
+| 1920×1080 DPR 2 | medium | 39.2 | 38.0 | 25.4 |
+| 1920×1080 DPR 2 | low | 27.5 | 26.4 | 20.2 |
+| 375×812 DPR 3 | high | 21.1 | 19.7 | 12.4 |
+| 375×812 DPR 3 | medium | 14.7 | 13.7 | 10.0 |
+| 375×812 DPR 3 | low | 10.7 | 10.1 | 9.4 |
+
+All four target cells are OVER (high ≤ 2.5, low ≤ 3). That's T7's job. On the temp noise it was 102–412 ms.
+
+**Follow-ups** (detail in `handoffs/M1.md`):
+
+| ID | Owner | Blocks | Task |
+| --- | --- | --- | --- |
+| F1 | GLM (T3) | T8 | Deliver T3 as specified: the controls panel, clamping, `vol-lab-state` tests; accept `cloudAtSun=cover` |
+| F2 | Claude Code (T8) | sign-off | B: the `edge` cell reads as a flat slab on the horizon, and the low sun is always hidden. Add the `forcedCell.clear` gap, shape the cell, extend `lab-cloud-at-sun` to B |
+| F3 | Claude Code (T8) | sign-off | C: the overcast deck streaks and swirls toward the horizon (the rejected look). Needs cellular texture with no smear |
+| F4 | GLM | nothing | `scripts/probe/lab-noise.mts`: GPU-vs-CPU noise readback probe |
+
+**Notes for T7:**
+- `gpuMs` > `rafMs` in heavy cells: check the timer semantics.
+- `WeatherMap.offset` wraps, so reproject with `velocity`.
+- The forced cell regenerates the map once a second (~1.5 ms).
+- Draw `background()` at full resolution.
+<!-- /M1 -->
+
+<!-- T7 -->
+### T7: performance
+
+**Done when:**
+- Clouds render to an RGBA16F target at the tier scale.
+- 2×2 checkerboard reprojection with α 0.25 and a neighbourhood clamp.
+- Re-march at ≤ 15 Hz, with a bilateral upsample.
+- Automatic tiers step down after 20 ms for 3 s, and the change is logged.
+- `pnpm lab:gpu`: high ≤ 2.5 ms (1920×1080 DPR 2) and low ≤ 3 ms (375×812 DPR 3), with a before/after table.
+- Two frames 10 s apart show no ghosting.
+
+**Status:** partial (2026-11-27, `vol/T7-perf`). Everything is built. The mobile target is met. The desktop high target
+is **OVER** (4.3–4.5 ms against ≤ 2.5), and closing it needs an owner decision (`handoffs/T7.md`, "Why desktop high
+is still OVER").
+
+**Files:**
+- `targets.ts`: the passes, in order:
+  - march: a quarter of the pixels, Bayer 2×2, into RGBA32F with the distance packed into the alpha.
+  - resolve: into the RGBA16F cloud target at the tier scale, with wind reprojection, the 3×3 clamp and α 0.25.
+  - full-resolution background caches, every 4th march.
+  - the full-resolution composite, every frame.
+  - Plus the ≤ 15 Hz march clock and `invalidate()`.
+- `reproject.glsl.ts`: `cloudsAt` (bilateral only at transmittance edges, and the wind shift since the last resolve),
+  the resolve, velocity and composite helpers, and the `REPROJECT_*` tunables.
+- `tiers.ts`: `auto` starts high, or medium on a coarse pointer, and steps down when the median rAF interval is over
+  20 ms for 3 s (logged).
+- `renderer.ts` (wiring):
+  - The governor gets the rAF interval.
+  - `setState` calls `invalidate()`.
+  - `__vol.gpuMs` = the mean of the last 60 measured frames (it was one frame, which aliased with the 15 Hz march in
+    `lab:gpu`).
+- `tests/unit/vol-tiers.test.ts`: 19 tests.
+
+**GPU, before → after** (`pnpm lab:gpu`, mean ms, ANGLE Metal on an M2):
+
+| Viewport | Tier | A | B | C |
+| --- | --- | --- | --- | --- |
+| 1920×1080 DPR 2 | high | 58.75 → **4.45** | 56.99 → **4.37** | 36.73 → **4.26** |
+| 1920×1080 DPR 2 | medium | 40.19 → 4.15 | 38.92 → 3.85 | 26.22 → 3.63 |
+| 1920×1080 DPR 2 | low | 28.31 → 3.53 | 26.96 → 3.46 | 20.64 → 3.83 |
+| 375×812 DPR 3 | high | 20.48 → 2.15 | 18.65 → 2.01 | 12.62 → 1.64 |
+| 375×812 DPR 3 | medium | 14.21 → 1.94 | 12.80 → 1.71 | 9.58 → 1.37 |
+| 375×812 DPR 3 | low | 10.80 → **1.40** | 9.73 → **1.43** | 8.95 → **1.24** |
+
+- High ≤ 2.5: OVER.
+- Low ≤ 3: met.
+- The desktop floor is a full-resolution pass at 3840×2160: 0.83 ms writing a constant, 1.2–1.6 ms copying a cache.
+
+**How to verify:**
+- Gates; `pnpm vitest run tests/unit/vol-tiers.test.ts`.
+- e2e: `pnpm build:e2e && pnpm e2e:only tests/e2e/lab-cloud-at-sun.spec.ts tests/e2e/lab-smoke.spec.ts`. 2 passed.
+- With the dev server on :3005: `pnpm lab:shots && RUN_DIR=$(ls -td .shots/volumetric-lab/run-* | head -1) pnpm lab:gpu`.
+  - Final run: `.shots/volumetric-lab/run-20261127-090543/`. Before: `.shots/volumetric-lab/T7-before/gpu.json`.
+  - Ghosting: `A-drift-0s.png` vs `A-drift-10s.png`. No trails, no smear, and no stripes on thin cloud.
+
+**Notes for the next task:**
+- **T8:**
+  - The `REPROJECT_*` constants, `HISTORY_ALPHA`, `MARCH_HZ` (≤ 15) and `BG_EVERY` are tunable.
+  - At 0.35 scale, edges are softer than the old full-res march. Judge checklist item 2 with that in mind.
+  - `reprojectWorldVelocity` uses `DENSITY_DETAIL_DRIFT`.
+- **T3:** every `setState` resets the history (four marches), so throttle drags to one call per frame.
+- **M1:**
+  - Requests: `CloudPipeline.invalidate`, the `VolDebug.gpuMs` doc, and, optionally, an `outColor` location and
+    `textureGather` in the assembly test.
+  - The desktop target needs an owner decision.
+<!-- /T7 -->
+
+<!-- T8 -->
+### T8: visual tuning, then the owner's review
+
+**Done when:**
+- Two review rounds are recorded: PASS/FAIL per checklist item, per state and size, with shot paths.
+- Only constants and shaping functions were changed.
+- The `pnpm lab:gpu` budgets still hold.
+- The hand-off lists the 3 URLs, the contact sheet, the GPU table and an honest list of what still doesn't look real.
+- Status `needs-human`; nothing integrated into the home page.
+
+**Status:** needs-human (2026-11-27, `vol/T8-tuning`, branched from `feat/volumetric-lab` after the T7 merge).
+
+**Files:**
+- `density.glsl.ts`: the stratus SHAPE tile, its far fade, erosion, the coverage floor and ragged bases.
+- `lighting.glsl.ts`: diffuse per type with a neutral tint, ambient, light path, octaves, and the haze with its
+  overcast grey.
+- `march.glsl.ts`: the per-type detail LOD.
+- `background.glsl.ts`: sun gain and blooms.
+- `sun-cell.ts`, `weather-map.ts`, and `forcedCell.clear` in `types.ts` (F2).
+- `lab-cloud-at-sun.spec.ts`: B.
+- `vol-sun-cell.test.ts`: one line.
+
+**Review rounds** (full tables in `handoffs/T8.md`; shots in `.shots/volumetric-lab/T8-r{0,1,2,3}/`; sheet
+`T8-r3/sheet.png`). Final round, A / B / C at 1440 and 375, all tiers alike:
+
+| # | Item | A | B | C |
+| --- | --- | --- | --- | --- |
+| 1 | Sunlit tops, darker bases | PASS | PASS | – |
+| 2 | Detailed edges, no smear | FAIL (soft at 0.35 scale) | PASS | FAIL (soft streaks overhead) |
+| 3 | Shrink to horizon, no banding | PASS | PASS | PASS (faint spokes at full res) |
+| 4 | Warm undersides, silver lining (B) | – | PASS | – |
+| 5 | Sun hidden / bleeds through | PASS (e2e, cloudAtSun=1) | PASS (e2e + shots) | – |
+| 6 | Overcast deck, no tiling (C) | – | – | PASS |
+| 7 | Mobile equally real | PASS | PASS | PASS |
+
+**GPU** (`T8-r3/gpu.json`):
+- Desktop high: 4.42–4.70 ms, still OVER 2.5, as after T7.
+- Mobile low: 1.38–1.50 ms, which meets its ≤ 3 target.
+
+**How to verify:**
+- Gates; then `pnpm build:e2e && E2E_PORT=3111 pnpm e2e:only tests/e2e/lab-cloud-at-sun.spec.ts tests/e2e/lab-smoke.spec.ts`.
+- `pnpm lab:shots` / `pnpm lab:gpu` with `LAB_URL` pointing at a lab dev server.
+
+**Notes for the owner:**
+- Review the three URLs in `handoffs/T8.md`.
+- Open decisions: the desktop GPU target (T7), A's soft edges at the 0.35 scale, and the cloudAtSun=edge staging
+  wedge.
+- T1 should switch the noise to mipmapped filtering, which would clear C's last spokes.
+<!-- /T8 -->
+
+<!-- T9 -->
+### T9: review tooling for the realism round
+
+**Status:** done (2026-11-27, `vol/T9-review-tools`, from `feat/volumetric-lab` after the T8 merge).
+**The four new params (`scale`, `reproject`, `accum`, `out`) change nothing on screen until T10 (scale, reproject,
+accum) and T11 (out) merge.** T9 parses them, puts them in the panel and measures their absence.
+
+**Files:**
+- `src/components/sky/volumetric/types.ts`: the `LabState` type only. Four optional fields: `scale?: number | null`
+  (0.25..1; null = the tier's), `reproject?: 0 | 1` (default 1), `accum?: number` (integer 0..256, default 0),
+  `out?: "single" | "layered"`. Optional because `LAB_DEFAULTS`, in the same file, is not T9's to edit.
+- `src/lib/sky/volumetric/lab-state.ts`: parse, serialise and clamp for all four, like the earlier params, plus
+  `REVIEW_DEFAULTS`, `LabStateResolved = Required<LabState>`, `SCALE_RANGE` and `ACCUM_MAX`.
+- `src/app/lab/clouds/controls/`: a "review" section (cloud scale slider with "use tier scale", reprojection toggle,
+  accum frames field, output select); the camera-view slider gains a typed "view azimuth" field.
+- `scripts/probe/lab-image.mts`: PNG decode/encode with no image dependency, exact crops, the texel-aligned box
+  resample. `lab-metrics.mts`: the crop geometry and `lattice`, `edgeWidth`, `bodyStd`, `streak`.
+  `lab-url.mts`: `LAB_URL` is required. `lab-shots.mts`: A-away, A-ref, C-ref, `crops/`, `crops.png`, `pair-A.png`,
+  `metrics.json`. `lab-gpu.mts`: only the `LAB_URL` change.
+- Tests: `tests/unit/vol-lab-state.test.ts` (25, was 16), `tests/unit/vol-lab-metrics.test.ts` (34, new).
+- `docs/volumetric/BRIEF.md`: the "Tools" section, appended.
+
+**How to verify:**
+- Gates. The `.mts` probes are outside `tsc`'s include: `lab-image`, `lab-metrics` and `lab-url` are typechecked
+  through the test that imports them; for all of them, `tsc --noEmit` on a tsconfig that includes `scripts/probe/lab-*.mts`.
+- `pnpm lab:shots` or `pnpm lab:gpu` without `LAB_URL` exits 2 with "LAB_URL is not set … no default port".
+- With a lab dev server: `LAB_URL=http://localhost:<port> RUN_DIR=<dir> pnpm lab:shots`, then the same for
+  `pnpm lab:gpu`. Run: `.shots/volumetric-lab/T9-run/` (28 shots, 112 crops, both sheets, `metrics.json`, `gpu.json`).
+- `.shots/volumetric-lab/T9-controls.png`: the panel at 1440×1080 with every new control in use.
+
+**Notes for the next task:**
+- **T10:** read `state.scale ?? TIERS[tier].scale`, `state.reproject !== 0` and `state.accum ?? 0`. A reference render
+  must set `window.__vol.accumReady` (false while averaging, true once N frames are in); `lab:shots` waits on it and,
+  without it, labels the ref shots "NOT a reference render". T10's temporary `scale` (0.1..1) and `az` URL parsing
+  is superseded: `scale` clamps to 0.25..1, and the camera azimuth is `view`.
+- **T11:** `state.out === "layered"`. `crops.png` only needs the single output; `out` is not captured yet.
+- **M2:** fold `REVIEW_DEFAULTS` into `LAB_DEFAULTS` and drop the four `?` (Request 1). `plan.json` has no T9 entry.
+  Detail: `handoffs/T9.md`.
+<!-- /T9 -->
+
+<!-- T10 -->
+### T10: realism (LOD, scattering, aureole)
+
+**Status:** partial (2026-11-27, `vol/T10-realism`, from `feat/volumetric-lab` at the T8 merge; T9 had no commits, so
+the review params sit behind `// TEMP until T9` in `renderer.ts`).
+
+**Files:**
+- `density.glsl.ts`: footprint LOD for SHAPE and DETAIL; DETAIL fades to its mean by LOD 2 → 4; σt 66 km⁻¹ without the
+  × coverage; the cumulus edge curve; the 0.32-km DETAIL tile; the wispy-to-billowy blend over height 0.05–0.5.
+- `lighting.glsl.ts`: octaves 0.5 / 0.35 / 0.5; the 40 m × 2 light march (detail on every step but the last, which
+  reads SHAPE at LOD + 2); AO from +100 m and +400 m; cumulus diffuse 0.5.
+- `march.glsl.ts`: the fixed-km detail fades are gone.
+- `background.glsl.ts`: the Cornette–Shanks aureole (sun and moon) in `skyGradient`.
+- `noise-gpu.ts`: `LINEAR_MIPMAP_LINEAR` (filtering only).
+- `renderer.ts`: `applyReviewParams` only (`scale`, `reproject=0`, `accum=N`, `az`).
+
+**Diagnosis:**
+- A-ref (scale 1, reproject=0, accum=64) matched A-high: bodyStd 12.2 vs 12.4, edge 19.6 vs 19.9 px. The softness was in
+  density and lighting.
+- The horizon slices persist in A-ref, so they were in the field.
+- Nothing is handed to T11 for the pipeline.
+
+**Results:** the full tables are in `handoffs/T10.md`; shots in `.shots/volumetric-lab/T10-r0` (baseline) to `T10-r4`
+(final), each with `metrics.json`, `crops.png` and `pair-A.png`.
+
+**Open (owner):**
+- `lab-cloud-at-sun.spec.ts` **fails on the e2e build**: A's clear precondition reads 0.551 against > 0.6, the same on every run (B and smoke pass). It also fails on medium and high:
+  - A's cover check reads luminance, and with the new scattering a covered sun's cloud glows. T shows ≥ 99% of the disc
+    hidden.
+  - A's ordinary field now has a cumulus over the sun.
+  - B's edge shift (`sun-cell.ts`) fully covers the disc on medium and high.
+- See hand-off Requests 1–2 and DECISIONS #204.
+
+**Notes for T11 (desktop GPU):**
+- T10 adds detail to light-march steps 2–4 and two AO density samples per lit sample.
+- Measured, same day and machine: desktop high A +0.50, B −0.22, C +0.96 ms (mobile low ≤ +0.27, 1.27–1.44 ms). C pays the most, because almost every
+  sample of a 95% deck is lit cloud.
+- Cheaper AO (shape only, or one sample) is the first lever. It costs some lobe contrast in backlit bodies.
+<!-- /T10 -->
+<!-- T11 -->
+### T11: checkerboard reconstruction, layered output
+
+**Status:** partial (2026-11-27, `vol/T11-pipeline`). The lattice is gone, and layered output is built and recommended.
+Three pass lines are not met: T9's lattice number (it reads cloud detail, see the hand-off), A's p99 ΔL (it sits at
+A's run-to-run noise floor), and desktop high ≤ 2.5 ms (the best is 2.7–2.9; the march now dominates).
+
+**Files:**
+- `reproject.glsl.ts`: the new resolve and `reprojectLayered`.
+  - The resolve has a spatial estimate (bilateral by depth) and a min/max box (tight for non-fresh pixels, with an
+    extent floor). The history is Catmull-Rom, clipped, and mixed with w = 1 − off/τ.
+  - `reprojectLayered` gives A = 1 − T, lifted so that C ≤ A, and C = D(c + T·b) − (1 − A)·D(b).
+- `targets.ts`:
+  - `readOutput` (`out`, `sout`, `lift`, `clampviz`, `hold`; TEMP until T9), `layeredSize`, `createBackgroundLayer`.
+  - The layered branch and `hold` in `createPipeline`.
+- `types.ts`: `CloudPipeline.invalidate`.
+- `renderer.ts`: the output wiring.
+- `LabClient.tsx`: the background canvas.
+- `tests/unit/vol-output.test.ts`.
+
+**How to verify:**
+- `/lab/clouds?…&out=layered`. Add `&clampviz=1&lift=0` to see where the brief's clamp binds.
+- Review sheets: `.shots/volumetric-lab/T11/review/`.
+- Probes: `.scratch/t11/` (listed in the hand-off).
+
+**Recommendation:** layered, lifted alpha, s_out = the tier's scale, no hold. Desktop is −30% GPU (about 3.4 ms), with
+no visible difference from single. The decision table is in `handoffs/T11.md`.
+
+**Notes for the next task:**
+- The remaining desktop cost is the march and resolve (about 2.5 ms amortised).
+- The remaining motion artefact is reprojection lag across the wind (cause not found).
+<!-- /T11 -->
+
+<!-- M2 -->
+### M2: merge and review of T9–T11
+
+**Status:** done (2026-11-27, `feat/volumetric-lab`). The lab is **not** signed off: most realism checks still FAIL
+(below). Nothing touches the home page.
+
+**Merged** (each `--no-ff`, gates green after each):
+- `vol/T9-review-tools` (`13231b9`).
+- `vol/T10-realism`: T10 left its work uncommitted in its worktree (status partial). M2 committed it there as
+  `fa2d141` (without the dev server's `tsconfig.json` include) and merged that.
+- `vol/T11-pipeline` (`7596206`). Conflicts in `renderer.ts`, `TASKS.md` and `DECISIONS.md` (T11's #198–#203 → #205–#210).
+
+**Step 1 (T8's requests):** approved `WeatherMapParams.forcedCell.clear` and the one-line `vol-sun-cell.test.ts` edit
+(the shift is measured against the edge cell's own 3.2-km radius, which is right). Added the missing test:
+`vol-weather-map.test.ts` "clear … zeroes coverage on the wedge's spine, keeps it beyond its half-width".
+
+**Review of the branches:**
+- **T9:** inside its ownership (the `LabState` type only in `types.ts`). Tests are real (the metrics are checked on
+  synthetic patterns with known answers; the codec is byte-exact). Weak spot: `lattice` reads sharpness as lattice
+  (T11 D2), and `streak` says A's band improved (3.28 → 1.52) while the slices are still plainly visible at 100%.
+- **T10:** shaders, `noise-gpu.ts` filtering and `applyReviewParams` only. **No tests and no committed metrics
+  tooling**; its numbers come from scratch scripts in its worktree. Left `lab-cloud-at-sun.spec.ts` failing (DECISIONS #204).
+- **T11:** inside its row. `vol-output.test.ts` only tested the TEMP URL parser; M2 replaced it with `outputFor` /
+  `sameOutput` tests. Its key measures (class asymmetry, residual, ΔL) are scratch, not in `lab:shots`.
+
+**Integration (renderer.ts and friends):** every `// TEMP until T9` block is gone. The review params and T11's output
+switches are `LabState` fields (`scale`, `reproject`, `accum`, `out`, `sout`, `hold`, `lift`, `clampviz`), all in
+`LAB_DEFAULTS` (T9 Request 1). `applyReviewParams` reads the state; `createPipeline` gets the review scale through
+`PipelineOutput.scale` (no more swapping `TIERS[tier]`, T10 Request 4). `accum > 0` and debug views always draw the single output.
+The output mode is a context attribute, so the panel reloads on a mode change; the other switches rebuild the
+pipeline. `VolDebug` gained `accumReady` (T9 Request 2), `out`, `bgGpuMs`, `bgDrawMs` (T11 Request 1). The panel has
+the T11 switches. `.next-*/` is ignored by git, ESLint and tsc (T9 Request 4, T10 Request 5). `lab:gpu` measures both
+outputs, sums the contexts and traces the compositor on the target cells.
+
+**Default output:** `out=layered` (T11's recommendation: lifted alpha, s_out = the cloud scale, no hold).
+Attribution check (`.shots/volumetric-lab/M2/attr/`, frozen, same frame): the staircase edges and the 375 low
+blockiness are the same in `out=single`, so they come from the 0.35/0.25 cloud scale with T10's crisp edges and
+T11's sharp history, not from the layered stretch.
+
+**Run:** `.shots/volumetric-lab/M2/` — 28 shots, `sheet.png`, `crops.png`, `pair-A.png`, `metrics.json`, `gpu.json`.
+A-ref and C-ref are true references (`accumConfirmed: true`, scale 1).
+
+**GPU** (`M2/gpu.json`, mean ms/frame, ANGLE Metal on an M2; sum = both contexts, comp = VizCompositorThread):
+
+| Viewport | Tier | Out | A | B | C | comp (A / B / C) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1920×1080 DPR 2 | high | single | 4.80 | 4.87 | 5.24 | 0.79 / 0.76 / 0.63 |
+| 1920×1080 DPR 2 | high | layered | 3.52 (3.26 + 0.26) | 3.67 | 3.94 | 0.57 / 0.56 / 0.60 |
+| 375×812 DPR 3 | low | single | 1.41 | 1.50 | 1.54 | 0.91 / 0.77 / 0.74 |
+| 375×812 DPR 3 | low | layered | 0.74 (0.65 + 0.09) | 0.78 | 0.75 | 0.54 / 0.79 / 0.76 |
+
+Budget (sum + comp): desktop high layered **4.1–4.5 ms, OVER 2.5**; mobile low layered 1.3–1.6 ms, under 3.
+
+**Metrics, T8-r3 → M2** (`T9-run/metrics.json` is T8-r3's code under T9's metric code; 1440×900, means of 6 crops;
+`streak` on the band):
+
+| Shot | lattice | edgeWidth (CSS px) | bodyStd | streak |
+| --- | --- | --- | --- | --- |
+| A high | 0.0070 → 0.0165 | 4.07 → **1.84** | 0.0885 → 0.0850 | 3.28 → 1.52 |
+| A low | 0.0163 → 0.0262 | 3.88 → 2.14 | 0.0750 → 0.0842 | 2.99 → 1.32 |
+| A-ref (real only in M2) | – → 0.0109 | – → 2.01 | – → 0.0836 | – → 1.98 |
+| A-away high | 0.0047 → 0.0118 | 5.29 → 3.20 | 0.0491 → 0.0528 | 3.09 → 1.59 |
+| B high | 0.0009 → 0.0036 | 4.97 → 2.89 | 0.0019 → 0.0127 | 2.37 → 1.33 |
+| C high | 0.0008 → 0.0023 | 6.39 → 5.88 | 0.0182 → 0.0390 | 25.0 → 12.4 |
+| C-ref (real only in M2) | – → 0.0018 | – → 5.53 | – → 0.0391 | – → 21.5 |
+
+Edges are 2.2× crisper, and A-high is now crisper than its own reference (1.84 vs 2.01): the extra is aliasing, which
+`lattice` (1.5× the reference) also shows.
+
+**Review (strict photographer, 100% crops; shot paths under `.shots/volumetric-lab/M2/`).** The tiers look alike
+except that medium and low are progressively blockier; a verdict holds for every tier unless noted.
+
+| # | Item | A 1440 | A 375 | B 1440 | B 375 | C 1440 | C 375 | A-away 1440 | A-away 375 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Sunlit tops, darker bases | PASS | PASS | PASS | PASS | – | – | PASS | PASS |
+| 2 | Detailed edges, no smear | FAIL: staircase on the 0.35 texel grid, dark specks under motion (`crops/A-high-1440x900-g1`, `-g4`) | FAIL: low is blocky (`A-low-375x812`) | FAIL: staircase rims, blotchy bodies (`crops/B-high-1440x900-g4`) | FAIL: rims break into squares at low (`B-low-375x812`) | FAIL: overhead is formless mush (`crops/C-high-1440x900-g1`) | FAIL: dotted rows (`C-high-375x812`) | FAIL: far field granular, "sugar" (`crops/A-away-high-1440x900-band`); near clouds PASS (`-g0`) | FAIL: granular (`A-away-high-375x812`) |
+| 3 | Shrink to horizon, no banding | FAIL: horizontal slices (`crops/A-high-1440x900-band`, also `A-ref`) | FAIL | FAIL: slices + a vertical comb under the right-hand cloud (`B-high-1440x900`, x 2100–2700, y 1100–1520) | FAIL | FAIL: rows + dotted rows (`crops/C-high-1440x900-band`) | FAIL | FAIL: slices (`crops/A-away-high-1440x900-band`) | FAIL |
+| 4 | Warm undersides, silver lining | – | – | PASS | PASS high/medium, FAIL low | – | – | – | – |
+| 5 | Sun hidden / bleeds through | e2e: see below | – | FAIL: the disc is a flat sticker with an opaque block across it, no bleed (`B-high-1440x900`, x 1150–1750, y 1100–1520) | FAIL (`B-low-375x812`) | – | – | – | – |
+| 6 | Overcast deck, no tiling | – | – | – | – | FAIL: continuous, no tile repeat, but dotted bright rows (pipeline; absent in `C-ref`) | FAIL | – | – |
+| 7 | Mobile equally real | – | FAIL (low) | – | FAIL | – | PASS (as desktop) | – | PASS (as desktop) |
+
+| Explicit check | Verdict | Evidence |
+| --- | --- | --- |
+| No dot lattice on thin cloud | **FAIL** | Dark specks and blocky dots in thin bright cloud: `crops/A-high-1440x900-g1.png`, `-g4.png`. `A-ref` instead shows a fine diagonal hatch on thin shaded flanks (`crops/A-ref-high-1440x900-g4.png`, lower right): the field, not the pipeline |
+| No horizontal slices in the horizon band | **FAIL** | Ruler-straight dark strips: `crops/A-high-1440x900-band.png`, `A-ref-…-band`, `A-away-…-band`, `B-high-1440x900.png`. Present in the reference, so in the field |
+| A visible bright glow around the sun in A | **FAIL** | The sun sits behind the main cumulus at the top centre; only a faint brightening beside the cloud, no disc, no bloom (`A-high-1440x900.png`, x 1200–1800, y 0–450) |
+| Lobe structure in A's dark bodies | **FAIL** | Lobes on the lit flanks only; the dark bellies are smooth grey slabs (`crops/A-high-1440x900-g3.png`, `-g4.png`); bodyStd 0.0885 → 0.0850 |
+| No spokes or repeated rows in C | **FAIL** | No radial spokes. Rows of elongated cells march to the horizon in `C-high` and `C-ref` (field); dotted bright rows in `C-high` and `C-high-375x812` only (pipeline) |
+
+**e2e** (`pnpm build:e2e && E2E_PORT=3111 pnpm e2e:only tests/e2e/lab-cloud-at-sun.spec.ts tests/e2e/lab-smoke.spec.ts
+--repeat-each=3 --workers=1`): **3 passed, 6 failed.**
+- `lab-smoke`: 3/3 PASS.
+- `lab-cloud-at-sun` A: 0/3, the "clear" precondition reads 0.443–0.455 against > 0.6 (T10's known failure, a cumulus
+  now sits over A's sun; it read 0.551 at T10). The ≥ 85% cover check never runs (by transmittance it held at T10).
+- `lab-cloud-at-sun` B: 0/3, the disc centre's T reads 0.082 against 0.14–0.65 (too covered). With `out=layered` it
+  read 0.050: a layered start-up transient of the debug view, fixed by drawing debug views with the single output
+  (DECISIONS #213). The rest is DECISIONS #204: the 0.7 edge shift was tuned for T8's soft fringe, and T10's crisp
+  fringe plus T11's sharper history leave it covering the centre. Re-solving it is the owner's call (T10 Request 2).
+- So item 5 has no passing automated check in M2.
+
+**Requests left open (not M2's to settle, or not needed yet):** T9 R3 (typecheck the probes in `pnpm typecheck`),
+T9 R6 (`LAB_PRESETS` entries for A-away / A-ref / C-ref), T10 R1–R2 (the cloud-at-sun spec and the edge shift),
+T11 R3 (adopt its scratch probes: class asymmetry, residual, ΔL; the compositor trace is now in `lab:gpu`).
+
+**Open (owner):** the desktop budget (4.1–4.5 against 2.5, even layered); whether to raise the cloud scale (the
+staircase); A's preset with the sun covered; the cloud-at-sun spec (DECISIONS #204); the field's horizontal slices
+and C's rows (T10's LOD did not remove them).
+<!-- /M2 -->

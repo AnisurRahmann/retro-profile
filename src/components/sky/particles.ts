@@ -4,6 +4,16 @@
  */
 import { hexToRgb } from "@/lib/sky/color";
 import { STAR_COOL, STAR_WARM } from "@/lib/sky/palette";
+import { DRIZZLE, RAIN_LAYER, RAIN_LAYERS, RAIN_MAX, layerCounts } from "@/lib/sky/rain";
+
+/** How far past each side a streak may be before it wraps (px): more than the widest streak leans. */
+const RAIN_EDGE = 40;
+/** A streak drawn whole, or in two parts (from, to, alpha factor along its length from the head): the near ones. */
+const SOLID = [[0, 1, 1]] as const;
+const NEAR_BLUR = [
+  [0, 0.55, 1],
+  [0.55, 1, 0.4],
+] as const;
 
 export { mulberry32 } from "@/lib/sky/random";
 import { mulberry32 } from "@/lib/sky/random";
@@ -16,9 +26,15 @@ export const skyRotation = (ms: number) => (((ms / 3.6e6) * SIDEREAL_DEG_PER_H) 
 export type ParticleState = {
   night: number;
   cloudCover: number;
+  /** 1 under a stratus deck (overcast, rain): no stars through it. */
+  deck: number;
   fog: number;
   rainDensity: number;
   rainSlant: number;
+  /** A drizzle: far and mid streaks only, shorter and slower (rain.ts DRIZZLE). */
+  drizzle: boolean;
+  /** A lightning flash 0..1: the streaks' alpha × (1 + 1.5 · flash), so × 2.5 in a stroke. */
+  flash: number;
   moon: { x: number; y: number; up: boolean; fraction: number; waxing: boolean };
   moonVisible: number;
   /** Moon disc radius, CSS px. */
@@ -27,8 +43,15 @@ export type ParticleState = {
   moonDim: number;
 };
 
-/** Extra drawing between layers: `back` before the stars (the arc), `front` after the moon (sun, birds, planes). */
-export type DrawHooks = { back?: (ctx: CanvasRenderingContext2D) => void; front?: (ctx: CanvasRenderingContext2D) => void };
+/**
+ * Extra drawing between layers: `afterStars` right after the stars (the clouds cut out of them), `back` after that
+ * (the arc), `front` after the moon (sun, birds, planes).
+ */
+export type DrawHooks = {
+  afterStars?: (ctx: CanvasRenderingContext2D) => void;
+  back?: (ctx: CanvasRenderingContext2D) => void;
+  front?: (ctx: CanvasRenderingContext2D) => void;
+};
 
 const css = (rgb: [number, number, number], a = 1) =>
   `rgba(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)},${a})`;
@@ -56,11 +79,13 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
     sWarm = new Uint8Array(0);
   let px = 0,
     py = 0;
-  // Rain pool.
-  const RAIN_MAX = 40;
+  // Rain: three depths (src/lib/sky/rain.ts) in one pool. rU holds three seeded draws (length, alpha, speed) per
+  // streak; which depth a streak is, and so what those draws mean, follows the count (layerCounts).
   let nRain = 0;
+  let nDrawn = -1;
   let rX = new Float32Array(0),
     rY = new Float32Array(0),
+    rU = new Float32Array(0),
     rL = new Float32Array(0),
     rA = new Float32Array(0),
     rV = new Float32Array(0);
@@ -108,17 +133,19 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
     const cap = Math.ceil((RAIN_MAX * w * h) / 100_000);
     rX = new Float32Array(cap);
     rY = new Float32Array(cap);
+    rU = new Float32Array(cap * 3);
     rL = new Float32Array(cap);
     rA = new Float32Array(cap);
     rV = new Float32Array(cap);
     rainRng = mulberry32(11);
     for (let i = 0; i < cap; i++) {
-      rX[i] = rainRng() * w * 1.2 - 0.1 * w;
+      rX[i] = rainRng() * (w + 2 * RAIN_EDGE) - RAIN_EDGE;
       rY[i] = rainRng() * h;
-      rL[i] = 10 + rainRng() * 12;
-      rA[i] = 0.18 + rainRng() * 0.17;
-      rV[i] = 900 + rainRng() * 400;
+      rU[i * 3] = rainRng();
+      rU[i * 3 + 1] = rainRng();
+      rU[i * 3 + 2] = rainRng();
     }
+    nDrawn = -1;
   };
 
   return {
@@ -149,6 +176,22 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
     /** Advance rain by dt seconds (0 under reduced motion). */
     step(dt: number, s: ParticleState) {
       nRain = Math.min(rX.length, Math.round((s.rainDensity * w * h) / 100_000));
+      const key = nRain * 2 + (s.drizzle ? 1 : 0);
+      if (key !== nDrawn) {
+        const n = layerCounts(nRain, s.drizzle);
+        const kl = s.drizzle ? DRIZZLE.len : 1;
+        const kv = s.drizzle ? DRIZZLE.speed : 1;
+        let i = 0;
+        for (const id of RAIN_LAYERS) {
+          const spec = RAIN_LAYER[id];
+          for (let k = 0; k < n[id]; k++, i++) {
+            rL[i] = kl * (spec.len[0] + rU[i * 3]! * (spec.len[1] - spec.len[0]));
+            rA[i] = spec.alpha[0] + rU[i * 3 + 1]! * (spec.alpha[1] - spec.alpha[0]);
+            rV[i] = kv * (spec.speed[0] + rU[i * 3 + 2]! * (spec.speed[1] - spec.speed[0]));
+          }
+        }
+        nDrawn = key;
+      }
       if (!dt || !nRain) return;
       const slope = Math.tan(s.rainSlant);
       for (let i = 0; i < nRain; i++) {
@@ -156,8 +199,12 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
         rX[i] = rX[i]! + rV[i]! * dt * slope;
         if (rY[i]! - rL[i]! > h) {
           rY[i] = -rL[i]! - rainRng() * 40;
-          rX[i] = rainRng() * w * 1.2 - 0.1 * w;
+          rX[i] = rainRng() * (w + 2 * RAIN_EDGE) - RAIN_EDGE;
         }
+        // A slanted streak drifts up to 0.7 of the height sideways while it falls: it wraps, so the upwind side
+        // keeps its rain (spawning across the width alone leaves a dry wedge in the lower corner).
+        if (rX[i]! > w + RAIN_EDGE) rX[i] = rX[i]! - (w + 2 * RAIN_EDGE);
+        else if (rX[i]! < -RAIN_EDGE) rX[i] = rX[i]! + (w + 2 * RAIN_EDGE);
       }
     },
     /** @param hero the hero text block in viewport px: stars behind its text are dimmed (they read as dots in the copy). */
@@ -173,10 +220,9 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
       ctx.clearRect(0, 0, w, h);
       const under = (x: number, y: number) =>
         hero && x > hero.x0 - 6 && x < hero.x1 + 6 && y > hero.y0 - 6 && y < hero.y1 + 6 ? 1 : 0;
-      hooks.back?.(ctx);
 
       // Stars.
-      const vis = s.night * (1 - s.cloudCover * 0.9) * (1 - s.fog * 0.8);
+      const vis = s.night * (1 - s.cloudCover * 0.9) * (1 - s.fog) * (1 - s.deck);
       if (vis > 0.01) {
         const rot = skyRotation(nowMs);
         for (let i = 0; i < nStars; i++) {
@@ -195,7 +241,9 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
             ctx.fill();
           }
         }
+        hooks.afterStars?.(ctx);
       }
+      hooks.back?.(ctx);
 
       // Moon: lit disc + terminator ellipse; earthshine on the dark limb. Its soft glow is the shader's
       // (sky-shader.ts); there is no ring around it (the 22° halo was removed: it read as a UI circle, v5.1 T2).
@@ -203,6 +251,9 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
         const R = s.moonR;
         const cx = s.moon.x * w;
         const cy = s.moon.y * h;
+        // In fog the moon is pale and blurred, never sharp.
+        const pale = 1 - 0.6 * s.fog;
+        ctx.filter = s.fog > 0.01 ? `blur(${(2.5 * s.fog).toFixed(2)}px)` : "none";
         ctx.globalAlpha = 0.06 * s.moonVisible * s.moonDim;
         ctx.fillStyle = text;
         ctx.beginPath();
@@ -213,13 +264,14 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
           ctx.save();
           ctx.translate(cx, cy);
           if (!s.moon.waxing) ctx.scale(-1, 1); // waxing: lit limb toward the setting sun (west, right)
-          ctx.globalAlpha = 0.92 * s.moonVisible * s.moonDim;
+          ctx.globalAlpha = 0.92 * s.moonVisible * s.moonDim * pale;
           ctx.beginPath();
           ctx.arc(0, 0, R, -Math.PI / 2, Math.PI / 2, false);
           ctx.ellipse(0, 0, R * Math.abs(1 - 2 * f), R, 0, Math.PI / 2, -Math.PI / 2, f <= 0.5);
           ctx.fill();
           ctx.restore();
         }
+        ctx.filter = "none";
       }
 
       hooks.front?.(ctx);
@@ -248,27 +300,41 @@ export function createParticles(canvas: HTMLCanvasElement, textRgb: [number, num
         ctx.stroke();
       }
 
-      // Rain: 1 px streaks in --text, alpha × 0.4 behind the hero text.
+      // Rain: three depths in --text, alpha × 0.4 behind the hero text and × 2.5 in a lightning stroke.
       if (nRain) {
         const slope = Math.tan(s.rainSlant);
         ctx.strokeStyle = text;
-        ctx.lineWidth = 1;
         ctx.lineCap = "butt";
-        for (const inCol of [false, true]) {
-          for (const bucket of [0.2, 0.27, 0.34]) {
-            ctx.globalAlpha = bucket * (inCol ? 0.4 : 1);
-            ctx.beginPath();
-            for (let i = 0; i < nRain; i++) {
-              const ra = rA[i]!;
-              if (Math.abs(ra - bucket) > 0.035) continue;
-              const x = rX[i]!;
-              const y = rY[i]!;
-              if (under(x, y) > 0.5 ? !inCol : inCol) continue;
-              ctx.moveTo(x, y);
-              ctx.lineTo(x - rL[i]! * slope, y - rL[i]!);
+        const n = layerCounts(nRain, s.drizzle);
+        const flash = 1 + 1.5 * s.flash;
+        let i0 = 0;
+        for (const id of RAIN_LAYERS) {
+          const spec = RAIN_LAYER[id];
+          const i1 = i0 + n[id];
+          const mid = (spec.alpha[0] + spec.alpha[1]) / 2;
+          ctx.lineWidth = spec.width;
+          // The near streaks are motion-blurred: the head at full alpha, the tail fading (two strokes, not a
+          // gradient per streak).
+          for (const [from, to, k] of id === "near" ? NEAR_BLUR : SOLID) {
+            for (const half of [0, 1]) {
+              const a = spec.alpha[0] + (spec.alpha[1] - spec.alpha[0]) * (0.25 + 0.5 * half);
+              for (const inCol of [false, true]) {
+                ctx.globalAlpha = Math.min(1, a * k * (inCol ? 0.4 : 1) * flash);
+                ctx.beginPath();
+                for (let i = i0; i < i1; i++) {
+                  if (Number(rA[i]! > mid) !== half) continue;
+                  const x = rX[i]!;
+                  const y = rY[i]!;
+                  if (under(x, y) > 0.5 ? !inCol : inCol) continue;
+                  const l = rL[i]!;
+                  ctx.moveTo(x - l * from * slope, y - l * from);
+                  ctx.lineTo(x - l * to * slope, y - l * to);
+                }
+                ctx.stroke();
+              }
             }
-            ctx.stroke();
           }
+          i0 = i1;
         }
       }
       ctx.globalAlpha = 1;

@@ -18,6 +18,8 @@ import {
   oklabToRgb,
   over,
   scaleL,
+  toGamma,
+  toLinear,
   type Lab,
   type RGB,
 } from "@/lib/sky/color";
@@ -31,7 +33,8 @@ import { PARALLAX, type LayerId } from "@/lib/sky/landscape/anchors";
 import { BANK_Y, RIVER } from "@/lib/sky/landscape/shapes";
 /** The 1px glint's line, band units: just above the near bank's lowest point (ridgeL4 ≥ 87.2). */
 const GLINT_Y = 87.4;
-import { CITY_GLOW, MOON_RIM } from "@/lib/sky/palette";
+import { CITY_GLOW, LIGHTNING_RIM, MOON_RIM } from "@/lib/sky/palette";
+import { FOG_AT, FOG_PERIOD, GROUND_FOG, groundFog, groundFogX } from "@/lib/sky/fog";
 import { ridgeL1, ridgeL2, ridgeL4, type Placed, type World } from "@/lib/sky/landscape/world";
 import type { Shape } from "@/lib/sky/landscape/shapes";
 
@@ -73,6 +76,19 @@ export type Lighting = {
    * up), and the moon's screen x. */
   moonRim: number;
   moonX: number;
+};
+
+/** Heavy rain: how far the far hills (0.6) and the tea hills (0.35) fade into the sky's colour (W3). */
+export const VEIL = { L1: 0.6, L2: 0.35 } as const;
+
+/** What the sky does to the landscape in a frame (SkyRenderer.tsx): the heavy-rain veil, a bolt's rim, and fog. */
+export type LayerFx = {
+  veil: number;
+  rim: number;
+  /** Fog 0..1: the distance fade and the ground fog. */
+  fog: number;
+  /** The ground fog's drift in wind-seconds (signed, toward the way the wind blows on screen); still frames hold it. */
+  fogT: number;
 };
 
 /**
@@ -219,6 +235,85 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
     g.globalCompositeOperation = "source-over";
   };
 
+  /**
+   * The land fades toward the foggy sky at the horizon. The shader's fog colour is the horizon colour 60% of the
+   * way to its own grey, × 1.19, in linear light, composited at 0.85 over the sky, the share the shader's fog has
+   * reached where the land begins: the same here, so the far hills end where the sky above them does instead of
+   * under a strip of another colour.
+   */
+  let fogCss = "rgba(0,0,0,0)";
+  let fogRgb: [number, number, number] = [0, 0, 0];
+  /** The three bands of ground fog, half resolution and one period wider than the viewport, rebuilt when the size or the colour changes. */
+  const fogStrips: HTMLCanvasElement[] = [];
+  /** Each strip's own key (size and colour): one shared key left the second and third strips stale after a change. */
+  const fogKeys: string[] = [];
+  const fogStrip = (k: number) => {
+    const { h } = GROUND_FOG[k]!;
+    const key = `${w}|${fogRgb.map((v) => Math.round(v / 8)).join()}`;
+    const c = fogStrips[k] ?? (fogStrips[k] = document.createElement("canvas"));
+    if (fogKeys[k] === key) return c;
+    const W = Math.ceil((FOG_PERIOD + w) / 2);
+    const Hh = Math.ceil(h / 2) + 1;
+    c.width = W;
+    c.height = Hh;
+    const g = c.getContext("2d")!;
+    const img = g.createImageData(W, Hh);
+    for (let j = 0; j < Hh; j++)
+      for (let i = 0; i < W; i++) {
+        const o = (j * W + i) * 4;
+        img.data[o] = fogRgb[0];
+        img.data[o + 1] = fogRgb[1];
+        img.data[o + 2] = fogRgb[2];
+        img.data[o + 3] = Math.round(255 * groundFog(i * 2, j * 2, h, k));
+      }
+    g.putImageData(img, 0, 0);
+    fogKeys[k] = key;
+    return c;
+  };
+  /** Ground fog: three bands lying on the ground, the tallest the nearest and the fastest, drifting with the wind. */
+  const groundFogBands = (fx: LayerFx) => {
+    for (let k = 0; k < GROUND_FOG.length; k++) {
+      const { h } = GROUND_FOG[k]!;
+      const x0 = ((groundFogX(k, fx.fogT, 1) % FOG_PERIOD) + FOG_PERIOD) % FOG_PERIOD;
+      ctx.globalAlpha = fx.fog;
+      ctx.drawImage(fogStrip(k), -x0, H - h, FOG_PERIOD + w, h);
+    }
+    ctx.globalAlpha = 1;
+  };
+
+  /**
+   * Lightning: a 1px rim of LIGHTNING_RIM along a layer's top edge. The strip minus itself a pixel lower is that
+   * edge; tinted and drawn back over the layer at `k` × 0.6. Only while a bolt is up.
+   */
+  const rimCanvas = document.createElement("canvas");
+  const boltRim = (st: { c: HTMLCanvasElement; x0: number }, o: number, k: number) => {
+    const oc = rimCanvas;
+    if (oc.width !== st.c.width || oc.height !== st.c.height) {
+      oc.width = st.c.width;
+      oc.height = st.c.height;
+    }
+    const og = oc.getContext("2d")!;
+    og.setTransform(1, 0, 0, 1, 0, 0);
+    og.globalCompositeOperation = "source-over";
+    og.clearRect(0, 0, oc.width, oc.height);
+    og.drawImage(st.c, 0, 0);
+    og.globalCompositeOperation = "destination-out";
+    og.drawImage(st.c, 0, dpr);
+    og.globalCompositeOperation = "source-in";
+    og.fillStyle = css(hexToRgb(LIGHTNING_RIM));
+    og.fillRect(0, 0, oc.width, oc.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 0.6 * k;
+    ctx.drawImage(oc, Math.round((st.x0 - o) * dpr), Math.round(lift * dpr));
+    ctx.globalAlpha = 1;
+  };
+
+  /** The sky's veil and fog over the strips (draw()'s fx), in steps of 0.05: one that eases in re-renders them at
+   *  most twenty times. A step is at most 0.025 of fog or veil out, 0.02 of alpha on the far hills. */
+  let fxVeil = 0,
+    fxFog = 0;
+  const stripKey = () => `${lightKey}|${fxVeil}|${fxFog}`;
+
   const renderStrip = (layer: LayerId, offsetPx: number) => {
     if (!world) return;
     const st = strips[layer];
@@ -261,8 +356,29 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
     } else solid(g, layer, x0, x1, body, layer === "L4" ? css(ground) : body);
     if (layer === "L2") teaRows(g, x0, x1);
     cuts(g, layer, x0, x1);
+    // Heavy rain veils the far hills and the tea hills (the sky's own colour, VEIL); fog fades every layer by its
+    // distance (the fog's colour, FOG_AT). Over the layer's own pixels only (source-atop): the headroom above the
+    // hills is the sky's, with the shader's own fog and haze in it.
+    const fogV = (FOG_AT[layer] ?? 0) * fxFog;
+    const rainV = (VEIL[layer as keyof typeof VEIL] ?? 0) * fxVeil * (1 - fogV);
+    if (fogV > 0.003 || rainV > 0.003) {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.globalCompositeOperation = "source-atop";
+      if (fogV > 0.003) {
+        g.globalAlpha = fogV;
+        g.fillStyle = fogCss;
+        g.fillRect(0, 0, st.c.width, st.c.height);
+      }
+      if (rainV > 0.003) {
+        g.globalAlpha = rainV;
+        g.fillStyle = css(oklabToRgb(light.horizon));
+        g.fillRect(0, 0, st.c.width, st.c.height);
+      }
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = "source-over";
+    }
     st.x0 = x0Px;
-    st.key = lightKey;
+    st.key = stripKey();
   };
 
   return {
@@ -296,6 +412,12 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
       tones.glass = css(oklabToRgb(l.horizon));
       river = css(oklabToRgb(riverColor(l.horizon)));
       ground = oklabToRgb(groundColor(l));
+      const lin = oklabToRgb(l.horizon).map(toLinear);
+      const grey = 0.2126 * lin[0]! + 0.7152 * lin[1]! + 0.0722 * lin[2]!;
+      fogRgb = lin.map((v, i) =>
+        Math.round(toGamma(Math.min(1, 0.15 * v + 0.85 * (grey + (lin[i]! - grey) * 0.4) * 1.19)) * 255),
+      ) as [number, number, number];
+      fogCss = `rgb(${fogRgb.join(",")})`;
       glint = css(oklabToRgb(scaleL(riverColor(l.horizon), 0.12)), 0.7);
       return true;
     },
@@ -309,13 +431,18 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
     /**
      * Draw the band. `between(g, layer, offset)` runs after each layer (night lights, fireflies, the rickshaw,
      * reflections) with the context in CSS px, origin at the band's top-left; a world-unit point x on that layer
-     * is at screen x · s − offset.
+     * is at screen x · s − offset. `veil` (0..1) is the heavy rain's veil over the far hills and the tea hills;
+     * and `fx` what the sky does to it: the heavy-rain veil, a bolt's rim, and fog (the distance fade and the
+     * ground fog).
      */
     draw(
       walk: number,
       between: (g: CanvasRenderingContext2D, layer: LayerId | "river", offset: number) => void,
+      fx: LayerFx = NO_FX,
     ) {
       if (!world) return;
+      fxVeil = Math.round(fx.veil * 20) / 20;
+      fxFog = Math.round(fx.fog * 20) / 20;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (light.glow > 0.003) {
@@ -336,11 +463,14 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
       for (const layer of LAYERS) {
         const o = walk * PARALLAX[layer];
         const st = strips[layer];
-        if (!(o >= st.x0 + 8 && o + w <= st.x0 + w + 2 * PAD - 8) || st.key !== lightKey)
-          renderStrip(layer, o);
+        if (!(o >= st.x0 + 8 && o + w <= st.x0 + w + 2 * PAD - 8) || st.key !== stripKey()) renderStrip(layer, o);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.drawImage(st.c, Math.round((st.x0 - o) * dpr), Math.round(lift * dpr));
         ctx.setTransform(dpr, 0, 0, dpr, 0, lift * dpr);
+        if (fx.rim > 0.01) {
+          boltRim(st, o, fx.rim);
+          ctx.setTransform(dpr, 0, 0, dpr, 0, lift * dpr);
+        }
         if (layer === "L2") {
           // The Surma: a band across the whole width, in front of the tea hills and behind the town's bank.
           ctx.fillStyle = river;
@@ -357,6 +487,7 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
         }
         between(ctx, layer, o);
       }
+      if (fx.fog > 0.003) groundFogBands(fx);
       if (fade > 0) {
         // A scene's ground doesn't stop on a line: it runs on under the band and fades into the sky below it
         // (which is the mid colour there, never the horizon's: src/lib/sky/horizon.ts).
@@ -381,3 +512,6 @@ export function createLandscape(canvas: HTMLCanvasElement, lift = LIFT, fade = 0
 }
 
 export type Landscape = NonNullable<ReturnType<typeof createLandscape>>;
+
+/** Nothing from the sky on the landscape. */
+export const NO_FX: LayerFx = { veil: 0, rim: 0, fog: 0, fogT: 0 };

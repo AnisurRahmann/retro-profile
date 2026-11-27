@@ -23,6 +23,8 @@
     "build:e2e": "tsx scripts/build-knowledge.ts && NEXT_PUBLIC_E2E=1 NEXT_DIST_DIR=.next-e2e next build",
     "e2e:only": "playwright test",
     "shots:sky": "tsx scripts/shots-sky.ts",
+    "lab:shots": "tsx scripts/probe/lab-shots.mts",
+    "lab:gpu": "tsx scripts/probe/lab-gpu.mts",
     "check:bundle": "tsx scripts/check-bundle.ts"
   },
   "dependencies": {

@@ -4,13 +4,17 @@
  * Sun: a limb-darkened disc (edge at 82%) coloured by altitude (palette SUN_HIGH ≥ 30°, SUN_MID at 10°, SUN_LOW at 0°,
  * OKLab), three stacked blooms (3×, 8×, 20× the radius at 0.35, 0.12, 0.05, tinted toward the horizon colour
  * near sunrise and sunset), 24 corona rays turning once per 180 s at 0.06, and a 9 s breathing (bloom × 1 ± 0.04).
- * Cloud in front (the CPU cloud field, c 0..1): disc alpha × (1 − 0.85c), bloom radius × (1 + 0.6c).
+ * Cloud in front is an optical depth τ from the flat clouds' exact geometry at the sun (flat-cloud-layer.ts coverAt:
+ * the disc is 0.08 of itself inside a near or mid cloud, linear across its edge, a far cloud half that): the disc is
+ * exp(−1.8 τ) of itself, thin cloud spreads the bloom. Under a deck (overcast, rain, thunder) there is no disc, no
+ * corona and no rays: only a diffuse bright patch where the sun is.
  * Crepuscular rays at golden hour with 0.2 < cover < 0.7: 6–10 faint wedges fanning upward, each as strong as
- * the gap in the cloud field along it (≤ 0.05).
+ * the gap in the clouds along it (≤ 0.05).
  * Everything is pre-rendered into sprites (rebuilt when the colour moves), so a frame is a handful of drawImage
  * calls and no allocation.
  */
 import type { RGB } from "@/lib/sky/color";
+import { BLOOM_PEAK, SUN_PATCH } from "@/lib/sky/backing";
 import { sunColor } from "@/lib/sky/gradient";
 import { mulberry32 } from "./particles";
 
@@ -35,8 +39,10 @@ export type SunState = {
   /** Horizon glow 0..1 (sunrise/sunset): tints the bloom. */
   glow: number;
   horizon: RGB;
-  /** Cloud opacity in front of the sun 0..1. */
-  cloud: number;
+  /** Optical depth of the cloud sheets in front of the sun, 0 (clear) … 2 (a rain deck). */
+  tau: number;
+  /** Overcast, rain, heavy rain, thunder: no disc, only a diffuse bright patch. */
+  deck: boolean;
   fog: number;
   cover: number;
   /** Altitude fade 0..1 (only cloud and altitude change the sun; nothing dims it behind text). */
@@ -153,14 +159,18 @@ export function createSun(dpr: () => number) {
         build(s);
         key = k;
       }
-      const c = Math.min(1, Math.max(0, s.cloud));
-      const discA = (1 - 0.85 * c) * (1 - 0.5 * s.fog) * s.dim;
+      const c = 1 - Math.exp(-s.tau);
+      // In fog (not in common haze: that keeps its dim disc and corona) the sun is pale, at most 0.6, and rayless:
+      // no corona, no crepuscular rays, a diffuse patch only.
+      const foggy = s.fog >= 0.9;
+      const clear = Math.exp(-1.8 * s.tau) * (1 - 0.5 * s.fog) * s.dim;
+      const discA = s.deck ? 0 : foggy ? Math.min(0.6, clear) : clear;
       const breath = 1 + 0.04 * Math.sin((t * Math.PI * 2) / 9);
       const bScale = (1 + 0.6 * c) * (1 + 0.3 * s.fog) * breath;
       const prev = ctx.globalCompositeOperation;
       ctx.globalCompositeOperation = "lighter";
       // Crepuscular rays.
-      if (s.glow > 0.25 && s.cover > 0.2 && s.cover < 0.7 && wedge) {
+      if (!s.deck && !foggy && s.glow > 0.25 && s.cover > 0.2 && s.cover < 0.7 && wedge) {
         const rng = mulberry32(day * 977);
         const n = 6 + Math.floor(rng() * 5);
         for (let i = 0; i < n; i++) {
@@ -178,12 +188,17 @@ export function createSun(dpr: () => number) {
         }
       }
       if (bloom) {
-        const B = 20 * s.r * bScale;
-        // Thin cloud spreads the glow; a thick deck leaves only a soft bright patch.
-        ctx.globalAlpha = Math.min(1, s.dim * (1 - 0.75 * c));
+        // Thin cloud spreads the glow. Under a deck only a diffuse bright patch is left where the sun is: 22% of the
+        // viewport wide, at SUN_PATCH.alpha · exp(−τ / SUN_PATCH.thin).
+        const B = s.deck || foggy ? SUN_PATCH.radius * ctx.canvas.clientWidth : 20 * s.r * bScale;
+        ctx.globalAlpha = foggy
+          ? (SUN_PATCH.alpha / BLOOM_PEAK) * s.dim
+          : s.deck
+            ? ((SUN_PATCH.alpha * Math.exp(-s.tau / SUN_PATCH.thin)) / BLOOM_PEAK) * s.dim
+            : Math.min(1, s.dim * (1 - 0.75 * c));
         ctx.drawImage(bloom, s.x - B, s.y - B, 2 * B, 2 * B);
       }
-      if (corona) {
+      if (corona && !s.deck && !foggy) {
         const C = 3.4 * s.r * breath;
         ctx.globalAlpha = 0.06 * discA;
         ctx.save();
@@ -193,7 +208,7 @@ export function createSun(dpr: () => number) {
         ctx.restore();
       }
       ctx.globalCompositeOperation = prev;
-      if (disc) {
+      if (disc && !s.deck) {
         ctx.globalAlpha = discA;
         const D = s.r + 2;
         ctx.drawImage(disc, s.x - D, s.y - D, 2 * D, 2 * D);

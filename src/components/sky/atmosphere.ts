@@ -1,7 +1,7 @@
 /** WebGL2 atmosphere layer. Returns null when WebGL2 or the shader is unavailable (the CSS gradient stays). */
-import { FRAG, NOISE_SIZE, noiseData, VERT } from "./sky-shader";
+import { FRAG, VERT } from "./sky-shader";
 
-/** Uniform values by GLSL name: numbers → float, [x, y] → vec2, [r, g, b] → vec3. */
+/** Uniform values by GLSL name: numbers → float, [x, y] → vec2, [r, g, b] → vec3, [x, y, z, w] → vec4. */
 export type Uniforms = Record<string, number | number[]>;
 
 export type Atmosphere = {
@@ -44,6 +44,7 @@ export async function createAtmosphere(canvas: HTMLCanvasElement, isDead: () => 
       const s = gl.createShader(type)!;
       gl.shaderSource(s, src);
       gl.compileShader(s);
+      if (DEBUG && !gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.warn("[sky] shader:", gl.getShaderInfoLog(s));
       gl.attachShader(prog, s);
     }
     gl.linkProgram(prog);
@@ -57,24 +58,13 @@ export async function createAtmosphere(canvas: HTMLCanvasElement, isDead: () => 
     gl.useProgram(prog);
     loc.clear();
     gl.bindVertexArray(gl.createVertexArray());
-    // Value-noise lattice as a texture: seeded, so the cloud field is the same on every load.
-    const data = noiseData();
-    gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, NOISE_SIZE, NOISE_SIZE, 0, gl.RED, gl.UNSIGNED_BYTE, data);
-    for (const [k, v] of [
-      [gl.TEXTURE_MIN_FILTER, gl.LINEAR],
-      [gl.TEXTURE_MAG_FILTER, gl.LINEAR],
-      [gl.TEXTURE_WRAP_S, gl.REPEAT],
-      [gl.TEXTURE_WRAP_T, gl.REPEAT],
-    ]) gl.texParameteri(gl.TEXTURE_2D, k!, v!);
     return true;
   };
   if (!(await build())) return null;
 
   const resize = () => {
     // Backing store at 0.4 × DPR (brief: 0.5, lowered to meet the 2 ms GPU budget; DECISIONS #83). Everything in
-    // this layer is soft and upscales cleanly.
+    // this layer is soft and upscales cleanly (the clouds are on their own layer, at full resolution).
     scale = (qScale > 0 && qScale <= 2 ? qScale : ATMOSPHERE_SCALE) * (devicePixelRatio || 1);
     canvas.width = Math.max(1, Math.round(canvas.clientWidth * scale));
     canvas.height = Math.max(1, Math.round(canvas.clientHeight * scale));
@@ -109,6 +99,7 @@ export async function createAtmosphere(canvas: HTMLCanvasElement, isDead: () => 
         const v = u[k]!;
         if (typeof v === "number") gl.uniform1f(l, v);
         else if (v.length === 2) gl.uniform2fv(l, v);
+        else if (v.length === 4) gl.uniform4fv(l, v);
         else gl.uniform3fv(l, v);
       }
       gl.drawArrays(gl.TRIANGLES, 0, 3);

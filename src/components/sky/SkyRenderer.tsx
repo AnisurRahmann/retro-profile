@@ -4,8 +4,27 @@ import { useEffect, useRef, useState } from "react";
 import { brand } from "@/lib/brand";
 import { onSky } from "@/lib/signal-bus";
 import { hexToRgb, oklabToRgb, rgbToOklab, toGamma, toLinear, type Lab } from "@/lib/sky/color";
-import { dayness } from "@/lib/sky/gradient";
-import { driftVector, MIN_DRIFT, skyModel, type SkyModel } from "@/lib/sky/model";
+import { gradientLab, HORIZON_AWAY } from "@/lib/sky/horizon";
+import { skyModel, type SkyModel } from "@/lib/sky/model";
+import {
+  LAYER,
+  LAYERS,
+  bandPx,
+  brightest,
+  cloudTones,
+  cloudsAt,
+  coverage,
+  gust,
+  isDeck,
+  nearSpeed,
+  planClouds,
+  type LayerId,
+  type Plan,
+  type Tones,
+} from "@/lib/sky/flat-clouds";
+import { LAMPS_AT, SPLASH_RATE, gustSlant } from "@/lib/sky/rain";
+import { bolt, boltAlpha, createLightningScheduler, SEPARATION, sheetAlpha, strikeEnd, type Kind, type Strike } from "@/lib/sky/lightning";
+import { LIGHTNING_CORE, LIGHTNING_HALO, LIGHTNING_MID } from "@/lib/sky/palette";
 import { effectiveWeather, skyStore, skyTime } from "@/lib/sky/store";
 import { dayOfYear, dhakaParts } from "@/lib/sky/time";
 import { sunColor } from "@/lib/sky/gradient";
@@ -13,17 +32,15 @@ import { nightPoint, sunPath, type ArcGeom } from "@/lib/sky/arc";
 import {
   COLUMN_BREAK,
   geomNow,
-  notifyGeometry,
   onViewGeometry,
   onViewScroll,
-  runtime,
   view,
 } from "@/lib/sky/view";
 import { startBacking, type BackingRunner } from "./backing-runner";
 import { createAtmosphere, type Atmosphere } from "./atmosphere";
 import { createSun, drawArc, type SunState } from "./bodies";
-import { CLOUD_REFRESH_S, createCloudField } from "./cloud-field";
-import { createLandscape, GLOW_HORIZON, LIFT, type Landscape } from "./landscape";
+import { createFlatCloudLayer, type FlatCloudLayer, type Zone } from "./flat-cloud-layer";
+import { createLandscape, GLOW_HORIZON, LIFT, NO_FX, type Landscape } from "./landscape";
 import { createLife, TAKEOFF_S, type Life, type LifeFrame } from "./life";
 import { createAmbient, type Ambient } from "./ambient";
 import {
@@ -34,6 +51,7 @@ import {
 } from "@/lib/sky/landscape/lights";
 import { createParticles, mulberry32, type Particles, type ParticleState } from "./particles";
 import {
+  bandHeight,
   closingWalk,
   gutterCentre,
   landMode,
@@ -63,39 +81,28 @@ import {
   type Horizon,
 } from "@/lib/sky/horizon";
 
-const TEST = process.env.NEXT_PUBLIC_E2E === "1";
 /** The sky's debug flag (store.ts SKY_DEBUG), written out here so a release build folds what it guards away (as atmosphere.ts does). */
 const DEBUG = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_SKY_DEBUG === "1" || process.env.NEXT_PUBLIC_E2E === "1";
-/** The clear-sky cirrus floor on phones (an aesthetic choice, DECISIONS). */
-const CIRRUS_FLOOR = 0.06;
 
 /** Smoothed shader inputs, keyed by uniform name. Each converges over ~4 s (exponential, τ = 1 s); 0.12 s while scrubbing. */
 type Targets = Record<string, number | number[]>;
 
 const linear = (lab: Lab) => oklabToRgb(lab).map(toLinear);
 
+/** Conditions whose cloud deck hides the sun's disc: only a diffuse bright patch is left where it is. */
+const DECK = new Set(["overcast", "drizzle", "rain", "heavy-rain", "thunder"]);
+
 function targetsOf(m: SkyModel): Targets {
   return {
     uSunX: m.sunX,
     uGlow: m.glow,
-    uGolden: m.glow,
-    uDay: dayness(m.astro.elevation),
+    // A thunderstorm's darker base and dimmed horizon glow (W5).
+    uStorm: m.thunder ? 1 : 0,
     uNight: m.night,
     uCloudCover: m.cloudCover,
     uFog: m.fog,
     uRainDark: m.rainDark,
-    uWind: driftVector(
-      m.windKmh,
-      m.windFromDeg,
-      view.vw < COLUMN_BREAK ? MIN_DRIFT.mobile : MIN_DRIFT.desktop,
-    ),
     uMoonPos: [m.moon.x, m.moon.y],
-    // Phones, clear day or golden hour: an aesthetic floor of thin cirrus in the top 30% of the stage (not data).
-    uCirrus:
-      view.vw < 640 && view.stage > 0 && m.cloudCover < CIRRUS_FLOOR && m.astro.elevation > -2
-        ? CIRRUS_FLOOR
-        : 0,
-    uCirrusY: 0.3 * (view.stage - (view.sections.stage ?? 0)),
     sunPos: [m.sun.x, m.sun.y],
     sunAlt: m.sun.alt,
     uMoonIllum: m.moon.fraction,
@@ -119,16 +126,6 @@ function approach(cur: Targets, to: Targets, k: number): void {
 
 const clone = (t: Targets): Targets => ({ ...t });
 
-/** Lightning: a strike every 18–45 s, double pulse 80 ms on, 60 ms off, 120 ms on. ≤ 2 flashes a second. */
-export function lightningEnvelope(sinceStrike: number): number {
-  const ms = sinceStrike * 1000;
-  if (ms < 0) return 0;
-  if (ms < 80) return 1;
-  if (ms < 140) return 0;
-  if (ms < 260) return 0.85;
-  return 0;
-}
-
 function readToken(name: string): [number, number, number] {
   return hexToRgb(
     getComputedStyle(document.documentElement).getPropertyValue(name).trim() || brand.text,
@@ -144,12 +141,18 @@ type Window2 = Window & {
     frames?: number;
     webgl?: boolean;
     cap?: number;
-    sun?: { x: number; y: number; up: boolean; cloud: number; dim: number };
+    sun?: { x: number; y: number; up: boolean; tau: number; deck: boolean; dim: number };
     moon?: { x: number; y: number; up: boolean };
     geom?: ArcGeom;
     plane?: { state: string; flights: number };
     /** Test builds: hold the take-off at s seconds in (null lets go). */
     pinPlane?: (s: number | null) => void;
+    /** Dev and test builds (Weather v6): force a strike now, and the last 20 with the running count. */
+    strike?: (k: "cg" | "ic") => void;
+    lightningLog?: unknown[];
+    lightningCount?: { cg: number; ic: number };
+    /** Dev and test builds: the flat clouds (their count on screen, each layer's drift in px, the coverage now). */
+    clouds?: { n: number; off: Record<string, number>; coverage: () => number; plan: string };
     place?: string | null;
     land?: {
       mode: LandMode;
@@ -167,6 +170,7 @@ const smooth01 = (e0: number, e1: number, x: number) => {
 
 function start(
   atmCanvas: HTMLCanvasElement,
+  cloudCanvas: HTMLCanvasElement,
   ptsCanvas: HTMLCanvasElement,
   fixedCanvas: HTMLCanvasElement,
   onNoWebGL: () => void,
@@ -177,6 +181,10 @@ function start(
   const coarse = matchMedia("(pointer: coarse)").matches;
   const q = new URLSearchParams(window.location.search);
   const forceBolt = DEBUG && q.get("bolt") === "1";
+  /** Dev and test builds: `lightning=off` schedules no strike (evidence of the storm between strikes). */
+  const noLightning = DEBUG && q.get("lightning") === "off";
+  /** Dev and test builds: `clouds=off` draws no cloud layer (GPU attribution). */
+  const noClouds = DEBUG && q.get("clouds") === "off";
   const origin = performance.now();
   const now = () => (performance.now() - origin) / 1000;
   const rng = mulberry32(Date.now() & 0xffffffff);
@@ -291,9 +299,31 @@ function start(
     }
   };
   const sunLayer = createSun(() => Math.min(window.devicePixelRatio || 1, 2));
-  const clouds = createCloudField();
-  const drift: [number, number] = [0, 0];
-  let lastClouds = -Infinity;
+  /**
+   * The flat clouds (src/lib/sky/flat-clouds.ts): the plan for this condition and layout, each layer's drift (px:
+   * the wind, integrated, so a change of wind never jumps), and their tones, which follow the sky's state (the
+   * tick, the weather, a scrub at most 10 times a second).
+   */
+  let cloudLayer: FlatCloudLayer | null = null;
+  let plan: Plan | null = null;
+  let planKey = "";
+  const cloudOff: Record<LayerId, number> = { far: 0, mid: 0, near: 0 };
+  let skyVer = 0;
+  let toneVer = -1;
+  let toneAt = -Infinity;
+  let tones: Tones | null = null;
+  let cbTones: Tones | null = null;
+  let strikeNo = 0;
+  let windX = 0;
+  /** The mid sky's relative luminance (linear): what the lamps and windows go by. */
+  let midLuma = 0;
+  /** The lightning envelope of the frame (the rain brightens in it) and the mean frame time (splashes on phones). */
+  let flashNow = 0;
+  /** The rain's slant this frame: the model's, swung ±4° by the gusts. */
+  let slantNow = 0;
+  let emaDt = 1 / 60;
+  /** The ground fog's drift in wind-seconds: held in a still frame (reduced motion). */
+  let fogT = 0;
   let geom = geomNow();
   let model = skyModel(skyTime(), effectiveWeather(skyStore.get()), geom);
   let target = targetsOf(model);
@@ -308,8 +338,6 @@ function start(
     fps = 0,
     fpsWindow = 0,
     fpsFrames = 0,
-    nextStrike = 0,
-    strikeAt = -1,
     nextMeteor = 0,
     astroTimer = 0,
     nightArc = 0,
@@ -320,7 +348,115 @@ function start(
   let dayPath: { x: number; y: number }[] = [];
   let nightPath: { x: number; y: number }[] = [];
 
-  const scheduleStrike = (t: number) => (nextStrike = t + 18 + rng() * 27);
+  /**
+   * Lightning (W4, src/lib/sky/lightning.ts): the scheduler, the strike under way, when the next of each kind
+   * falls, and one held back until a second has passed since the last began (a due time is computed before the
+   * strikes before it have). The bolt's paths are built once and stroked while it lasts.
+   */
+  const lightningLog: { t: number; kind: Kind; x: number }[] = [];
+  const lightningCount = { cg: 0, ic: 0 };
+  const scheduler = createLightningScheduler(rng);
+  let strike: Strike | null = null;
+  let nextL: Record<Kind, number> = { cg: Infinity, ic: Infinity };
+  let forced: Kind | null = null;
+  let stormOn = false;
+  let stageWas = true;
+  let boltPaths: Path2D[] = [];
+  let boltX = 0;
+  /** The bolt's top (under the cloud base) and its foot (the cloud horizon), CSS px: the leader grows down between them. */
+  let boltTop = 0;
+  let boltFoot = 0;
+  const boltPass = ([["halo", LIGHTNING_HALO, 10, 0.22], ["mid", LIGHTNING_MID, 4, 0.6], ["core", LIGHTNING_CORE, 1.6, 1]] as const).map(
+    ([, hex, width, alpha]) => {
+      const [r, g, b] = hexToRgb(hex).map((v) => Math.round(v * 255)) as [number, number, number];
+      return [`rgb(${r},${g},${b})`, width, alpha] as const;
+    },
+  );
+  const toPath = (pts: number[]) => {
+    const path = new Path2D();
+    path.moveTo(pts[0]!, pts[1]!);
+    for (let i = 2; i < pts.length; i += 2) path.lineTo(pts[i]!, pts[i + 1]!);
+    return path;
+  };
+  /**
+   * Where a bolt may fall: a column with nothing written over the sky beside it (a bolt wanders 12% of its
+   * height), or with room below what is written there (a phone's hero spans the width). Six tries; null if none,
+   * and the strike becomes a sheet flash. A forced one (the debug hook) gets sixty, so evidence can rely on it.
+   */
+  const placeBolt = (tries = 6) => {
+    const y1 = cloudHz();
+    const margin = 0.12 * y1;
+    const boxes = [...document.querySelectorAll("[data-on-sky], .card, .glass")]
+      .map((el) => el.getBoundingClientRect())
+      .filter((r) => r.bottom > 0 && r.top < y1 && r.width > 0 && r.height > 0);
+    for (let i = 0; i < tries; i++) {
+      const x = view.vw * (0.06 + rng() * 0.88);
+      let top = 0.12 * y1;
+      let clear = true;
+      for (const r of boxes) {
+        if (x < r.left - margin || x > r.right + margin) continue;
+        if (r.bottom > y1 - 70) {
+          clear = false;
+          break;
+        }
+        top = Math.max(top, r.bottom + 6);
+      }
+      if (clear) return { x, top };
+    }
+    return null;
+  };
+  /**
+   * A strike begins now: a CG where nothing is written over the sky, else a sheet flash inside the cloud. One that
+   * falls due inside a second of the last simply waits (it is tried again next frame): its next is dated from when
+   * it does begin.
+   */
+  const fire = (kind: Kind, nowMs: number, force = false) => {
+    if (!force && nowMs < scheduler.settle(nowMs)) return;
+    let k: Kind = kind;
+    let place: { x: number; top: number } | null = null;
+    if (kind === "cg") {
+      place = placeBolt(force ? 60 : 6);
+      if (!place) k = "ic";
+    }
+    strike = scheduler.begin(k, nowMs);
+    strikeNo++;
+    if (place) {
+      boltX = place.x;
+      boltTop = place.top;
+      boltFoot = cloudHz();
+      boltPaths = bolt(rng, place.x, place.top, boltFoot).map(toPath);
+    }
+    lightningCount[k]++;
+    nextL[kind] = scheduler.due(kind, nowMs, model.thunder, model.condition === "heavy-rain");
+    lightningLog.push({ t: Math.round(nowMs / 100) / 10, kind: k, x: place ? Math.round(place.x) : -1 });
+    if (lightningLog.length > 20) lightningLog.shift();
+  };
+  /**
+   * The bolt, in three passes: a blue halo, a body, a white core. The branches are thinner and dimmer. `reveal`
+   * (0..1) is how far down the stepped leader has got: it is drawn down from the cloud, the branches with it.
+   */
+  const paintBolt = (ctx: CanvasRenderingContext2D, a: number, reveal: number) => {
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const clip = reveal < 1;
+    if (clip) {
+      ctx.save();
+      ctx.beginPath();
+      // Branches run up to a quarter of the bolt's height below its foot; the reveal covers them too.
+      ctx.rect(0, 0, view.vw, boltTop + reveal * 1.3 * (boltFoot - boltTop));
+      ctx.clip();
+    }
+    boltPaths.forEach((path, i) => {
+      for (const [color, width, alpha] of boltPass) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width * (i ? 0.55 : 1);
+        ctx.globalAlpha = a * alpha * (i ? 0.7 : 1);
+        ctx.stroke(path);
+      }
+    });
+    if (clip) ctx.restore();
+    ctx.globalAlpha = 1;
+  };
   const scheduleMeteor = (t: number) => (nextMeteor = t + 40 + rng() * 50);
 
   const recompute = () => {
@@ -328,59 +464,126 @@ function start(
     geom = geomNow();
     model = skyModel(skyTime(s), effectiveWeather(s), geom);
     target = targetsOf(model);
+    skyVer++;
     pts?.ensureDay(dayOfYear(skyTime(s)));
     backing?.update();
-    if (TEST && w2.__sky)
+    if (DEBUG && w2.__sky)
       Object.assign(w2.__sky, {
         state: model.astro.state,
         elevation: model.astro.elevation,
         condition: model.condition,
+        lightningLog,
+        lightningCount,
+        // Dev and test builds: a strike on demand (the debug hook; nothing under reduced motion).
+        strike: (k: "cg" | "ic") => {
+          if (!reduce) forced = k;
+        },
       });
   };
 
   const n = (k: string) => cur[k] as number;
   const v2 = (k: string) => cur[k] as number[];
 
-  const refreshClouds = (t: number) => {
-    clouds.resize(view.vw, view.vh);
-    clouds.update({
-      drift,
-      z: 0.015 * t,
-      cover: n("uCloudCover"),
-      rainDark: n("uRainDark"),
-      cirrus: n("uCirrus"),
-      cirrusY: n("uCirrusY"),
+  /**
+   * The clouds' horizon, where the land meets the sky: in scene mode the visible ground (the gradient's horizon);
+   * with the fixed band, the far hills' skyline (their ridge averages 34 band units down), not the viewport bottom,
+   * which would leave the visible sky only v 0.82–1 and no perspective at all.
+   */
+  const cloudHz = () => (sceneMode() ? hz.h : view.vh - 0.66 * bandHeight(view.vw, view.vh));
+  /** The clouds' horizon as it is at the top of the page: the clouds never scroll (the sky's parallax is 0). */
+  const refCloudHz = () => {
+    if (!sceneMode()) return cloudHz();
+    const st = bands.find((b) => b.id === "stage" && b.land.world);
+    return st ? st.docTop + SCENE_HORIZON * st.land.height : cloudHz();
+  };
+  /** The plan for this condition and layout, rebuilt only when either changes. */
+  const ensurePlan = () => {
+    const head = document.querySelector<HTMLElement>("[data-sky-head]");
+    let deckTop = 0;
+    head?.querySelectorAll("[data-on-sky]").forEach((el) => {
+      deckTop = Math.max(deckTop, el.getBoundingClientRect().bottom + view.y + 4);
     });
-    lastClouds = t;
-    if (!runtime.cloudsIn) {
-      runtime.cloudsIn = (x0, y0, x1, y1) => clouds.maxIn(x0, y0, x1, y1);
-      notifyGeometry();
-    }
+    const col = head?.getBoundingClientRect();
+    const gutters: [number, number][] | undefined =
+      col && landMode(view.vw, !!view.stage) === "gutter" ? [[0, col.left], [col.right, view.vw]] : undefined;
+    const skyH = Math.round(refCloudHz());
+    const day = dayOfYear(skyTime());
+    const cover = Math.round(model.cloudCover * 100) / 100;
+    const key = `${model.condition}|${cover}|${day}|${view.vw}|${skyH}|${Math.round(deckTop)}|${gutters?.flat().map(Math.round)}`;
+    if (key === planKey && plan) return plan;
+    planKey = key;
+    plan = planClouds({ condition: model.condition, cover, day, vw: view.vw, skyH, deckTop: Math.round(deckTop), gutters });
+    cloudLayer?.reset();
+    return plan;
+  };
+  /** The tones now, and a cumulonimbus's: lifted off the deck behind it (no new colour, the deck's own, lighter). */
+  const updateTones = () => {
+    tones = cloudTones(model.astro.elevation, model.condition, model.moon);
+    const b = tones.body;
+    // In front of a storm's deck: its body a step lighter than the deck, its lit edge two steps.
+    const up = (c: Lab, k: number): Lab => [Math.min(1, c[0] + k), c[1], c[2]];
+    cbTones = { ...tones, body: up(b, 0.07), cap: up(b, 0.18), base: up(tones.base, 0.04) };
+  };
+  /** Where the clouds can be, for the backing model: each puff layer's band, each row, the storm's tower. */
+  const cloudSpans = () => {
+    const p = ensurePlan();
+    if (!tones) updateTones();
+    const t = tones!;
+    const lab = brightest(t);
+    const all = { x0: -Infinity, x1: Infinity };
+    return {
+      alpha: 1 - 0.6 * model.fog,
+      spans: [
+        ...p.puffs.map((L) => {
+          const [y0, y1] = bandPx(L.id, p.input.skyH);
+          return { ...all, y0, y1, lab, mix: LAYER[L.id].mix };
+        }),
+        ...p.rows.map((r) => ({ ...all, y0: r.y, y1: r.y + r.h + 1.4 * r.hang, lab, mix: LAYER[r.layer].mix })),
+        ...(p.cb
+          ? [{ x0: p.cb.x, x1: p.cb.x + p.cb.shape.w, y0: p.cb.base - p.cb.shape.h, y1: p.cb.base, lab: brightest(cbTones!), mix: 0 }]
+          : []),
+      ],
+    };
+  };
+  /**
+   * Where the clouds are lit from: the sun's place on screen while any light is left in it, and after it has set
+   * the moon's, or the zenith by a quarter's strength on a moonless night.
+   */
+  const light = (): number[] => {
+    const [fx, fy] = v2("sunPos");
+    const moonUp = n("uMoonUp");
+    const [mx, my] = v2("uMoonPos");
+    const ox = (0.5 * view.vw) * (1 - moonUp) + mx! * view.vw * moonUp;
+    const oy = my! * view.vh * moonUp;
+    const os = 0.25 * (1 - moonUp) + (0.35 + 0.65 * n("uMoonIllum")) * moonUp;
+    const k = smooth01(-6, -1.5, n("sunAlt"));
+    return [ox + (fx! * view.vw - ox) * k, oy + (fy! * view.vh - oy) * k, 0, os + (1 - os) * k];
   };
 
   const moonR = () => (view.vw < COLUMN_BREAK ? 12 : 14);
   /**
-   * How much cloud is in front of a point 0..1: the cloud field's opacity there, thickened by rain (a storm deck
-   * is darker than its alpha says) and by full cover (no gaps in an overcast sky).
+   * Cloud in front of a disc 0..1 (centre, radius): a near or mid cloud leaves the disc 0.08 of its alpha, a far one
+   * half that cover, linear across the disc's edge, less where the text clearing has thinned the cloud. As an optical
+   * depth for bodies.ts (its disc is exp(−1.8 τ)): τ = −ln(1 − 0.92 · cover) / 1.8.
    */
-  const occlusion = (x: number, y: number) => {
-    const cover = n("uCloudCover");
-    const c = clouds.ready ? clouds.at(x, y) : cover;
-    return Math.min(1, c * (1 + 0.6 * n("uRainDark")) + Math.max(0, cover - 0.85) * 3);
-  };
+  const occlusion = (x: number, y: number, r = 0) => 0.92 * (cloudLayer?.coverAt(x, y, r, view.y) ?? 0);
+  const tauAt = (x: number, y: number, r: number) => -Math.log(1 - occlusion(x, y, r)) / 1.8;
   const particleState = (): ParticleState => ({
     night: n("uNight"),
     cloudCover: n("uCloudCover"),
+    deck: isDeck(model.condition) ? 1 : 0,
     fog: n("uFog"),
     rainDensity: model.rainDensity,
-    rainSlant: model.rainSlant,
+    rainSlant: slantNow,
+    drizzle: model.condition === "drizzle",
+    flash: flashNow,
     moon: { ...model.moon, x: (cur.uMoonPos as number[])[0]!, y: (cur.uMoonPos as number[])[1]! },
     moonVisible:
       n("uMoonUp") *
       n("uNight") *
       Math.max(
         0,
-        1 - 1.05 * occlusion(v2("uMoonPos")[0]! * view.vw, v2("uMoonPos")[1]! * view.vh),
+        1 - 1.05 * occlusion(v2("uMoonPos")[0]! * view.vw, v2("uMoonPos")[1]! * view.vh, moonR()),
       ) **
         0.7 *
       (1 - 0.6 * n("uFog")),
@@ -402,7 +605,8 @@ function start(
       up: model.sun.up,
       glow: n("uGlow"),
       horizon: oklabToRgb(model.colors.horizon),
-      cloud: occlusion(x, y),
+      tau: tauAt(x, y, r),
+      deck: DECK.has(model.condition),
       fog: n("uFog"),
       cover: n("uCloudCover"),
       // Only cloud and altitude change the sun: nothing dims it behind text (loose text gets its own backing).
@@ -420,11 +624,19 @@ function start(
     const sy = m.sun.y * view.vh;
     const mx = m.moon.x * view.vw;
     const my = m.moon.y * view.vh;
-    const moonVis = m.night * Math.max(0, 1 - 1.05 * occlusion(mx, my)) ** 0.7 * (1 - 0.6 * m.fog);
+    const moonVis = m.night * Math.max(0, 1 - 1.05 * occlusion(mx, my, moonR())) ** 0.7 * (1 - 0.6 * m.fog);
     return {
       m,
       sun: m.sun.up
-        ? { x: sx, y: sy, r: sunR(), alt: m.sun.alt, cloud: occlusion(sx, sy), fog: m.fog }
+        ? {
+            x: sx,
+            y: sy,
+            r: sunR(),
+            alt: m.sun.alt,
+            tau: tauAt(sx, sy, sunR()),
+            deck: DECK.has(m.condition),
+            fog: m.fog,
+          }
         : null,
       moon:
         m.moon.up && moonVis > 0.01
@@ -457,6 +669,7 @@ function start(
           h: b.land.height,
         })),
       horizon: sceneMode() ? hz : undefined,
+      clouds: cloudSpans(),
     };
   };
 
@@ -475,23 +688,84 @@ function start(
   const cpu: number[] = [];
   const draw = (t: number, dt: number, still: boolean) => {
     const c0 = DEBUG ? performance.now() : 0;
+    // Under thunder: a bolt about every 9 s and a sheet flash every 5 s; under heavy rain, sheet flashes every
+    // 25 s. The first bolt comes 1.2–2.5 s after the first frame, and again within 1.5 s of the stage coming
+    // back, at most once in 20 s. Never in a still frame (reduced motion): nothing is scheduled or drawn.
+    const nowMs = t * 1000;
     let lightning = 0;
-    if (!still && model.thunder) {
-      if (forceBolt) lightning = 1;
-      else {
-        if (!nextStrike) scheduleStrike(t);
-        if (t >= nextStrike) {
-          strikeAt = t;
-          scheduleStrike(t);
-        }
-        lightning = strikeAt >= 0 ? lightningEnvelope(t - strikeAt) : 0;
+    let reveal = 1;
+    const flashAt = [0, 0, 0, 0];
+    const onStage = view.y < view.vh * 0.5;
+    // Keyed to the condition, not the eased uRainDark: that never quite reaches 1 after a change of weather.
+    const heavy = model.condition === "heavy-rain";
+    if (!still && !lost && !noLightning && (model.thunder || heavy)) {
+      if (!stormOn) {
+        stormOn = true;
+        // Thunder: the first bolt 1.2–2.5 s in (or when due, if one fell under 20 s ago), the first sheet flash a
+        // separation after it. Heavy rain: no bolt ever, the first sheet flash after a separation.
+        const first = model.thunder ? (scheduler.intro(nowMs, true) ?? scheduler.due("cg", nowMs, true, false)) : Infinity;
+        nextL = {
+          cg: first,
+          ic: scheduler.due("ic", (model.thunder ? first : nowMs) + SEPARATION, model.thunder, heavy),
+        };
       }
-    } else if (still && model.thunder && forceBolt) lightning = 1;
-    if (!still) {
-      drift[0] += v2("uWind")[0]! * dt;
-      drift[1] += v2("uWind")[1]! * dt;
+      if (model.thunder && onStage && !stageWas) nextL.cg = Math.min(nextL.cg, scheduler.intro(nowMs, false) ?? Infinity);
+      stageWas = onStage;
+      if (forceBolt) forced = "cg";
+      if (forced) {
+        // The debug hook: now, whatever the guard (dev and test builds only).
+        const k = forced;
+        forced = null;
+        strike = null;
+        fire(k, nowMs, true);
+      }
+      if (nowMs >= nextL.ic) fire("ic", nowMs);
+      // Never a bolt out of a storm that has eased to heavy rain (its due time was set under thunder).
+      if (model.thunder && nowMs >= nextL.cg) fire("cg", nowMs);
+      if (strike) {
+        const ms = nowMs - strike.t0 * 1000;
+        const end = strikeEnd(strike);
+        if (strike.kind === "cg") {
+          lightning = boltAlpha(strike, ms);
+          reveal = Math.min(1, ms / strike.leaderMs);
+          if (ms > end) boltPaths = [];
+          else if (boltPaths.length) {
+            // The cloud around the bolt's top lights up with it (a sheet flash at the bolt's x).
+            flashAt[0] = boltX;
+            flashAt[1] = boltTop;
+            flashAt[2] = 0.24 * view.vw;
+            flashAt[3] = 0.8 * lightning;
+          }
+        } else if (ms < end) {
+          flashAt[0] = strike.x * view.vw;
+          flashAt[1] = strike.y * view.vh;
+          flashAt[2] = strike.r * view.vw;
+          flashAt[3] = sheetAlpha(strike, ms);
+        }
+        if (ms > end) strike = null;
+      }
+    } else {
+      strike = null;
+      stormOn = false;
+      boltPaths = [];
+      stageWas = onStage;
     }
-    if (still || t - lastClouds >= CLOUD_REFRESH_S) refreshClouds(t);
+    const boltUp = strike?.kind === "cg" && boltPaths.length > 0;
+    flashNow = lightning;
+    if (dt > 0 && dt < 0.5) emaDt += (dt - emaDt) * 0.05;
+    if (dt > 0 && dt < 0.5 && !still)
+      // groundFogX's wind factor (1 at 15 km/h, 2 at 30), held at 1 or more: fog lies in calm air, and its banks
+      // still drift at their own speed then (≥ 2 px/s, W6).
+      fogT += dt * Math.min(2, Math.max(1, model.windKmh / 15)) * (model.wind[0] < 0 ? -1 : 1);
+    const mid = v2("uMid");
+    midLuma = 0.2126 * mid[0]! + 0.7152 * mid[1]! + 0.0722 * mid[2]!;
+    const hzCloud = cloudHz();
+    // The wind carries each layer across at its own speed (near 1, mid 0.55, far 0.3; ±20% gusts at 0.07 Hz).
+    const swell = gust(t);
+    slantNow = gustSlant(model.rainSlant, still ? 1 : swell);
+    const vNear = nearSpeed(model.windKmh, model.windFromDeg);
+    windX = vNear / 12;
+    if (!still) for (const id of LAYERS) cloudOff[id] += vNear * LAYER[id].speed * swell * dt;
     updateHorizon(still);
     const u: Targets = {
       ...cur,
@@ -499,10 +773,43 @@ function start(
       uHorizonB: hz.b,
       uTime: still ? 0 : t,
       uLightning: lightning,
-      uDrift: drift,
-      uZ: 0.015 * t,
+      uSheet: flashAt,
+      uCloudHz: hzCloud,
+      uWindX: windX,
     };
     if (atm && !lost) atm.draw(u);
+    if (cloudLayer && !noClouds) {
+      const p = ensurePlan();
+      if (skyVer !== toneVer && (still || t - toneAt >= 0.1)) {
+        updateTones();
+        toneVer = skyVer;
+        toneAt = t;
+      }
+      const lp = light();
+      const hzf = sceneMode() ? { h: hz.h / view.vh, b: hz.b / view.vh } : { h: 1, b: 1 };
+      cloudLayer.draw({
+        plan: p,
+        off: cloudOff,
+        t: still ? null : t,
+        tones: tones!,
+        cbTones: cbTones!,
+        sky: (y) => gradientLab(model.colors, y / view.vh, hzf, HORIZON_AWAY),
+        light: [lp[0]!, lp[1]!],
+        flash: { x: flashAt[0]!, y: flashAt[1]!, r: flashAt[2]!, k: still ? 0 : flashAt[3]! },
+        bolt: still ? 0 : lightning,
+        strike: strikeNo,
+        thunder: model.thunder,
+        scrollY: view.y,
+        alpha: 1 - 0.6 * n("uFog"),
+      });
+      if (DEBUG && w2.__sky)
+        w2.__sky.clouds = {
+          n: cloudLayer.count,
+          off: { ...cloudOff },
+          coverage: () => coverage(cloudsAt(p, cloudOff), view.vw, p.input.skyH),
+          plan: planKey,
+        };
+    }
     if (pts) {
       const ps = particleState();
       const ss = sunState();
@@ -519,11 +826,21 @@ function start(
         !still,
         {
           back: (ctx) => drawArc(ctx, dayPath, nightPath, text, nightArc),
+          // Stars are behind the clouds: the cloud layer's silhouettes are cut out of them.
+          afterStars: (ctx) => {
+            if (!cloudLayer) return;
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.drawImage(cloudCanvas, 0, 0, ptsCanvas.width, ptsCanvas.height);
+            ctx.restore();
+          },
           front: (ctx) => {
+            if (boltUp) paintBolt(ctx, lightning, reveal);
             sunLayer.draw(ctx, ss, still ? 0 : t, day, (a) => {
               const px = ss.x + Math.cos(a) * 180;
               const py = ss.y + Math.sin(a) * 180;
-              return 1 - clouds.at(px, py);
+              return 1 - occlusion(px, py) / 0.92;
             });
             if (!still && ambient) {
               ambient.sky(ctx, {
@@ -542,8 +859,15 @@ function start(
           ? { x0: hero.x, y0: hero.y - view.y, x1: hero.x + hero.w, y1: hero.y + hero.h - view.y }
           : null,
       );
-      if (TEST && w2.__sky) {
-        w2.__sky.sun = { x: ss.x, y: ss.y, up: ss.up, cloud: ss.cloud, dim: ss.dim };
+      if (DEBUG && w2.__sky) {
+        w2.__sky.sun = {
+          x: ss.x,
+          y: ss.y,
+          up: ss.up,
+          tau: ss.tau,
+          deck: ss.deck,
+          dim: ss.dim,
+        };
         w2.__sky.moon = { x: ps.moon.x * view.vw, y: ps.moon.y * view.vh, up: ps.moon.up };
         w2.__sky.geom = geom;
       }
@@ -591,7 +915,7 @@ function start(
           x: ss.x,
           k:
             ss.up && alt < 12
-              ? (1 - Math.max(0, alt) / 12) * (1 - ss.cloud) * smooth01(-0.9, 0.6, alt)
+              ? (1 - Math.max(0, alt) / 12) * (1 - occlusion(ss.x, ss.y)) * smooth01(-0.9, 0.6, alt)
               : 0,
           rgb: sunColor(alt),
           r: ss.r,
@@ -620,12 +944,20 @@ function start(
           minutes: mins,
           seed: dayOfYear(at),
           dark: smooth01(2, -5, alt),
-          lamps: smooth01(0.5, -1.5, alt),
+          // The lights follow the sky's luminance, not the clock: on in a dark storm at noon too (rain.ts LAMPS_AT).
+          lamps: smooth01(LAMPS_AT.off, LAMPS_AT.on, midLuma),
           glints,
           l3: b.land.colorOf("L3"),
           tones: b.land.tones,
           wind: { kmh: model.windKmh, side: model.wind[0] < 0 ? -1 : 1 },
           planePx: planePx(view.vw),
+          rain: {
+            slant: slantNow,
+            density: model.rainDensity,
+            // No splashes on a phone that is already under 30 fps.
+            splashes: view.vw < COLUMN_BREAK && emaDt > 1 / 30 ? 0 : (SPLASH_RATE[model.condition] ?? 0),
+          },
+          bolt: { x: boltX, k: lightning },
         };
         b.frame = f;
         const walk = walkOf(b);
@@ -658,14 +990,20 @@ function start(
           }
           if (arrival.update(near, away, life.ready(t) && b.frame !== null)) startTakeoff(t, b, o3);
         }
-        b.land.draw(walk, (g, layer, o) => {
-          life!.between(g, layer, o, f);
-          if (ll && !still && ambient && (layer === "L2" || layer === "L4"))
-            ambient.land(g, layer, o, ll);
-        });
+        b.land.draw(
+          walk,
+          (g, layer, o) => {
+            life!.between(g, layer, o, f);
+            if (ll && !still && ambient && (layer === "L2" || layer === "L4"))
+              ambient.land(g, layer, o, ll);
+          },
+          // The heavy-rain veil is in over the last fifth of the rain's darkening, so only heavy rain and thunder
+          // have it; the rim is the bolt under way; fog fades the land by distance and lies on the ground.
+          { ...NO_FX, veil: smooth01(0.8, 1, n("uRainDark")), rim: lightning, fog: n("uFog"), fogT },
+        );
         if (!("ready" in b.canvas.dataset)) b.canvas.dataset.ready = "";
       }
-      if (TEST && w2.__sky) {
+      if (DEBUG && w2.__sky) {
         const main = active[0]!;
         const mw = main.land.world;
         const walk = walkOf(main);
@@ -697,12 +1035,13 @@ function start(
       }
     }
     frames++;
-    if (TEST && w2.__sky) {
+    if (DEBUG && w2.__sky) {
       w2.__sky.frames = frames;
       if (life) w2.__sky.plane = life.plane(t);
     }
     if (frames === 1) {
       atmCanvas.dataset.ready = "";
+      cloudCanvas.dataset.ready = "";
       ptsCanvas.dataset.ready = "";
       // The server-rendered first-paint fallback (src/components/sky/SkyFallback.tsx) has done its job: it fades out
       // over 400ms and is then hidden (globals.css). Never removed: React owns those nodes, and removing them here
@@ -722,7 +1061,7 @@ function start(
     const busy =
       raining ||
       (pts?.meteorActive(t) ?? false) ||
-      (strikeAt >= 0 && t - strikeAt < 0.3) ||
+      strike !== null ||
       forceBolt ||
       s.scrubbing ||
       scrolling ||
@@ -730,7 +1069,7 @@ function start(
       tracker.moving ||
       (ambient?.active() ?? false);
     const cap = coarse ? (raining || scrolling || s.scrubbing ? 30 : 20) : busy ? 60 : 24;
-    if (TEST && w2.__sky) w2.__sky.cap = cap;
+    if (DEBUG && w2.__sky) w2.__sky.cap = cap;
     if (cap < 60 && dt < 1 / cap - 0.004) return;
     approach(cur, target, 1 - Math.exp(-dt / (s.scrubbing || s.preview !== null ? 0.12 : 1)));
     if (model.night > 0.3 && model.cloudCover < 0.6 && !reduce) {
@@ -747,7 +1086,7 @@ function start(
       fps = Math.round(fpsFrames / (t - fpsWindow));
       fpsFrames = 0;
       fpsWindow = t;
-      if (TEST && w2.__sky) w2.__sky.fps = fps;
+      if (DEBUG && w2.__sky) w2.__sky.fps = fps;
     }
   };
 
@@ -762,14 +1101,14 @@ function start(
     } else if (!go && running) {
       running = false;
       cancelAnimationFrame(raf);
-      if (TEST && w2.__sky) w2.__sky.fps = 0;
+      if (DEBUG && w2.__sky) w2.__sky.fps = 0;
     }
   };
 
   const still = () => {
     Object.assign(cur, clone(target));
     draw(0, 0, true);
-    if (TEST && w2.__sky) w2.__sky.fps = 0;
+    if (DEBUG && w2.__sky) w2.__sky.fps = 0;
   };
 
   // Astronomy every 60 s (and on every store change: weather, preview).
@@ -925,6 +1264,7 @@ function start(
   };
   const resize = () => {
     atm?.resize();
+    cloudLayer?.resize(cloudCanvas.clientWidth, cloudCanvas.clientHeight);
     pts?.resize(dayOfYear(skyTime()));
     relayoutLand();
   };
@@ -940,6 +1280,7 @@ function start(
     tx = readToken("--text");
     text = `rgb(${tx.map((c) => Math.round(c * 255)).join(",")})`;
     pts = createParticles(ptsCanvas, tx);
+    cloudLayer = createFlatCloudLayer(cloudCanvas);
     const fixedLand = createLandscape(fixedCanvas);
     if (fixedLand)
       bands.push({
@@ -957,7 +1298,7 @@ function start(
     atm = await createAtmosphere(atmCanvas, isDead);
     if (dead) return;
     if (!atm) onNoWebGL();
-    if (TEST)
+    if (DEBUG)
       w2.__sky = {
         state: model.astro.state,
         elevation: model.astro.elevation,
@@ -970,7 +1311,12 @@ function start(
         },
       };
     resize();
-    backing = startBacking(backingScene);
+    // The backing runner solves how far each loose text's clouds are thinned (backing.ts clearingFor) and hands
+    // the zones back: the cloud layer's mask. A still frame is drawn again with them.
+    backing = startBacking(backingScene, (z: Zone[]) => {
+      cloudLayer?.setZones(z);
+      if (reduce) still();
+    });
     ro.observe(ptsCanvas);
     ro.observe(fixedCanvas);
     motion.addEventListener("change", applyMotion);
@@ -989,7 +1335,6 @@ function start(
     window.clearTimeout(astroTimer);
     window.clearTimeout(resizeTimer);
     window.clearTimeout(stillTimer);
-    runtime.cloudsIn = null;
     backing?.stop();
     unsubGeom();
     unsubScroll();
@@ -1010,17 +1355,17 @@ function start(
   };
 }
 
-/** Atmosphere (WebGL2, z −3) and particles (Canvas 2D, z −2), one loop. Loaded after idle; the CSS gradient covers first paint. */
+/** Atmosphere (WebGL2, z −3), flat clouds (Canvas 2D, z −3 above it) and particles (Canvas 2D, z −2), one loop. Loaded after idle; the CSS gradient covers first paint. */
 export default function SkyRenderer() {
   const atm = useRef<HTMLCanvasElement>(null);
+  const cld = useRef<HTMLCanvasElement>(null);
   const pts = useRef<HTMLCanvasElement>(null);
   const land = useRef<HTMLCanvasElement>(null);
   const [webgl, setWebgl] = useState(true);
 
   useEffect(() => {
-    if (!atm.current || !pts.current) return;
-    if (!land.current) return;
-    return start(atm.current, pts.current, land.current, () => setWebgl(false));
+    if (!atm.current || !cld.current || !pts.current || !land.current) return;
+    return start(atm.current, cld.current, pts.current, land.current, () => setWebgl(false));
   }, []);
 
   return (
@@ -1033,6 +1378,7 @@ export default function SkyRenderer() {
           data-sky-atmosphere=""
         />
       ) : null}
+      <canvas ref={cld} aria-hidden="true" className="sky-layer sky-clouds" data-sky-clouds="" />
       <canvas
         ref={pts}
         aria-hidden="true"

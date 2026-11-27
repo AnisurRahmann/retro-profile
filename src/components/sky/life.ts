@@ -18,6 +18,8 @@ import { hexToRgb, type RGB } from "@/lib/sky/color";
 import type { LayerId } from "@/lib/sky/landscape/anchors";
 import { TV_HZ, windowLit, windowSchedule } from "@/lib/sky/landscape/lights";
 import { RIVER } from "@/lib/sky/landscape/shapes";
+import { SPLASH } from "@/lib/sky/rain";
+import { LIGHTNING_RIM } from "@/lib/sky/palette";
 import {
   FADE_IN_S,
   gateAt,
@@ -69,11 +71,16 @@ export type LifeFrame = {
   wind: { kmh: number; side: -1 | 1 };
   /** The plane's length on screen, px (plane.ts planePx). */
   planePx: number;
+  /** Rain: its slant (radians), its streaks per 100,000 px², and the splashes a second per 1,000 px of water (0: none). */
+  rain: { slant: number; density: number; splashes: number };
+  /** Lightning: a bolt's screen x and its brightness (0: none): its light on the water. */
+  bolt: { x: number; k: number };
 };
 
 export function createLife(textRgb: RGB) {
   const warm = hexToRgb(WINDOW_LIT);
   const warmCss = rgba(warm, 1);
+  const boltCss = rgba(hexToRgb(LIGHTNING_RIM), 1);
   const textCss = rgba(textRgb, 1);
   const tvCss = rgba(hexToRgb(TV_LIT), 1);
   const body = new Path2D(PLANE_BODY);
@@ -322,6 +329,54 @@ export function createLife(textRgb: RGB) {
             g.fillRect(Math.round(x - len / 2), Math.round(y), len, 1);
           }
         }
+        // Rain on the water: SPLASH_RATE marks a second per 1,000 px, each a ring that widens and fades over
+        // SPLASH.life. Read from the clock (no state), three birth ticks back.
+        if (f.moving && f.rain.splashes > 0) {
+          const tickS = 1 / 12;
+          const per = ((f.rain.splashes * f.w) / 1000) * tickS;
+          const whole = Math.floor(per);
+          const now = Math.floor(f.t / tickS);
+          g.strokeStyle = textCss;
+          g.lineWidth = 1;
+          for (let back = 2; back >= 0; back--) {
+            const born = now - back;
+            for (let k = 0; k <= whole; k++) {
+              if (k >= whole && hash(k + 31, born) >= per - whole) continue;
+              const age = f.t - (born + hash(k + 13, born)) * tickS;
+              if (age < 0 || age > SPLASH.life) continue;
+              const u = age / SPLASH.life;
+              const r = SPLASH.r0 + (SPLASH.r1 - SPLASH.r0) * u;
+              g.globalAlpha = SPLASH.alpha * (1 - u) * (1 - u);
+              g.beginPath();
+              g.ellipse(
+                hash(k, born) * f.w,
+                (RIVER[0] + 3 + hash(k + 7, born) * (RIVER[1] - RIVER[0] - 6)) * s,
+                r,
+                r * 0.32,
+                0,
+                0,
+                Math.PI * 2,
+              );
+              g.stroke();
+            }
+          }
+          g.globalAlpha = 1;
+        }
+        // A bolt's light on the water: a broken column under it, shimmering.
+        if (f.bolt.k > 0.01) {
+          const tick = f.moving ? Math.floor(f.t * 24) : 0;
+          g.fillStyle = boltCss;
+          const y0 = (RIVER[0] + 2.6) * s;
+          const y1 = RIVER[1] * s - 1;
+          let row = 0;
+          for (let y = y0; y < y1; y += 2, row++) {
+            const depth = (y - y0) / Math.max(1, y1 - y0);
+            const half = 2.5 + 3 * hash(row, tick) + 2 * depth;
+            g.globalAlpha = 0.5 * f.bolt.k * (1 - 0.5 * depth) * (0.55 + 0.45 * hash(row + 7, tick));
+            g.fillRect(Math.round(f.bolt.x - half + (hash(row + 31, tick) - 0.5) * 4), Math.round(y), Math.ceil(2 * half), 1);
+          }
+          g.globalAlpha = 1;
+        }
         // Sun / moon shimmer column.
         for (const b of f.glints) {
           if (b.k <= 0.01) continue;
@@ -424,6 +479,22 @@ export function createLife(textRgb: RGB) {
           g.drawImage(glow, x - R, y - R, 2 * R, 2 * R);
           g.fillStyle = warmCss;
           g.fillRect(Math.round(x - 1), Math.round(y - 0.5), 2, 1.5);
+          // Rain in the lamp's light: a few short streaks above its head, warm, at 0.5.
+          if (f.rain.density > 0) {
+            const tick = f.moving ? Math.floor(f.t * 10) : 0;
+            const slope = Math.tan(f.rain.slant);
+            g.strokeStyle = warmCss;
+            g.lineWidth = 1;
+            for (let k = 0; k < 5; k++) {
+              const rx = x + (hash(l.i * 5 + k, tick) - 0.5) * 36;
+              const ry = y - 8 - hash(l.i * 5 + k + 50, tick) * 44;
+              g.globalAlpha = 0.5 * f.lamps * (0.4 + 0.6 * hash(l.i * 5 + k + 90, tick));
+              g.beginPath();
+              g.moveTo(rx, ry);
+              g.lineTo(rx - 12 * slope, ry - 12);
+              g.stroke();
+            }
+          }
         }
         g.globalAlpha = 1;
       }

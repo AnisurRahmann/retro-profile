@@ -169,15 +169,22 @@ html[data-sky-scrub] .sky-gradient {
 .sky-atmosphere {
   z-index: -3;
 }
+/* The flat clouds (src/components/sky/flat-cloud-layer.ts): over the atmosphere (same z, later in the document), under
+   the particles. */
+.sky-clouds {
+  z-index: -3;
+}
 .sky-particles {
   z-index: -2;
 }
 .sky-atmosphere,
+.sky-clouds,
 .sky-particles {
   opacity: 0;
   transition: opacity 600ms ease;
 }
 .sky-atmosphere[data-ready],
+.sky-clouds[data-ready],
 .sky-particles[data-ready],
 .sky-landscape[data-ready] {
   opacity: 1;
@@ -1102,4 +1109,10 @@ html:is([data-sky="night"], [data-sky="astronomical"], [data-sky="nautical"]) .s
   .dots > span {
     opacity: 0.6;
   }
+}
+
+/* The volumetric clouds lab (/lab/clouds, dev and test builds): no site chrome. Its canvas covers the sky stack,
+   and SkyMount doesn't load the home renderer there (docs/volumetric/BRIEF.md). */
+body:has([data-vol-lab]) > header {
+  display: none;
 }

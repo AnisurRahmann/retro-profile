@@ -1,0 +1,395 @@
+# Volumetric clouds lab: the brief
+
+Every session on this project reads this file first, then `TASKS.md`, `plan.json` and the hand-offs of its
+dependencies (`handoffs/<id>.md`). It is the single source of context. The repo's `CLAUDE.md` still applies in full.
+
+## 1. Why
+
+The owner rejected both earlier attempts at the home page's clouds:
+
+- **The noise sheets** (Weather v6, W1/W2): smeared, marble swirls and banding toward the horizon.
+- **The flat paper-cut puffs** (2026-11-27): clip-art.
+
+The target is **photographic realism in every state**, with the sun, moon and stars genuinely **behind** the clouds:
+covered where a cloud is thick, glowing through where it is thin. The clouds are built in an isolated lab page first.
+**Nothing touches the home page sky until the owner signs off on the lab (after T8).**
+
+## 2. Technique
+
+Real-time volumetric clouds, ray-marched through a spherical shell, after:
+
+- A. Schneider, N. Vos: *The Real-Time Volumetric Cloudscapes of Horizon Zero Dawn* (SIGGRAPH 2015, Advances in
+  Real-Time Rendering).
+- A. Schneider: *Nubis: Authoring Real-Time Volumetric Cloudscapes with the Decima Engine* (SIGGRAPH 2017), and
+  *Nubis, Evolved* (SIGGRAPH 2022).
+- S. Hillaire: *Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite* (SIGGRAPH 2016 course), and
+  *A Scalable and Production Ready Sky and Atmosphere Rendering Technique* (EGSR 2020).
+
+**Implement from the papers and the maths, never from someone's code.** Do not copy or port code from Shadertoy (its
+default licence is CC BY-NC-SA, which this site can't use) or from any source without a permissive licence (MIT, BSD,
+Apache, CC0). If a permissive source shaped your code, name it in your hand-off.
+
+## 3. The lab
+
+- **Route:** `/lab/clouds`. It exists in dev and test builds only. A production build returns 404 unless it was
+  built with `NEXT_PUBLIC_SKY_DEBUG=1`. The gate is `src/lib/sky/volumetric/gate.ts`: a module constant the build
+  folds (DECISIONS #120), plus a pure `labEnabled()` the tests cover.
+- **The page:** a full-viewport canvas, no site chrome (the header is hidden by `globals.css`, and `SkyMount` doesn't
+  load the home renderer on `/lab/`), a debug overlay and a controls panel (T3).
+- **Hooks for tests and probes:** `window.__vol` (`VolDebug` in `types.ts`): frames, ready, tier, gpuMs, the last 120
+  frame times, the state, the noise generation ms and any error.
+- **URL state:** every field of `LabState` (`types.ts`) is a URL parameter of the same name. For example:
+  `/lab/clouds?t=11:00&cov=0.38&type=cumulus&wind=15&from=270&tier=high&sunAz=&sunEl=&cloudAtSun=0&debug=`
+
+| Param | Values | Default | Meaning |
+| --- | --- | --- | --- |
+| `date` | `YYYY-MM-DD` | 2026-12-15 | The Dhaka calendar day |
+| `t` | `HH:MM` | 11:00 | Dhaka wall clock. Sun and moon come from `src/lib/sky/astro.ts` |
+| `cov` | 0..1 | 0.38 | Coverage |
+| `type` | stratus, cumulus, cumulonimbus | cumulus | Cloud type |
+| `wind` | 0..60 | 15 | km/h |
+| `from` | 0..359 | 270 | The bearing the wind blows from (270 means clouds move east) |
+| `precip` | 0..1 | 0 | Precipitation |
+| `tier` | high, medium, low, auto | high | Quality tier (`TIERS`) |
+| `sunAz`, `sunEl` | degrees or empty | empty | Sun override. Empty means the real sun |
+| `cloudAtSun` | 0, 1, edge | 0 | A forced cell over the sun (the moon at night): `1` covers it, `edge` puts the cell's edge on it |
+| `freeze` | 0, 1 | 0 | Stops the animation clock (wind scroll, detail evolution) |
+| `seed` | integer | 1 | Weather-map seed |
+| `view` | degrees or empty | empty | Camera azimuth. Empty faces the sun (the moon at night, else south) |
+| `debug` | empty, a JS view, or a shader view | empty | `registerDebugView` names, or `SHADER_DEBUG_VIEWS` (weather, density, transmittance, light, depth) |
+| `scale` | 0.25..1 or empty | empty | The cloud target's scale instead of `TIERS[tier].scale` (T9, T10) |
+| `reproject` | 0, 1 | 1 | 0: march every pixel every frame, no checkerboard, no history |
+| `accum` | integer 0..256 | 0 | > 0: freeze time and show the mean of N frames (a reference render). Always drawn with `out=single`, like every `debug` view |
+| `out` | layered, single | **layered** | The output (§5). Changing it needs a new WebGL context, so the panel reloads the page |
+| `sout` | 0.2..1 or empty | empty | layered: the cloud canvas's scale; empty = the cloud target's |
+| `hold` | 0, 1 | 0 | 1: draw the clouds only on march frames (T7 option 1; judders ~3 px per step) |
+| `lift` | 0, 1 | 1 | layered: 1 lifts the alpha so C ≤ A holds exactly; 0 clamps C (the rejected original) |
+| `clampviz` | 0, 1 | 0 | layered: paint where the C ≤ A clamp would bind (a diagnostic) |
+
+## 4. Conventions
+
+- **Units:** km for distances. Degrees in TypeScript, radians in GLSL. Colours are linear RGB in the shaders and in
+  the uniforms. `displayColor()` (common) does exposure, a soft shoulder and the sRGB encoding at the very end.
+- **World axes:** +x east, +y up, +z north. The camera is at `(0, CAMERA_ALT, 0)`. The planet's centre is
+  `(0, −EARTH_R, 0)`. A bearing `az` and an elevation `el` give the direction
+  `(sin az · cos el, sin el, cos az · cos el)` (`dirFromAzEl` in `scene.ts`).
+- **Weather map:** shaders sample it at `uv = world.xz / WEATHER_MAP_KM − uWeatherOffset`. `offset` grows in the
+  direction the clouds move (u east, v north). A map feature at uv `c` sits over world
+  `xz = WEATHER_MAP_KM · (c + offset)`.
+- **Hex:** none in this project's code. Colours come from `src/lib/sky/palette.ts` and `gradient.ts` through
+  `scene.ts` and the uniforms. GLSL float constants (`vec3(1.0, 0.96, 0.9)`) are allowed. A new palette colour is a
+  "Request for M1".
+- **Copy:** the lab is a developer tool, not site copy, so its labels stay in the controls. Keep each string literal
+  under 40 characters (`tests/unit/copy-scan.test.ts`). Never put lab strings in `src/content.ts`, because that file
+  feeds the agent's knowledge.
+- **No new dependencies.** No Three.js, no glslify, no noise libraries.
+
+## 5. Renderer spec
+
+**Noise (T1).** Generate the noise on the GPU at startup into 3D textures, once per session (and again on a tier
+change).
+
+- **SHAPE:** 64³ (128³ on the high tier), RGBA8. R is Perlin-Worley (Perlin fbm remapped by inverted Worley). GBA are
+  inverted Worley fbm at three rising frequencies.
+- **DETAIL:** 32³, RGB inverted Worley fbm at three frequencies.
+- Every channel tiles seamlessly in x, y and z.
+- **BLUE:** a 64×64 blue-noise 2D texture (R8, NEAREST, REPEAT).
+- Generation must take under 150 ms.
+
+**Weather map (T2).** 2D, 128×128 RGBA8, LINEAR, REPEAT.
+
+- Channels: R coverage. G type (0 stratus, 0.5 cumulus, 1 cumulonimbus). B precipitation.
+- It is generated on the CPU from `WeatherMapParams` (deterministic per seed), clustered rather than uniform, and
+  scrolled with the wind (`offset`, `velocity`).
+- The wind is time-lapsed (`WIND_TIMELAPSE`, T2 documents it) so drift is visible.
+
+**Geometry (T4).**
+
+- The camera is at ground level.
+- The cloud shell is spherical: earth radius 6,360 km, base 1.5 km, top 4 km. Cumulonimbus reaches 10 km.
+- Vertical FOV is 60°, with the horizon at 82% of the viewport height from the top. `scene.ts` pitches the camera to
+  do this; `viewRay(uv)` returns the ray.
+- March between the shell intersections. Clamp the march to `MAX_MARCH` (60 km) and grow the step with distance
+  (near-horizon rays are long).
+- Jitter the start with blue noise (`blueNoise(gl_FragCoord.xy)`).
+- Exit early at transmittance < 0.01.
+- Steps: high 64, medium 40, low 24 (`VOL_STEPS`). Light-march steps: 6 (`VOL_LIGHT_STEPS`).
+
+**Density (T4).**
+
+- SHAPE is remapped by a per-type height gradient:
+  - stratus: thin and flat
+  - cumulus: rounded, with a flat base
+  - cumulonimbus: tall, with an anvil spreading at the top
+- It is eroded by DETAIL at low density and at the edges (the standard remap), then multiplied by the weather map's
+  coverage.
+- DETAIL evolves slowly with `uTime`.
+- Precipitation darkens the base (the hook stays for later).
+
+**Lighting (T4).**
+
+- Beer–Lambert with the powder term.
+- Dual-lobe Henyey–Greenstein (g 0.8 and −0.2, mixed 0.5). The silver lining comes from the forward lobe.
+- Ambient from the gradient: zenith colour on the tops, horizon colour on the bases, by height fraction.
+- Sun colour by elevation (`uSunColor`, from `gradient.ts sunColor`). Moonlight at night (`uMoonDir`, `uMoonFraction`).
+- Aerial perspective toward the horizon colour by distance.
+- Output: premultiplied colour, plus transmittance.
+
+**Background (T5), in the same pass, before the clouds.**
+
+- The sky gradient (`gradient.ts` through `uZenith`, `uMid` and `uHorizonCol`), dithered with blue noise so it doesn't
+  band.
+- Stars: seeded per day, twinkling, hidden by day (`uStarAlpha`).
+- The moon: phase-correct, from the existing astro inputs, with terminator, earthshine and a soft glow.
+- The sun: limb darkening, bloom at three radii, colour by elevation.
+- Port the look of `src/components/sky/bodies.ts` and `particles.ts`.
+- Clouds composite over all of this with their transmittance: `final = cloud.rgb + cloud.a × background`.
+
+**Performance (T7).**
+
+- Clouds render into an RGBA16F target at 0.35 / 0.3 / 0.25 × the drawing buffer (high / medium / low).
+- 2×2 checkerboard temporal reprojection: one pixel of each 2×2 block per frame, history reprojected with the wind
+  velocity, α 0.25, and a neighbourhood clamp against ghosting.
+- Re-march at most 15 Hz. Bilateral upsample (4 taps, weighted by the transmittance difference). Composite every
+  frame.
+- Automatic tiers: high on a fine pointer, medium on a coarse one. Step down when the median frame time is over 20 ms
+  for 3 s.
+- **Resolve (T11).** A spatial estimate (the pixel's fresh sample, else the bilinear mix of the fresh samples around
+  it, weighted by cloud depth), a min/max box in YCoCg + T (tight for non-fresh pixels, with an extent floor), and a
+  Catmull-Rom history clipped into it; out = mix(spatial, history, w), w = 1 − off/τ. Not the μ ± γσ box.
+
+**The output architecture (T11, the lab's default since M2: `out=layered`).**
+
+- Two canvases, both fixed and full-viewport. Underneath, the **background layer**: its own WebGL2 context at the full
+  drawing buffer, running `displayColor(background(viewRay))` alone. It redraws on a reset and on the frame *after*
+  every `BG_EVERY`-th march, never on a march frame; the browser keeps showing it in between.
+- Above it, the **cloud layer**: the march context, its canvas `{alpha: true, premultipliedAlpha: true}` with its
+  drawing buffer at s_out × the full one (s_out = the cloud target's scale, 0.35 on high), stretched by the browser.
+  It writes A = 1 − T and C = D(c + T·b) − T·D(b), with b a background cache at s_out, and the alpha **lifted** to the
+  least value that keeps every channel C ≤ A (exact for that b). No full-resolution pass runs in the cloud context.
+- `out=single` (T7's) stays as the reference and fallback: one opaque canvas, the full-resolution composite every
+  frame. Reference renders (`accum` > 0) and debug views always use it.
+- The home page already composes fixed layers this way, so stage 2 can keep the split.
+
+**The budget (M2).** A frame's cost is what every context and the browser spend on it:
+
+> **budget ms** = Σ over the WebGL contexts of the GPU ms per frame, **amortised** (the timer-query mean over ≥ 5 s, so
+> the 15 Hz march and the ¼-rate background are spread over the frames between them) **+ the compositor's** busy ms
+> per frame (Chrome's `VizCompositorThread` task time over a 3 s trace ÷ frames drawn).
+
+- `pnpm lab:gpu` measures both outputs: `sum` (cloud `gpuMs` + background `bgGpuMs`), `comp` on the two target
+  cells, and `OVER` against sum + comp. Single output has one context, so its sum is its `gpuMs`.
+- **Targets:** high ≤ 2.5 ms at 1920×1080 DPR 2. Low ≤ 3 ms at 375×812 DPR 3. Measure with `pnpm lab:gpu`.
+- On the M2 the per-frame timer peaks (11–15 ms in every mode) are the GPU clock dropping between bursts, not a
+  frame's cost (T11 D6). Judge per-frame spikes with the trace, not the timer.
+
+## 6. Architecture: how the pieces plug together
+
+```
+src/app/lab/clouds/page.tsx        T0  server page: the gate, metadata (noindex)
+src/app/lab/clouds/LabClient.tsx   T0  canvas + overlay; parseLabState → startRenderer → <Controls>
+src/app/lab/clouds/controls/**     T3  the panel; calls renderer.setState and history.replaceState
+src/components/sky/volumetric/
+  types.ts         T0  THE CONTRACT: every type, constant, uniform and GLSL function signature
+  renderer.ts      T0  context, tier, noise, weather map, uniforms, timer query, frame loop, hook API
+  assemble.ts      T0  header (+ #defines + uniforms) + modules in order + a pass's main
+  debug-views.ts   T0  registerDebugView registry (?debug=<name>)
+  common.glsl.ts   T0  viewRay, blueNoise, raySphere, remap, displayColor, gCloudDist
+  background.glsl.ts  T5   density.glsl.ts / lighting.glsl.ts / march.glsl.ts  T4
+  reproject.glsl.ts, targets.ts, tiers.ts  T7      noise-gpu.ts  T1
+src/lib/sky/volumetric/
+  scene.ts   T0  LabState → sun, moon, sky colours, stars, camera, weather params (pure)
+  gate.ts    T0  labEnabled / LAB_ENABLED
+  lab-state.ts T3   weather-map.ts T2   noise/** T1   sun-cell.ts T5
+```
+
+**A frame** (`renderer.ts`):
+
+1. Advance the clock (unless frozen).
+2. `weather.update(dt)`. Once a second, `weather.setParams` with `forcedCellFor(...)` (T5).
+3. `sceneFor(state)` → `CloudUniforms`.
+4. Begin the GPU timer query.
+5. Either a registered debug view's `draw(ctx)`, or `pipeline.render(ctx)` (T7's `targets.ts`, with the output from
+   `outputFor(state)`), wrapped by `applyReviewParams` (T10: `reproject=0` invalidates first; `accum` folds the canvas
+   into the running mean). With `out=layered` the pipeline also tells the background layer when to redraw.
+6. End the query, then notify `onFrameTime` listeners and the tier governor. `__vol` gets `gpuMs`, `bgGpuMs`,
+   `out` and `accumReady`.
+
+**Shaders.**
+
+- There is one assembly for every pass: `header(tier)` + `common` → `background` → `density` → `lighting` →
+  `march` → `reproject` + the pass's `main`.
+- The header declares every `CLOUD_UNIFORMS` name and the `VOL_*` defines (`GEOMETRY`, tier steps and sizes).
+- Modules never declare those uniforms. A module's own uniforms (T7's history textures) use its own prefix (`uRp…`).
+- A module may call only functions from modules earlier in the order. It defines exactly its contract functions
+  (`GLSL_CONTRACT`), and every helper it adds starts with the module's name (`densityRemap`, `marchStep`, …).
+- `tests/unit/vol-assembly.test.ts` enforces all of this.
+- `PassContext.program(key, main)` compiles and caches. `apply(p, overrides)` sets every uniform and binds the
+  textures (units: `TEXTURE_UNITS`; T7 uses 4 and up). `fullscreen()` draws the triangle.
+- A compile error prints the numbered assembled source to the console and sets `window.__vol.error`.
+
+**The hook API** (`VolRenderer`):
+
+- `setState(state)`
+- `registerDebugView(name, view)` (also importable from `debug-views.ts`, so a task registers its view from its own
+  file)
+- `onFrameTime(cb)`, returning the unsubscribe; each call receives `{ gpuMs, cpuMs, rafMs, tier }`
+- `tier`, `gl` and `dispose()`
+
+## 7. Acceptance
+
+The three states:
+
+| | URL | What it shows |
+| --- | --- | --- |
+| **A** | `/lab/clouds?t=11:00&type=cumulus&cov=0.38&wind=15&from=270` | Late-morning fair-weather cumulus |
+| **B** | `/lab/clouds?t=16:45&type=cumulus&cov=0.4&wind=10&from=300&cloudAtSun=edge` | Low sun, partly behind a cloud edge |
+| **C** | `/lab/clouds?t=13:00&type=stratus&cov=0.95&wind=15&from=270` | Overcast deck |
+
+(`LAB_PRESETS` in `types.ts`. Date 2026-12-15, seed 1.)
+
+Review states (T9, in `scripts/probe/lab-shots.mts`):
+
+| | URL | What it is |
+| --- | --- | --- |
+| **A-away** | A + `&view=345.56` | A with the camera 180° from the sun (165.56°): the sunlit sides, the tops-vs-bases check |
+| **A-ref** | A + `&tier=high&scale=1&reproject=0&accum=64` | Every pixel marched, no history, 64-frame mean, single output: what A should converge to |
+| **C-ref** | C + the same | The overcast reference |
+
+The refs are shot at 1440×900 DPR 2 on the high tier only. The probe waits for `window.__vol.accumReady`.
+
+**Metrics** (`metrics.json`, from the 100% crops; for comparing runs, not gates):
+
+- `lattice` (T9): the 2×2 checkerboard response on the cloud target's texel grid. It reads real edge detail too, so
+  for A it is **not** a pass gate (T11 D2); the reference itself reads 0.008.
+- `edgeWidth` (T9): median 10–90% rise of the strongest 1% of edges, CSS px. Lower is crisper.
+- `bodyStd` (T9): luma σ over low-saturation 41×41 boxes: lobe structure inside cloud bodies.
+- `streak` (T9): Σ(∂y)² ÷ Σ(∂x)² over the 300 px above the horizon. Above ~3: horizontal slices.
+- T10 and T11 used scratch measures too (anisotropy and coherence of the horizon band, class asymmetry, the residual
+  against A-ref, ΔL single vs layered); their numbers are in `handoffs/T10.md` and `T11.md`, not in `metrics.json`.
+
+Explicit checks on top of the checklist (M2): no dot lattice on thin cloud; no horizontal slices in the horizon band;
+a visible bright glow around the sun in A; lobe structure in A's dark bodies; no spokes or repeated rows in C.
+
+**Checklist.** Each item is judged PASS or FAIL per state, at 1440×900 and at 375×812, on every tier:
+
+1. Sunlit tops and darker bases.
+2. Detailed edges with no smear.
+3. Clouds shrink toward the horizon, with no banding.
+4. Warm undersides and a silver lining at dusk (B).
+5. The sun is hidden where it is covered, and light bleeds through thin edges (B, and `cloudAtSun=1`, where the
+   disc's centre loses at least 85%).
+6. Overcast is a continuous, textured deck with no visible tiling (C).
+7. Mobile looks equally real.
+
+Plus the GPU targets in §5.
+
+## 8. Ownership
+
+- `plan.json` `owns` is the source of truth (globs per task). The conductor rejects a task whose commit touches
+  anything else.
+- **Never edit another task's files.** If you need an interface change (a type, a uniform, a contract function, a
+  palette colour, something in `renderer.ts`), write it under **"Requests for M1"** in your hand-off and work around
+  it in your own files meanwhile.
+- `docs/DECISIONS.md` and `docs/PROGRESS.md` are written by T0, M1 and T8 only, because parallel tasks would collide
+  there. Every other task records its decisions in its hand-off, and M1 or T8 carries them over.
+- Each task owns its own section of `TASKS.md` (between its `<!-- Tn -->` markers) and its hand-off file.
+
+## 9. Workflow (every session is unattended)
+
+1. **Setup.** The conductor prepares your worktree on the branch `vol/<id>-<name>` (from `feat/volumetric-lab`) and
+   a dev server at `http://localhost:$VOL_PORT`. If you run a session by hand, create the branch yourself and start a
+   dev server: `WEATHER_MOCK=1 CHAT_MOCK=1 NEXT_DIST_DIR=.next-dev pnpm dev -p 3005`, checking the port first.
+2. **Read** `CLAUDE.md`, this brief, `TASKS.md`, `plan.json`, and your dependencies' hand-offs.
+3. **One task per session.** Implement only the files your task owns.
+4. **Screenshots** where your task asks for them, into `.shots/volumetric-lab/`:
+   `pnpm exec playwright screenshot --viewport-size=W,H "<url>" <file>` against the running server. Look at them.
+   For several shots, make one contact sheet (`npx tsx scripts/probe/sheet.mts out.png <cols> <w> <files…>`) and
+   read that.
+5. **Update your section of `TASKS.md`** (status, files, how to verify, notes for the next task). **Write
+   `handoffs/<id>.md`**, using the template below.
+6. **Gates before the commit** (CLAUDE.md): `pnpm typecheck && pnpm lint && pnpm test && pnpm build &&
+   pnpm check:bundle`.
+7. **Commit** once: `feat(vol): <id> …` (T7 uses `perf(vol)`, M1 uses `chore(vol)`).
+8. **Never** push, deploy, merge, create other branches or worktrees, or start or stop servers you didn't start.
+
+**Hand-off template** (`handoffs/<id>.md`):
+
+```
+# <id> hand-off
+Status: done | partial | blocked | needs-human
+## What I built
+## Files (each owned file and what it holds)
+## How to verify (commands, URLs, shot paths)
+## Decisions (for M1/T8 to carry into docs/DECISIONS.md)
+## Known issues
+## Requests for M1 (interface changes, with the reason)
+## Notes for the next task
+```
+
+## 10. Rules carried from CLAUDE.md
+
+- No push, no deploy. Never touch `main`.
+- Hex only in `palette.ts` and `globals.css`.
+- Gates green before every commit.
+- No new dependencies without a DECISIONS entry (here: a Request for M1).
+- Accessibility beats design: the controls are keyboard-usable and labelled.
+- **Do not change the home page sky** (`src/components/sky/*` outside `volumetric/`, and `src/lib/sky/*` outside
+  `volumetric/`). The volumetric code may import from the home page's sky code; never the other way round.
+- Never call the real Anthropic API, never hit Open-Meteo, never put keys anywhere but `.env.local`.
+
+## 11. Tools (T6)
+
+Both probes run against a dev or test build of the lab (any build where the gate is open) and take the base URL
+from `LAB_URL`, defaulting to `http://localhost:$VOL_PORT`, else `http://localhost:3005`. No new dependencies:
+Playwright through tsx, like the other `scripts/probe/` tools.
+
+- `pnpm lab:shots [A B C …]` — review shots into `.shots/volumetric-lab/run-<ts>/`: every state (§7, from
+  `LAB_PRESETS`) × tier (high, medium, low) × 1440×900 DPR 2 and 375×812 DPR 3, plus two frames of A 10 s apart
+  (wind drift), and `sheet.png`, a contact sheet of the whole run (an HTML grid screenshotted by Playwright).
+- `pnpm lab:gpu [A B C …]` — GPU ms/frame per state × tier at 1920×1080 DPR 2 and 375×812 DPR 3 (`GPU_TARGETS`),
+  5 s per cell, read through `window.__vol` from the renderer's per-frame `EXT_disjoint_timer_query_webgl2` query
+  (the probe samples the latest finished result every 100 ms). Prints a table (mean / p95 / max, rows over the §5
+  targets marked `OVER`) and writes `<run>/gpu.json`. `RUN_DIR=<shots run> pnpm lab:gpu` files the JSON next to
+  that run's shots.
+
+**T9: review tooling for the realism round.** `scale`, `reproject`, `accum` and `out` are URL state (`lab-state.ts`)
+and controls in the panel's "review" section, wired since M2 (§3 holds the full table, with T11's `sout`, `hold`,
+`lift` and `clampviz`). The camera azimuth is the existing `view`.
+
+| Param | Values | Default | Meaning |
+| --- | --- | --- | --- |
+| `scale` | 0.25..1 or empty | empty | The cloud target's scale instead of `TIERS[tier].scale` |
+| `reproject` | 0, 1 | 1 | 0: march every pixel every frame, with no checkerboard and no history |
+| `accum` | integer 0..256 | 0 | > 0: the renderer freezes time and averages N frames (a reference render) |
+| `out` | single, layered | single | `layered`: clouds and background as separate outputs |
+
+- **`LAB_URL` is required** by both probes, and there is no default port:
+  `LAB_URL=http://localhost:<port> pnpm lab:shots`. `VOL_PORT` no longer stands in, so a probe can never shoot
+  another session's server.
+- `pnpm lab:shots [A B C A-away A-ref C-ref …]` — the default is all six. A, B and C are unchanged. New:
+  - **A-away**: state A with the camera 180° from the sun (`view=` is the sun's bearing + 180°), captured like A–C.
+  - **A-ref**, **C-ref**: `scale=1&reproject=0&accum=64`, at 1440×900 DPR 2 on the high tier only: every pixel
+    marched, no reprojection, a 64-frame mean. The probe waits for the mean through `window.__vol.accumReady`, which
+    T10 exposes. A renderer without the flag ignores the params, so the probe warns and labels the shots "NOT a
+    reference render": they are ordinary renders of the preset at the tier's scale.
+- `crops/` — a 100% crop of every 1440×900 shot, unscaled device px (byte-exact; no resampling):
+  `<shot>-g0.png` … `<shot>-g5.png`, six 600×600 crops with their centres at 1/6, 1/2 and 5/6 of the width and at
+  25% and 55% of the height (row-major), and `<shot>-band.png`, the 300 device px above the horizon.
+  `crops.png`: one row per shot, the six crops side by side and the band under them.
+  `pair-A.png`: each crop of A-high beside the same crop of A-ref.
+- `metrics.json` — one entry per crop, plus a per-shot `summary`. The numbers are for comparing runs; they are not
+  gates. Luma is Rec.709 luma of the sRGB bytes; saturation is HSV saturation.
+  - `lattice`: the crop box-resampled onto the cloud target's texel grid (texel k covers device px
+    [k/scale, (k+1)/scale), in phase with the frame), then the mean absolute response of [[1, −1], [−1, 1]] on luma
+    over the 2×2 windows whose four texels all have saturation < 0.35. A 2×2 checkerboard of amplitude A on that grid
+    reads 4A. `latticeQuads` is how many windows counted.
+  - `edgeWidth`: the median 10–90% rise width in CSS px of the strongest 1% of Sobel edges, each profiled ±12 device
+    px along its gradient. Within 1% from about 4 to 10 device px of width; a wider edge is cut off by the window and
+    reads narrow (−7% at 15 px).
+  - `bodyStd`: the median standard deviation of luma over the 41×41-pixel boxes whose mean saturation is < 0.2.
+  - `streak` (the band only): Σ(dL/dy)² ÷ Σ(dL/dx)² of the band's Sobel gradients. Above 1: horizontal streaks.
+- The image code is Node-only, with no image dependency: `scripts/probe/lab-image.mts` decodes and encodes PNG
+  (verified byte-exact against Chromium on a lab screenshot) and `lab-metrics.mts` holds the metrics.
+  `tests/unit/vol-lab-metrics.test.ts` checks each one on a 2×2 checkerboard, a step edge blurred with a known
+  sigma, and stripes.

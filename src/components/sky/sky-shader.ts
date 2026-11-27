@@ -1,106 +1,54 @@
 /**
- * Atmosphere fragment shader: horizon glow, moon glow, clouds (value-noise fbm, domain-warped once), fog band and
- * lightning, composited front-to-back in linear light and written as premultiplied sRGB. Coordinates are CSS px
- * with y down, so every size below is in CSS px whatever the backing scale.
+ * Atmosphere fragment shader: the sky gradient with the fog band, moon glow, horizon glow, rain curtains, a storm's
+ * dark base and lightning, composited front-to-back in linear light and written as premultiplied sRGB. Coordinates
+ * are CSS px with y down, so every size below is in CSS px whatever the backing scale.
  * OKLab lightness ≈ cbrt(linear luminance), so "raise OKLab L by k%" ≈ scale linear RGB by (1 + k)³.
  *
- * Layers, nearest first:
- * - Clouds: q = CSS px drifting with the wind (uDrift, integrated on the CPU so a wind change never jumps the
- *   field), squashed toward the horizon. uZ (0.015/s) moves the warp fields' inputs in two directions, a cheap
- *   third noise dimension: clouds change shape, not just slide. src/components/sky/cloud-field.ts mirrors this. fbm (3 + 2 octaves) on a domain warped
- *   once by two 3-octave fbms; the sum is stretched (×1.9 around 0.48) so the coverage threshold
- *   mix(0.85, 0.25, cover) means what it says; rain lowers it by 0.3 × rainDark (a rain deck has no gaps). Tops are where density falls off upward (one extra 3-octave sample).
- *   Day: the sky greyed halfway, cores level, tops +12% L; golden hour leans the undersides to the horizon colour.
- *   Night: near-black silhouettes, rim-lit near the moon. Rain greys and darkens the deck. Lightning adds +0.12
- *   OKLab L to the cloud layer only. Alpha ≤ 0.85, reduced by fog (fog swallows cloud structure).
- * - Cirrus: on phones, a clear day or golden-hour sky gets a coverage floor of 0.06 in the top 30% of the stage
- *   (uCirrus, uCirrusY): one or two thin wisps (45% alpha), an aesthetic floor, not data (real cloud overrides it).
- * - Fog: desaturated sky lifted +6% L, alpha uFog × 0.55, strongest toward the horizon.
- * - Moon glow: radial halo, illumination × up × night × (1 − 0.7 cover).
- * - Horizon glow: ellipse on the horizon line under the sun (0.9 × width), horizon colour +10% L; under a scene
- *   (below uHorizonB) it belongs to the "away" horizon, like the gradient.
- * The horizon line is uHorizonY (CSS px): the viewport bottom on desktop; in scene mode it tracks the visible
- * ground, and under a scene the sky is back to the "away" sky (horizon at 1.45 vh) by uHorizonB (src/lib/sky/horizon.ts).
- * Nothing is damped anywhere: there is no column scrim. Loose text gets per-element backing
- * (src/lib/sky/backing.ts), which mirrors these layers.
+ * There are no clouds here: they are flat paper-cut shapes on their own Canvas 2D layer in front of this one
+ * (src/components/sky/flat-cloud-layer.ts, the model src/lib/sky/flat-clouds.ts).
+ * - Fog: the sky desaturated and lifted, 55% of it, rising to 85% where the land begins (uCloudHz).
+ * - Moon glow: a radial halo, illumination × up × night × (1 − 0.7 cover).
+ * - Horizon glow: an ellipse on the horizon line under the sun, halved under a storm.
+ * - Rain: the whole sky 10% darker under the heaviest; curtains of heavier rain drifting with the wind (uWindX), in
+ *   heavy rain and thunder only (uRainDark ≥ 0.8), at alpha ≤ 0.12. A two-octave hashed value noise: no texture.
+ * - A storm's base (uStorm): the top of the sky, eased from 55% up to 20% of the viewport, 30% darker.
+ * - Lightning (W4): the whole sky +5% L for a bolt, +25% L over a soft disc for a sheet flash (uSheet).
+ * The horizon line is uHorizonY (CSS px): the viewport bottom on desktop; in scene mode it tracks the visible ground,
+ * and under a scene the sky is back to the "away" sky (horizon at 1.45 vh) by uHorizonB (src/lib/sky/horizon.ts).
+ * Nothing is damped anywhere: there is no column scrim. Loose text gets per-element backing (src/lib/sky/backing.ts),
+ * which mirrors these layers.
  */
-import { mulberry32 } from "./particles";
-
-export const OCTAVES = 4;
-/** Side of the value-noise texture (R8, repeat, linear). One filtered fetch per noise lookup instead of 4 hashes. */
-export const NOISE_SIZE = 256;
-
-let noise: Uint8Array | null = null;
-/** The value-noise lattice (seeded, so the cloud field is the same on every load). Shared with the CPU mirror. */
-export function noiseData(): Uint8Array {
-  if (!noise) {
-    const rnd = mulberry32(1013);
-    noise = new Uint8Array(NOISE_SIZE * NOISE_SIZE).map(() => (rnd() * 256) | 0);
-  }
-  return noise;
-}
-
 export const VERT = `#version 300 es
 void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.-1.,0.,1.);}`;
 
 export const FRAG = `#version 300 es
 precision highp float;
 uniform vec2 uRes;
-uniform float uScale,uTime,uSunX,uGlow,uCloudCover,uFog,uRainDark,uLightning,uMoonIllum,uMoonUp,uNight,uDay,uGolden;
-uniform vec2 uDrift,uMoonPos;
-uniform float uZ,uHorizonY,uHorizonB,uCirrus,uCirrusY;
+uniform float uScale,uTime,uSunX,uGlow,uCloudCover,uFog,uRainDark,uLightning,uMoonIllum,uMoonUp,uNight,uStorm,uWindX;
+uniform vec2 uMoonPos;
+uniform float uHorizonY,uHorizonB,uCloudHz;
 uniform vec3 uZenith,uMid,uHorizon;
+uniform vec4 uSheet;
 out vec4 o;
-uniform sampler2D uNoise;
-float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return texture(uNoise,(i+f+.5)/${NOISE_SIZE}.).r;}
-const mat2 R=mat2(1.6,1.2,-1.2,1.6);
-float fbm3(vec2 p){float v=0.,a=.5;for(int i=0;i<3;i++){v+=a*noise(p);p=R*p;a*=.5;}return v;}
-float detail(vec2 p){p=R*R*R*p;float v=0.,a=.0625;for(int i=3;i<${OCTAVES};i++){v+=a*noise(p);p=R*p;a*=.5;}return v;}
-vec3 sky(float y){return y<.55?mix(uZenith,uMid,y/.55):mix(uMid,uHorizon,(y-.55)/.45);}
+float hs(vec2 p){p=fract(p*vec2(.1031,.103));p+=dot(p,p.yx+33.33);return fract((p.x+p.y)*p.x);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hs(i),hs(i+vec2(1,0)),f.x),mix(hs(i+vec2(0,1)),hs(i+1.),f.x),f.y);}
+// The sky gradient (one parameter, 0 zenith … 1 horizon), compositing and the sRGB transfer.
 float skyP(float y,float A){if(y<=uHorizonY)return uHorizonY>0.?max(y,0.)/uHorizonY:1.;if(y<=uHorizonB)return mix(1.,min(1.,uHorizonB/A),(y-uHorizonY)/max(uHorizonB-uHorizonY,1e-3));return clamp(y/A,0.,1.);}
+vec3 sky(float y){return y<.55?mix(uZenith,uMid,y/.55):mix(uMid,uHorizon,(y-.55)/.45);}
 float luma(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
 void over(inout vec4 acc,vec3 c,float a){acc.rgb+=c*a*(1.-acc.a);acc.a+=a*(1.-acc.a);}
 vec3 toGamma(vec3 c){return mix(c*12.92,1.055*pow(c,vec3(1./2.4))-.055,step(.0031308,c));}
 void main(){
 vec2 css=vec2(gl_FragCoord.x,uRes.y-gl_FragCoord.y)/uScale;
 vec2 vp=uRes/uScale;
-vec2 uv=css/vp;
 float p=skyP(css.y,1.45*vp.y);
-vec3 base=sky(p);
+vec3 base=sky(p)*(1.-.3*smoothstep(.55*vp.y,.2*vp.y,css.y)*uStorm);
 vec4 acc=vec4(0.);
-float cloudA=0.;
-float ci=uCirrus*(1.-smoothstep(.7*uCirrusY,uCirrusY,css.y));
-float cover=max(uCloudCover,ci);
-if(cover>.005){
-vec2 q=(css-uDrift)/vec2(400.,190.+210.*(1.-uv.y));
-vec2 w=vec2(fbm3(q*.6+vec2(1.7,9.2)+uZ*vec2(1.,.6)),fbm3(q*.6+vec2(8.3,2.8)-uZ*vec2(.7,1.)));
-vec2 qw=q+1.6*(w-.5);
-float lo=fbm3(qw);
-float d=(lo+detail(qw)-.48)*1.9+.5;
-float th=mix(.85,.25,cover)-.3*uRainDark;
-float dens=smoothstep(th,th+.22,d);
-if(dens>0.){
-float up=fbm3(qw+vec2(0.,-.09));
-float top=clamp((lo-up)*9.+.5,0.,1.);
-float thick=smoothstep(th,th+.5,d);
-vec3 grey=mix(vec3(luma(base)),base,.5);
-vec3 day=mix(grey*.95,grey*1.405,top);
-day=mix(day,mix(day,uHorizon*1.1,.55),uGolden*(1.-top)*.9);
-vec3 night=base*.55;
-float md=length((css-uMoonPos*vp)/vp.y);
-night+=vec3(.55,.58,.66)*uMoonUp*uMoonIllum*(1.-thick)*.35*exp(-md*md*14.);
-vec3 c=mix(night,day,uDay);
-c=mix(c,vec3(luma(c)),.4*uRainDark)*(1.-.32*uRainDark*thick);
-float L=pow(max(luma(c),1e-5),1./3.);
-c*=pow((L+.12*uLightning)/L,3.);
-cloudA=dens*mix(.55,.85,thick)*mix(1.,1.08,uRainDark);
-cloudA=min(cloudA,.85)*(1.-.6*uFog)*(ci>uCloudCover?.45:1.);
-over(acc,c,cloudA);
-}
-}
+// Fog: the sky desaturated 60% and lifted, 55% of it, rising to 85% where the land begins (uCloudHz: the far
+// hills' skyline), so the foggy land and the sky above it meet in the same colour.
 if(uFog>.001){
 vec3 f=mix(vec3(luma(base)),base,.4)*1.19;
-over(acc,f,uFog*.55*smoothstep(.35,1.,p));
+over(acc,f,uFog*mix(.55,.85,smoothstep(.45,1.,clamp(css.y/max(uCloudHz,1.),0.,1.)))*smoothstep(.35,1.,p));
 }
 float mg=uMoonIllum*uMoonUp*uNight*(1.-.7*uCloudCover);
 if(mg>.001){
@@ -110,7 +58,24 @@ over(acc,vec3(.62,.66,.76),mg*.16*exp(-r*r*.9));
 if(uGlow>.001){
 vec2 e=(css-vec2(uSunX*vp.x,css.y<=uHorizonB?uHorizonY:1.45*vp.y))/vec2(.9*vp.x,.42*vp.y);
 float g=exp(-dot(e,e)*2.2);
-over(acc,uHorizon*1.331,uGlow*.75*g);
+over(acc,uHorizon*1.331,uGlow*.75*g*(1.-.5*uStorm));
 }
-o=acc.a>0.?vec4(toGamma(acc.rgb/acc.a)*acc.a,acc.a):vec4(0.);
+// Rain curtains: heavy rain and thunder only, vertically stretched noise drifting with the wind.
+float cur=smoothstep(.8,1.,uRainDark);
+if(cur>.001){
+vec2 cu=vec2(css.x/(.9*vp.x)*3.5-uTime*.06*uWindX,css.y/vp.y*.5);
+float n=.65*vn(cu)+.35*vn(cu*2.03+vec2(5.2,1.3));
+over(acc,uHorizon*.5,.12*cur*smoothstep(.4,.8,n));
+}
+// The whole sky, the gradient behind this layer included: 10% darker under the heaviest rain; lightning lifts it
+// (OKLab L) by +5% for a bolt (uLightning) and +25% over a soft disc for a sheet flash in the cloud (uSheet).
+vec3 allc=(acc.rgb+(1.-acc.a)*base)*(1.-.1*uRainDark);
+// Only while something is striking: three powers on every pixel is not free.
+if(uLightning>0.||uSheet.w>0.){
+float L=pow(max(luma(allc),1e-5),1./3.);
+float lk=.05*uLightning;
+if(uSheet.w>0.)lk+=.25*uSheet.w*exp(-pow(length(css-uSheet.xy)/max(uSheet.z,1.),2.)*2.2);
+allc*=pow((L+lk)/L,3.);
+}
+o=vec4(toGamma(allc),1.);
 }`;
