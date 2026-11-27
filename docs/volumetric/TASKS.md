@@ -153,7 +153,8 @@ page.
 <!-- T5 -->
 ### T5: sun, moon and stars behind the clouds
 
-**Status:** todo
+**Status:** done (2026-11-27, `vol/T5-background`). The e2e check skips, with the reason, until M1 merges T2 and
+removes `VOL_TEMP_NOISE`.
 
 **Done when:**
 - The sun (limb darkening, bloom at 3 radii), the moon (phase, terminator, earthshine, glow) and the seeded,
@@ -164,7 +165,35 @@ page.
 - `tests/e2e/lab-cloud-at-sun.spec.ts` passes: the disc centre loses at least 85% of its brightness.
 - Screenshots in `.shots/volumetric-lab/T5-*.png`: B with and without `cloudAtSun`, and 20:30 with the moon.
 
-**Files:** (fill in) · **How to verify:** (fill in) · **Notes for the next task:** (fill in)
+**Files:**
+- `background.glsl.ts`:
+  - The gradient, with the horizon glow and a blue-noise dither (in `background()` only).
+  - Stars: a cube-mapped field seeded per day that twinkles and turns with the sun's hour angle.
+  - The moon: a sphere lit from the sun's side, with `uMoonFraction`, earthshine and glow.
+  - The sun: a limb-darkened disc with three blooms.
+- `sun-cell.ts`: `forcedCellFor`, with the cell on the sun's (or the moon's) ray at 2.2 km, 5–8 km in radius, and
+  `edge` shifted 0.4 radii sideways.
+- Tests: `tests/unit/vol-sun-cell.test.ts` and `tests/e2e/lab-cloud-at-sun.spec.ts`.
+- `renderer.ts` is unchanged: T0 already calls `forcedCellFor`.
+
+**How to verify:**
+- `pnpm vitest run tests/unit/vol-sun-cell.test.ts tests/unit/vol-assembly.test.ts`
+- `pnpm build:e2e && pnpm e2e:only tests/e2e/lab-cloud-at-sun.spec.ts`. It asks for the GPU, and skips until T2 and
+  M1 are in.
+- Shots: `.shots/volumetric-lab/T5-{B,B-edge,B-cover,A,A-edge,A-cover,night,night-cover,night-clear,sun-clear-1100,sun-clear-1645}.png`
+  and `T5-sheet.png`.
+- Disc centre with cloudAtSun 0 → 1, in linear luminance: A goes from 1.00 to 0.099 (−90%).
+
+**Notes for the next task:**
+- **M1:** once T2 and the `VOL_TEMP_NOISE` removal are in, the cloud-at-sun check runs.
+  - With T1 and T2 overlaid and the define off, it was run with GPU args. Result: it passed in 1.0 s, with the disc at −90%.
+  - `lab-smoke` (T0) times out in `locator.screenshot` on the e2e build. Playwright's default Chromium uses software
+    GL, on which the march takes seconds per frame. It needs GPU args, as `lab-cloud-at-sun` has, or T7's cost
+    cuts.
+- **B can't show the sun.** B's 3.4° sun is hidden by the horizon cloud band whatever `cloudAtSun` says. See the
+  hand-off's request: a forced clear gap.
+- **T7:** draw `background()` in the full-resolution composite.
+- **T8:** the tunables are `BACKGROUND_*` and `SUN_CELL`.
 <!-- /T5 -->
 
 <!-- T6 -->
