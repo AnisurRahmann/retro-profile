@@ -631,6 +631,38 @@ bands (#166).
 
 **Bundle and GPU:** DECISIONS #178, #179. **Open:** the 26/30 kB budget (#178); "Shipped" at dusk (#171).
 
+## Volumetric clouds lab (2026-11-27)
+
+Branch `feat/volumetric-lab` (from `feat/weather-v6`). **Resume from `docs/volumetric/`:** `BRIEF.md` (the single
+source of context), `TASKS.md` and `plan.json` (the board: T0–T8, M1, owners, dependencies, `owns` globs), the
+`handoffs/` folder, and `prompts/` (the owner's per-task prompts). The home page sky is unchanged (DECISIONS #180).
+
+- **T0 done:**
+  - Brief, contract (`src/components/sky/volumetric/types.ts`) and the lab skeleton at `/lab/clouds`.
+  - A full-screen WebGL2 pass draws the gradient, a placeholder sun and the ground, with GPU timing and
+    `window.__vol`.
+  - Every later task's file exists as a typed placeholder.
+  - Tests: `vol-assembly`, `vol-gate`, `vol-scene` (28 unit tests) and `lab-smoke` (e2e) are green.
+  - Hand-off: `docs/volumetric/handoffs/T0.md`. Decisions #180–#186.
+- **T1, T2, T4, T5 and T6 done, and merged by M1** (2026-11-27, `chore(vol): M1 merge T1–T6`):
+  - The lab renders real volumetric clouds on T1's GPU noise and T2's weather map. The temporary noise is gone.
+  - `lab-cloud-at-sun` and `lab-smoke` pass.
+  - GPU, full resolution: 20–58 ms on desktop and 9–21 ms on mobile, against 2.5 and 3 ms targets (T7's job).
+  - Shots: `.shots/volumetric-lab/run-20261127-074508/`.
+  - Hand-off: `docs/volumetric/handoffs/M1.md`. Decisions #187–#193.
+- **T3 was never delivered** (follow-up F1, GLM). It must land before T8.
+- **T7 merged into `feat/volumetric-lab`** (`21bc50b`). Mobile meets its GPU target; desktop high is ~4.5 ms against
+  2.5 (an owner decision). Decision #194.
+- **T8 (needs-human, 2026-11-27, `vol/T8-tuning`, worked in the worktree `../retro-profile-t8`):**
+  - Constants and shaping tuned over four shot rounds (`.shots/volumetric-lab/T8-r0` … `T8-r3`).
+  - F2: B's low sun now shows beside a cloud edge.
+  - F3: C is a cellular, luminous grey deck with no smear or blue strip.
+  - Still failing item 2 (edges): A at the 0.35 cloud scale, and C overhead.
+  - GPU unchanged within the noise.
+  - Hand-off: `docs/volumetric/handoffs/T8.md`. Decisions #195–#197.
+  - T3 was being built in parallel in the main folder (`vol/T3-lab-controls`).
+- **Next:** the owner reviews the lab (the three URLs in the T8 hand-off). Nothing reaches the home page before that.
+
 ## Done
 
 - Phase 0–2: Next 16 shell, tokens, content model (`src/content.ts` + zod), `/`, `/work/[slug]` ×5, `/lifts`, `/privacy`.

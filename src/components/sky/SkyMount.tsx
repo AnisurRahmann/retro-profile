@@ -9,6 +9,8 @@ const SkyRenderer = dynamic(() => import("./SkyRenderer"), { ssr: false });
 export function SkyMount() {
   const [go, setGo] = useState(false);
   useEffect(() => {
+    // The volumetric clouds lab draws its own sky (docs/volumetric/BRIEF.md).
+    if (window.location.pathname.startsWith("/lab/")) return;
     const idle = "requestIdleCallback" in window;
     const id = idle ? window.requestIdleCallback(() => setGo(true), { timeout: 2000 }) : window.setTimeout(() => setGo(true), 200);
     return () => (idle ? window.cancelIdleCallback(id) : window.clearTimeout(id));

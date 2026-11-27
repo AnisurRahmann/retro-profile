@@ -250,3 +250,104 @@ A browser review of PR #8 found the noise clouds read as smeared paint and marbl
 177. **Rain curtains**: heavy rain and thunder only (smoothstep 0.8–1 of the rain darkening), alpha ≤ 0.12, a hashed two-octave value noise (no texture). **The storm base** darkens the sky itself (the top of the viewport, 55% → 20% of its height, −30%), since there is no LOW sheet to darken.
 178. **Bundle: the idle renderer is 34.8 kB gzip, so neither 26 nor 30 kB fits without dropping v6.** Measured on the production build: up-front 10.6 kB (budget 13), renderer 34.8 kB (34.2 before this work). Gone: the shader's sheets, both textures and their generators, the CPU mirror. Added: the model (4.4 kB minified + gzip on its own, most of it the coverage solver, the deck and the tones) and the layer (2.0 kB). What took the renderer from 26.1 to 34 kB is W3–W6 as much as W1 (#133, #143, #152, #157), and the brief keeps lightning, rain, splashes and fog. Reaching 30 kB means taking about 5 kB of those out or splitting them into a chunk loaded only when the weather needs it; neither was done here. `check-bundle.ts` stays at 35 kB, CLAUDE.md is unchanged. **Open for a decision.**
 179. **GPU** (1920×1080 DPR 2, the renderer's timer, medians of six 60-frame samples after the 4 s ease): the atmosphere pass alone (`?clouds=off`, dev and test builds) is 0.74 ms in overcast, from 1.81 before; with the cloud layer on, the timer, which also catches the canvas compositing on the same GPU, reads partly 0.66 ms (1.66 before), overcast 1.49 (1.81), heavy rain 1.60 (1.02): a 93% rain deck is many full-width sprites at 4K. Scrolling partly at 1440×900: 59.8 fps, no task over 50 ms. The first frame (plan + every sprite) is a 50–55 ms task at load, not while scrolling.
+
+## Volumetric clouds lab (T0, 2026-11-27)
+
+Branch `feat/volumetric-lab` from `feat/weather-v6`. Brief, board and contract: `docs/volumetric/`.
+
+180. **The volumetric clouds are built in an isolated lab, `/lab/clouds`, before anything touches the home page.** Both earlier cloud designs were rejected: the noise sheets (smeared, marble swirls, banding at the horizon) and the flat puffs (clip-art). The target is photographic realism with the sun, moon and stars behind the clouds. That calls for real volumetric rendering (Schneider/Guerrilla "Nubis", Hillaire), built from the papers, with no Shadertoy code (CC BY-NC-SA). The lab exists in dev and test builds only; a production build returns 404 unless `NEXT_PUBLIC_SKY_DEBUG=1` (`gate.ts`, the #120 module constant). The page is `noindex`. Two shared files change, and the home page is unaffected: `SkyMount` doesn't load the home renderer on `/lab/` (its GPU would skew the lab's timings), and `globals.css` hides the header while `[data-vol-lab]` is on the page. On the test build, `sky.spec` and `sky-firstpaint` stay green (35/35).
+181. **Many unattended sessions and two agents (Claude Code, and GLM through the same CLI) under a conductor.** `docs/volumetric/plan.json` lists, per task, its `owns` globs (binding: the conductor rejects a commit outside them), its dependencies, branch, prompt, commit message and done-when checks. `TASKS.md` mirrors it for people, with one marked section per task so parallel merges don't collide. A task that needs an interface change writes it under "Requests for M1" in its hand-off rather than editing another task's file. Only T0, M1 and T8 edit `docs/DECISIONS.md` and `docs/PROGRESS.md`, because the parallel tasks would conflict there; their decisions travel in their hand-offs.
+182. **One shader assembly for every pass.** `assemble.ts` builds a header (the tier and `GEOMETRY` as `VOL_*` defines, plus every `CLOUD_UNIFORMS` declaration), then the modules in a fixed order (common → background → density → lighting → march → reproject), then the pass's own main. Each module defines exactly its contract functions (`GLSL_CONTRACT`), prefixes its helpers with its own name and never re-declares a shared uniform; `tests/unit/vol-assembly.test.ts` enforces this without a GPU. Unused functions cost nothing after compilation, so T7 can write any pass, such as march-only or composite, as just a main in `targets.ts`, and the pass structure stays T7's (`CreatePipeline`). The renderer (T0) owns the context, the uniforms, the timer query and the frame loop.
+183. **Lab camera.** The camera stands at ground level, with a 60° vertical FOV and a pitch of 20.3° that puts the horizon at 82% of the height. By default it faces the sun (the moon at night, otherwise south), so states A, B and C all have the sun in frame. `view=<az>` overrides the direction. World axes: +x east, +y up, +z north. Colours are linear in the shaders: `scene.ts` converts `gradient.ts`'s OKLab and the palette's hex, and `displayColor` applies the exact sRGB curve, so the lab's gradient matches the home page's.
+184. **Weather-map convention:** the shaders sample at `world.xz / WEATHER_MAP_KM − offset`, so `offset` grows in the direction the clouds move (+u east, +v north; from 270 → +u). One tile spans 40 km. The wind is time-lapsed so drift shows (`WIND_TIMELAPSE`, 6 in the placeholder; T2 sets and documents it).
+185. **`cloudAtSun` has three values: `0`, `1` (a dense cell covers the sun, or the moon at night) and `edge` (the cell's edge on it).** State B needs the sun partly behind a cloud edge, and a random seed can't promise that. T5 places the cell (`sun-cell.ts`); the renderer re-asks once a second because the field drifts.
+186. **The copy scan skips `*.glsl.ts`**, as it already skipped `*shader.ts`: GLSL reads as prose to it. The lab's control labels are developer UI and stay in the controls (each under 40 characters). They never go into `src/content.ts`, which feeds the agent's knowledge base.
+
+## Volumetric clouds lab: M1 merge of T1–T6 (2026-11-27)
+
+The detail is in `docs/volumetric/handoffs/M1.md` and in each task's hand-off.
+
+187. **Noise (T1).**
+     - SHAPE.R is Perlin fbm remapped by inverted Worley with the eroding remap, so 52% of R is clear air. SHAPE.GBA
+       and DETAIL.RGB are Worley fbm at 2/4/8 cells per tile.
+     - The resolution floor is 4 texels per cell, so 64³ and 128³ are the same noise plus one octave.
+     - The GLSL is written out straight from one recipe table that the CPU reference shares. It uses power-of-two
+       masks, never `%`.
+     - `genMs` waits for completion through a 1×1 `readPixels`, because `gl.finish()` returns early on ANGLE Metal.
+     - Full mip chains exist (`textureLod`).
+     - BLUE is void-and-cluster, made on the CPU once.
+     - **The 150 ms budget covers warm loads.** These measure 44–92 ms. A browser's first, cold shader compile is
+       exempt.
+188. **Weather map (T2).**
+     - The coverage param is the map's mean for every seed: the patchy field is percentile-ranked, and the stratus
+       deck z-scored.
+     - The type is per texel: cumulonimbus only in its 1–2 tower cells, and a forced cell is always cumulus.
+     - `WIND_TIMELAPSE` is 15.
+     - A wind-only change never regenerates the map.
+189. **March, density, lighting (T4).**
+     - `MAX_MARCH` caps the marched segment from the shell entry. It isn't an absolute distance.
+     - Steps are spaced geometrically.
+     - A two-stream diffuse term (weight 0.35) sits on top of Beer–Lambert, powder and the octaves.
+     - The light path's extinction is ×0.55 the view path's.
+     - Erosion is 0.22 for stratus and 0.6 for the other types.
+     - Aerial perspective never changes transmittance.
+     - There is one key light: the sun, or the moon at night.
+     - Scales: SHAPE tiles every 10 km, DETAIL every 0.6 km, and extinction is 80/km.
+     - `MIN_TRANSMITTANCE` reaches the GLSL as `VOL_MIN_TRANSMITTANCE`.
+     - `uPrecip` and `uCoverage` stay unused but declared.
+190. **Background (T5).**
+     - The stars, the moon and the sun's disc are laid "over" in gamma space, as the home page's canvas does. The
+       blooms are added in linear.
+     - The horizon glow lives in `skyGradient`. The dither lives only in `background()`.
+     - The star field turns with the sun's hour angle.
+     - The moon is drawn at night only.
+     - The `cloudAtSun` check measures state A's sun in linear luminance, because B's low sun is hidden by the horizon
+       band either way.
+     - The forced cell is 5–8 km at the 2.2 km altitude of the body's ray.
+191. **Probes (T6).**
+     - Shots at DPR 2 and DPR 3.
+     - GPU from the renderer's own timer query through `window.__vol`.
+     - Chromium runs with the GPU flags (ANGLE Metal, not SwiftShader).
+     - The probes wait for `load`, and flag a tier the renderer didn't honour (M1).
+192. **`.next-dev` is ignored by git, ESLint and tsc.** It is the by-hand dev server's dist dir. `next dev` still
+     appends its type paths to the tsconfig `include` on every start; revert that before committing.
+193. **T3 was never delivered.** M1 merged without it, because the T0 placeholder `lab-state.ts` parses every URL key.
+     T3 (follow-up F1) must land before T8. T8 takes over state B's cloud-at-sun and the overcast smear (F2, F3), with
+     ownership of `sun-cell.ts` and `lab-cloud-at-sun.spec.ts`.
+
+## Volumetric clouds lab: T7 performance and T8 tuning (2026-11-27)
+
+194. **Performance (T7, carried by T8; detail in `docs/volumetric/handoffs/T7.md`).**
+     - The march writes a quarter of the pixels (Bayer 2×2) into RGBA32F, with the distance packed into the alpha.
+       It is resolved into the RGBA16F cloud target with wind reprojection, a 3×3 clamp and α 0.25.
+     - It re-marches at ≤ 15 Hz, with a bilateral upsample only at transmittance edges. The background is cached at
+       full resolution and refreshed every 4th march.
+     - `uFrame` steps once per 4-march cycle. Every `setState` resets the history.
+     - The reprojection velocity includes `DENSITY_DETAIL_DRIFT`.
+     - `__vol.gpuMs` is the mean of the last 60 frames.
+     - The tier governor reads the rAF interval.
+     - Desktop high stays OVER its 2.5 ms target (about 4.5 ms). That's the owner's decision.
+195. **cloudAtSun=edge is one cumulus plus a clear wedge (T8, M1 F2).**
+     - The edge cell is 3.2 km across, shifted 0.7 radii sideways, not the 5–8 km "cover" disc that read as a slab
+       edge-on.
+     - A clear wedge runs along the body's line of sight, from the base crossing to the top crossing. Its half-width
+       is 0.8 km + tan 3° × distance. A low sun's ray crosses ~38 km of the layer, so without the wedge the field
+       always hides it.
+     - The wedge is a lab staging device (`WeatherMapParams.forcedCell.clear`).
+     - B's e2e reads the transmittance debug view, because a thin edge's glow is as bright as the disc.
+196. **The overcast deck has its own SHAPE tile (T8, M1 F3).**
+     - Stratus samples SHAPE at 3.2 km on axes turned ~37°, with 20% of the 10-km field mixed in. It fades back to
+       the 10-km field at 12–35 km, and its detail LOD runs 15 → 50 km. Without the fade, the undersampled tile beats
+       into moiré spokes: SHAPE has mips, but `MIN_FILTER` is LINEAR.
+     - Diffuse transmission is per type: a deck keeps 1.0 (the two-stream slab), cumulus 0.22.
+     - Above 60–95% coverage the haze greys to the horizon's luminance.
+197. **T8's lighting and shaping values.**
+     - Erosion 0.7 (cumulus) and 0.4 (stratus).
+     - A coverage floor at 0.07–0.22 (no dust of fragments).
+     - Bases offset by ±0.035 of the low fbm.
+     - Light-path extinction ×0.65; first octave weight 0.3.
+     - Base ambient: 70% zenith colour in the horizon colour.
+     - Haze 32 km.
+     - Sun gain 2.6, blooms 0.22 / 0.015 / 0.0014: the disc burns out like a photograph.
+     - The lab waits for the owner's review: `docs/volumetric/handoffs/T8.md`.
+
