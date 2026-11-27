@@ -351,3 +351,126 @@ The detail is in `docs/volumetric/handoffs/M1.md` and in each task's hand-off.
      - Sun gain 2.6, blooms 0.22 / 0.015 / 0.0014: the disc burns out like a photograph.
      - The lab waits for the owner's review: `docs/volumetric/handoffs/T8.md`.
 
+
+## Volumetric clouds lab: T10 realism (2026-11-27)
+
+198. **The noise is mipmapped and density picks its own LOD (T10; detail in `docs/volumetric/handoffs/T10.md`).**
+     - SHAPE and DETAIL use `LINEAR_MIPMAP_LINEAR`. Their box-filtered chains still tile, measured on the GPU: the wrap
+       seam over the interior difference is 1.00 at every level of 32³, 64³ and 128³.
+     - LOD = log2(max(1, footprint / texel)) per texture, with footprint = distance × vertical FOV / the cloud target's
+       height. The isotropic formula stays: stretching the footprint toward the horizon (1/sin el) doubled A's horizon
+       streak metric.
+     - DETAIL fades to its mean (0.45) as its LOD runs 2 → 4, instead of to no erosion. That replaces T8's fixed-km
+       fades (cumulus 25 → 90 km, stratus 15 → 50 km). Fading to no erosion swells far clouds.
+199. **A's softness was in density and lighting, not the pipeline.** A-ref (scale 1, every pixel marched, 64-frame mean)
+     matched A-high: bodyStd 12.2 vs 12.4, edge width 19.6 vs 19.9 px. The horizon slices were in the field too: A-ref
+     horizon anisotropy 2.36, A-high 2.15. Nothing was handed to T11.
+200. **Cumulus are surfaces.**
+     - σt = 66 km⁻¹ at density 1, a mean free path of 15 m. The density is no longer × coverage, so a body's core
+       reaches 1. Before, the MFP was 33 m at best and 50–125 m in most of A.
+     - The eroded cumulus density goes through ((d − 0.04) / 0.96)^0.35; stratus stays linear.
+     - The DETAIL tile is 0.32 km. The wispy (fbm) to billowy (1 − fbm) blend now runs over height 0.05–0.5; it used to
+       saturate at 0.125.
+201. **Lighting:**
+     - Three Wrenninge octaves, a = 0.5, b = 0.35, c = 0.5. Light-path extinction × 1, up from 0.65.
+     - The light march steps 40 m × 2 (2.5 km). Every step reads detail except the last, which reads SHAPE only, two
+       mip levels coarser.
+     - Ambient × exp(−0.14 · D), where D is the cloud above from samples at +100 m and +400 m, with detail.
+     - Cumulus diffuse transmission 0.5, up from 0.22.
+202. **A Mie aureole in `skyGradient`, so the aerial perspective inherits it.**
+     - Cornette–Shanks, g 0.76, k 0.05 × (0.35 → 1 by 12° of elevation) × (1 − overcast 0.6 → 0.95).
+     - Its colour runs from the sky's hue to the sun's within ~0.22 rad of the sun.
+     - The moon gets the same term at night, × 0.056 × its illuminated fraction.
+     - A: 5° from the sun is now 2.63× the sky 90° away (was 1.27×), and the sky beyond 30° stays blue.
+     - A brighter sky near the sun changes stage 2's text-backing solver (`backing.ts` estimates the sky behind
+       text). Re-solve it there, don't tune by eye.
+203. **Review params, TEMP until T9 (`applyReviewParams` in `renderer.ts`).**
+     - `scale` swaps `TIERS[tier].scale` only while `createPipeline` runs.
+     - `reproject=0` calls `pipeline.invalidate()` every frame, which marches all four offsets at α 1.
+     - `accum=N` freezes the clock and keeps a running mean of the canvas (an RGB8 copy into RGBA32F ping-pong
+       targets).
+     - `az` sets the camera azimuth.
+     - T9 moves these into `LabState`, and M2 removes the block.
+204. **`lab-cloud-at-sun.spec.ts` no longer matches the field. This is an owner decision, still open.**
+     - A, cover: the disc loses ≥ 99% (T 0.001–0.006), but the spec reads display luminance. With the stronger
+       scattering, a covered sun's cloud glows at 0.08–0.09: it passes at low by a 0.007 margin and fails on medium
+       and high.
+     - A, clear: a cumulus now sits over A's sun (T ≈ 0.002 against T8's 0.90). The clear check passes only through
+       that cloud's glow (0.64 at low).
+     - B: the edge shift tuned for T8's soft fringe (`sun-cell.ts`, 0.7) passes at low, where T is 0.20, but the disc
+       is fully covered on medium and high.
+     - The fix belongs to the spec and `sun-cell.ts` owners: read transmittance for A, as D3 did for B, and re-solve
+       the edge shift.
+## Volumetric clouds lab: T11 checkerboard reconstruction and layered output (2026-11-27)
+
+205. **The resolve follows the brief's structure, with a different box (T11 D1).**
+     - The structure: a spatial estimate (bilateral by `gCloudDist`), a clipped history, and
+       out = mix(spatial, history, w).
+     - The box is min/max in YCoCg plus T, not μ ± γσ. For a non-fresh pixel it covers only the samples it
+       interpolates, padded by 0.5 × the 3×3 range.
+     - Each extent has a floor (3% of Y in Y, Co and Cg; 0.01 in T), and the history is sampled with Catmull-Rom.
+     - Why:
+       - The dot lattice was reprojection lag, which the running mean grows about 4/α times, not the clamp.
+       - A 3×3 box of samples two texels apart can't see sub-texel lag.
+       - A σ box clips wisps out of their own history (16% class asymmetry, against 6% for min/max).
+       - A 4-D clip with no floor collapses on grey cloud.
+     - Measured: class asymmetry 21% (T8-r3) and 15% (T7) → 11%. The drift pair shows no ghosting.
+206. **T9's lattice metric isn't a gate for state A (T11 D2).**
+     - A per-pixel full-resolution reference reads the same 0.006–0.010 as T8-r3: the metric reads A's real cloud
+       detail at the texel grid.
+     - Use the per-Bayer-class asymmetry (reference 1.5%) and the residual against a frozen reference.
+207. **The layered output's alpha is lifted, not clamped (T11 D3).**
+     - A = max(1 − T, maxᵢ (Xᵢ − Yᵢ)/(1 − Yᵢ)), with X = D(c + T·b) and Y = D(b), is the least alpha that keeps C ≤ A.
+       It stays exact for b.
+     - The brief's clamp binds on 12.6% of A's cloud pixels (2.3% of B's), mostly by more than 8 levels.
+       ΔL p99 31% at 1440 and 45% at 375, and it greys B's silver lining.
+     - Lifted, ΔL is at the single-vs-single noise floor.
+208. **The background layer refreshes on the frame after the march (T11 D4).**
+     - It runs at the BG cadence (every 4th march) and on a reset, and draws nothing in between.
+     - The cloud context's s_out cache refreshes on the same frame, so b matches the canvas under it.
+209. **hold (T7's option 1) stays a lab switch (T11 D5).**
+     - It saves about 0.6 ms on desktop.
+     - The cost is a drift step of 3.25 device px per 15 Hz step at the top of A's view (0.16 px near the horizon).
+210. **The recommended architecture: layered, lifted, s_out = the tier's scale (T11 D6).**
+     - Desktop high 4.7–5.3 → 3.3–3.6 ms. The extra layer costs the compositor 0.24 ms per frame.
+     - Mobile low 0.7–0.8 ms.
+     - Desktop is still over 2.5 ms: the march and resolve are now the cost, about 2.5 ms.
+     - On the M2, per-frame GPU timer peaks (11–15 ms in every mode) are a clock-scaling artefact, so the 8 ms frame
+       rule needs the trace or another device. With tracing on, every mode held 60 fps.
+
+## Volumetric clouds lab: M2, the realism round merged (2026-11-27)
+
+The detail is in `docs/volumetric/TASKS.md` (M2) and the T9, T10 and T11 hand-offs.
+
+211. **T8's requests approved.** `WeatherMapParams.forcedCell.clear` stays (optional, used by `cloudAtSun=edge` only),
+     and so does the `vol-sun-cell.test.ts` edit: the edge cell's shift is measured against its own 3.2-km radius. M2
+     added the wedge's missing unit test (`vol-weather-map.test.ts`).
+212. **Merge bookkeeping.**
+     - T10 left its work uncommitted in its worktree. M2 committed it there (`fa2d141`, without the dev server's
+       `tsconfig.json` include) so it could merge `--no-ff` like the others.
+     - T10 and T11 both numbered their decisions from #198. T10 keeps #198–#204; T11's became #205–#210.
+     - T9 decided (its D1–D8, `handoffs/T9.md`): `LAB_URL` is required with no default port; the lattice resample is
+       phase-locked to the cloud target; the metric definitions; no image dependency; probes import as `./x.mjs`.
+213. **The review params and the output come from `LabState`; every `TEMP until T9` block is gone.**
+     - `LabState` gains `scale`, `reproject`, `accum`, `out` (T9) and T11's `sout`, `hold`, `lift`, `clampviz`, all in
+       `LAB_DEFAULTS`; `REVIEW_DEFAULTS` and `LabStateResolved` are gone.
+     - `applyReviewParams` reads the state each frame. `createPipeline` takes the review scale through
+       `PipelineOutput.scale` instead of swapping `TIERS[tier]` (T10 Request 4). `outputFor(state)` replaces T11's
+       URL reader.
+     - Reference renders (`accum` > 0) and debug views always draw with the single output: the mean is taken of the one
+       opaque canvas, and a debug view is a raw readout. With layered, the transmittance view read 0.050 at the disc
+       for the first ~10 frames after load (0.18–0.25 once settled), which failed `lab-cloud-at-sun`'s B at frame 8.
+     - The output mode is a context attribute, so the panel reloads the page when it changes; the other switches
+       rebuild the pipeline. `VolDebug` gains `accumReady` (T9 Request 2), `out`, `bgGpuMs` and `bgDrawMs`.
+214. **The lab defaults to `out=layered`** (T11's recommendation: lifted alpha, s_out = the cloud scale, no hold).
+     - Measured in M2: desktop high 3.5–3.9 ms GPU (both contexts) against 4.8–5.2 single; mobile low 0.74–0.78
+       against 1.41–1.54.
+     - Single and layered show the same staircase edges on the same frozen frame (`.shots/volumetric-lab/M2/attr/`):
+       the blockiness comes from the 0.35/0.25 cloud scale, not from the layered stretch.
+215. **The budget is GPU ms summed over the contexts, amortised, plus the compositor.**
+     - Σ over the WebGL contexts of the timer-query mean over ≥ 5 s, plus `VizCompositorThread` busy ms per frame from
+       a 3 s Chrome trace. `pnpm lab:gpu` measures both outputs and traces the two target cells.
+     - Desktop high layered: 4.1–4.5 ms, OVER 2.5. Mobile low layered: 1.3–1.6 ms, under 3.
+216. **`.next-*/` is ignored by git, ESLint and tsc** (T9 Request 4, T10 Request 5), so each worktree's dev server can
+     use its own dist dir.
+

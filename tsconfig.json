@@ -46,6 +46,7 @@
     "out",
     ".next",
     ".next-e2e",
-    ".next-dev"
+    ".next-dev",
+    ".next-*"
   ]
 }

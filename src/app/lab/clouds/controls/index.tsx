@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   LAB_PRESETS,
   SHADER_DEBUG_VIEWS,
+  TIERS,
   type CloudAtSun,
   type CloudType,
   type FrameTime,
@@ -12,7 +13,8 @@ import {
   type VolRenderer,
 } from "@/components/sky/volumetric/types";
 import { moon as moonAt, sun as sunAt } from "@/lib/sky/astro";
-import { presetState, serialiseLabState } from "@/lib/sky/volumetric/lab-state";
+import { outputFor } from "@/components/sky/volumetric/targets";
+import { ACCUM_MAX, SCALE_RANGE, SOUT_RANGE, presetState, serialiseLabState } from "@/lib/sky/volumetric/lab-state";
 import { labDate } from "@/lib/sky/volumetric/scene";
 import { DateField, FrameReadout, NumField, Section, Seg, SelectField, Slider, Toggle } from "./widgets";
 
@@ -46,6 +48,9 @@ const signedDeg = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}°`;
  * The lab's controls panel (owner T3): every LabState field, presets A–C and the frame-time readout. Each change
  * goes through commit(): React state at once, then one renderer.setState + history.replaceState per frame (T7:
  * every setState drops the reprojection history, so slider drags must not spam it).
+ *
+ * T9 adds the "review" section (scale, reproject, accum, out) and a number field for the camera azimuth. Those
+ * params are parsed and stored here; the renderer wires them in T10 and T11, so they change nothing on screen yet.
  */
 export function Controls({ initial, renderer }: ControlsProps) {
   const bodyId = useId();
@@ -65,6 +70,7 @@ export function Controls({ initial, renderer }: ControlsProps) {
   }, [renderer]);
 
   const pending = useRef<LabState | null>(null);
+  const applied = useRef<LabState>(initial);
   const raf = useRef(0);
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
   const commit = useCallback((next: LabState) => {
@@ -76,8 +82,13 @@ export function Controls({ initial, renderer }: ControlsProps) {
       const s = pending.current;
       pending.current = null;
       if (!s) return;
-      rendererRef.current?.setState(s);
+      const prev = applied.current;
+      applied.current = s;
       history.replaceState(null, "", `?${serialiseLabState(s)}`);
+      // The output mode is a context attribute (T11): a change, including a reference (accum > 0, single only),
+      // needs a fresh page.
+      if (outputFor(s).mode !== outputFor(prev).mode) return location.reload();
+      rendererRef.current?.setState(s);
     });
   }, []);
 
@@ -112,6 +123,12 @@ export function Controls({ initial, renderer }: ControlsProps) {
   const az = state.sunAz ?? Math.round(real.azimuthDeg);
   const el = state.sunEl ?? Math.round(real.elevationDeg);
   const viewAz = state.view ?? (el > -2 ? az : lum.altitudeDeg > 0 ? Math.round(lum.azimuthDeg) : 180);
+
+  // The review params (T9) and the output switches (T11).
+  const { scale, reproject, accum, out, sout } = state;
+  // scale null → the live tier's scale (with tier=auto that is the tier the renderer settled on).
+  const liveTier: QualityTier = state.tier === "auto" ? (renderer?.tier ?? ft?.tier ?? "high") : state.tier;
+  const tierScale = TIERS[liveTier].scale;
 
   const toggleOpen = () =>
     setOpen((o) => {
@@ -262,7 +279,15 @@ export function Controls({ initial, renderer }: ControlsProps) {
             />
             <Toggle label="freeze time" checked={state.freeze} onChange={(v) => set("freeze", v)} />
             <NumField label="seed" value={state.seed} onChange={(v) => set("seed", Math.trunc(v))} />
-            <Slider label="camera view" min={0} max={359} value={viewAz} format={deg} onInput={(v) => set("view", v)} />
+            <Slider
+              label="camera view"
+              field="view azimuth"
+              min={0}
+              max={359}
+              value={viewAz}
+              format={deg}
+              onInput={(v) => set("view", v)}
+            />
             <div className="flex items-center justify-between gap-2">
               <span className="text-graphite">{state.view === null ? "facing sun" : "fixed"}</span>
               <button
@@ -279,6 +304,93 @@ export function Controls({ initial, renderer }: ControlsProps) {
               value={state.debug}
               options={debugOptions.map((v) => ({ value: v, text: v === "" ? "off" : v }))}
               onChange={(v) => set("debug", v)}
+            />
+          </Section>
+
+          <Section title="review">
+            <Slider
+              label="cloud scale"
+              min={SCALE_RANGE.min}
+              max={SCALE_RANGE.max}
+              step={0.05}
+              value={scale ?? tierScale}
+              format={(v) => v.toFixed(2)}
+              onInput={(v) => set("scale", Math.round(v * 100) / 100)}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-graphite">{scale === null ? `tier · ${tierScale.toFixed(2)}` : "override"}</span>
+              <button
+                type="button"
+                onClick={() => set("scale", null)}
+                disabled={scale === null}
+                className="rounded border border-hairline px-1.5 py-0.5 hover:bg-surface-2 disabled:opacity-50"
+              >
+                use tier scale
+              </button>
+            </div>
+            <Toggle
+              label="reprojection"
+              title="off: every pixel marched each frame"
+              checked={reproject === 1}
+              onChange={(v) => set("reproject", v ? 1 : 0)}
+            />
+            <NumField
+              label="accum frames"
+              min={0}
+              max={ACCUM_MAX}
+              value={accum}
+              onChange={(v) => set("accum", Math.trunc(Math.min(ACCUM_MAX, Math.max(0, v))))}
+            />
+            <SelectField
+              label="output"
+              value={out}
+              options={[
+                { value: "single", text: "single" },
+                { value: "layered", text: "layered" },
+              ]}
+              onChange={(v) => set("out", v === "layered" ? "layered" : "single")}
+            />
+            {out === "layered" && (
+              <>
+                <Slider
+                  label="layer scale"
+                  min={SOUT_RANGE.min}
+                  max={SOUT_RANGE.max}
+                  step={0.05}
+                  value={sout ?? scale ?? tierScale}
+                  format={(v) => v.toFixed(2)}
+                  onInput={(v) => set("sout", Math.round(v * 100) / 100)}
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-graphite">{sout === null ? "cloud scale" : "override"}</span>
+                  <button
+                    type="button"
+                    onClick={() => set("sout", null)}
+                    disabled={sout === null}
+                    className="rounded border border-hairline px-1.5 py-0.5 hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    use cloud scale
+                  </button>
+                </div>
+                <Toggle
+                  label="lift alpha"
+                  title="off: clamp C to A (the original brief)"
+                  checked={state.lift === 1}
+                  onChange={(v) => set("lift", v ? 1 : 0)}
+                />
+                <Toggle
+                  label="show clamp"
+                  title="paint where the C ≤ A clamp binds"
+                  checked={state.clampviz === 1}
+                  onChange={(v) => set("clampviz", v ? 1 : 0)}
+                />
+              </>
+            )}
+            <Toggle
+              label="hold"
+              title="draw clouds on march frames only"
+              checked={state.hold === 1}
+              onChange={(v) => set("hold", v ? 1 : 0)}
             />
           </Section>
         </div>

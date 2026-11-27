@@ -9,13 +9,6 @@
 export const marchGlsl = /* glsl */ `
 // Closest the first step may start (km), so the geometric spacing is defined when the camera is inside the shell.
 const float MARCH_NEAR = 0.2;
-// Past this distance (km) steps sample the shape only: 25 → 90 for cumulus; T8: 15 → 50 for a stratus deck, where the
-// undersampled DETAIL tile beat into moiré near the horizon (cumulus keep it: without erosion, backlit clouds near a
-// low sun turn into thick glowing outlines).
-const float MARCH_LOD_NEAR = 25.0;
-const float MARCH_LOD_FAR = 90.0;
-const float MARCH_LOD_NEAR_STRATUS = 15.0;
-const float MARCH_LOD_FAR_STRATUS = 50.0;
 
 // The view ray's span inside the cloud shell (tStart, tEnd); tEnd <= tStart = no clouds on this ray.
 vec2 marchSpan(vec3 ro, vec3 rd, float top) {
@@ -67,15 +60,14 @@ vec4 marchClouds(vec3 ro, vec3 rd) {
     float lnr = log(ratio);
     float n = float(VOL_STEPS);
     float jitter = blueNoise(gl_FragCoord.xy);
-    float stratus = 1.0 - smoothstep(0.0, 0.5, uCloudType);
-    float lodNear = mix(MARCH_LOD_NEAR, MARCH_LOD_NEAR_STRATUS, stratus);
-    float lodFar = mix(MARCH_LOD_FAR, MARCH_LOD_FAR_STRATUS, stratus);
     for (int i = 0; i < VOL_STEPS; i++) {
       float x = (float(i) + jitter) / n;
       float t = t0 * exp(lnr * x);
       float dt = t * lnr / n;
       vec3 p = ro + rd * t;
-      float sigma = cloudDensity(p, smoothstep(lodNear, lodFar, t));
+      // T10: density picks its own mip levels and detail fade from the footprint (was a fixed-km fade: cumulus
+      // 25 → 90 km, stratus 15 → 50 km).
+      float sigma = cloudDensity(p, 0.0);
       if (sigma <= 0.0) continue;
       float a = exp(-sigma * dt);
       vec3 L = cloudRadiance(p, rd, sigma);
