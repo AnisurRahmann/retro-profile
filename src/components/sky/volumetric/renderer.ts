@@ -8,7 +8,7 @@ import { createWeatherMap } from "@/lib/sky/volumetric/weather-map";
 import { assembleFragment, VERTEX_SHADER } from "./assemble";
 import { debugView, registerDebugView } from "./debug-views";
 import { createNoiseTextures } from "./noise-gpu";
-import { createPipeline, type VolPipeline } from "./targets";
+import { createBackgroundLayer, createPipeline, readOutput, SINGLE_OUTPUT, type BackgroundLayer, type PipelineOutput, type VolPipeline } from "./targets";
 import { createTierGovernor, resolveTier, STEP_DOWN_MS, STEP_DOWN_WINDOW_MS } from "./tiers";
 import {
   CLOUD_TYPE_VALUE,
@@ -111,11 +111,21 @@ function uniformsFor(scene: LabScene, s: LabState, w: WeatherMap, frame: FrameIn
 export type RendererOptions = {
   /** Where a JS debug view mounts its UI. */
   overlay?: HTMLElement | null;
+  /** out=layered (T11): the background canvas under `canvas`, which then becomes the transparent cloud layer. */
+  background?: HTMLCanvasElement | null;
 };
+
+/** T11's layered-output numbers on window.__vol (Request for M1: fields of VolDebug). */
+type LayeredDebug = { out: PipelineOutput["mode"]; bgGpuMs: number | null; bgDrawMs: number[] };
 
 /** Starts the lab renderer on a canvas. Rejects if WebGL2 is unavailable or a shader fails to compile. */
 export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState, opts: RendererOptions = {}): Promise<VolRenderer> {
-  const gl = canvas.getContext("webgl2", { antialias: false, alpha: false, depth: false, stencil: false, premultipliedAlpha: false, powerPreference: "high-performance" });
+  // TEMP until T9: the output mode comes from the URL (readOutput); T9's LabState.out replaces it.
+  const asked = readOutput(window.location.search);
+  const output: PipelineOutput = asked.mode === "layered" && !opts.background ? { ...SINGLE_OUTPUT, hold: asked.hold } : asked;
+  const layered = output.mode === "layered";
+  // The layered cloud canvas is premultiplied over the background canvas (T11).
+  const gl = canvas.getContext("webgl2", { antialias: false, alpha: layered, depth: false, stencil: false, premultipliedAlpha: layered, powerPreference: "high-performance" });
   if (!gl) throw new Error("[vol] WebGL2 unavailable");
   // RGBA16F render targets (T7) need it; enabling it here keeps targets.ts free of context setup.
   gl.getExtension("EXT_color_buffer_float");
@@ -130,11 +140,12 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
   let weather: WeatherMap | null = null;
   const weatherParams = (): WeatherMapParams => ({ ...scene.weather, forcedCell: forcedCellFor(state, scene, weather?.offset ?? [0, 0]) });
   weather = createWeatherMap(gl, weatherParams());
-  let pipeline: VolPipeline = createPipeline(gl, tier);
+  let uniforms: CloudUniforms | null = null;
+  const bgLayer: BackgroundLayer | null = layered ? createBackgroundLayer(opts.background!, tier, () => uniforms) : null;
+  let pipeline: VolPipeline = createPipeline(gl, tier, output, bgLayer);
   let governor = createTierGovernor(tier, state.tier === "auto");
   let programs = new Map<string, WebGLProgram>();
   const locations = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>();
-  let uniforms: CloudUniforms | null = null;
 
   let width = 1;
   let height = 1;
@@ -143,8 +154,10 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
     const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
     const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
     if (w === width && h === height) return;
-    width = canvas.width = w;
-    height = canvas.height = h;
+    width = w;
+    height = h;
+    // Layered: the pipeline sizes the cloud canvas (s_out × this) and the background canvas.
+    if (!layered) [canvas.width, canvas.height] = [w, h];
     pipeline.resize(w, h);
   };
   resize();
@@ -200,7 +213,7 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
   const pending: WebGLQuery[] = [];
   let lastGpu: number | null = null;
   const gpuWindow: number[] = [];
-  const debug: VolDebug = { frames: 0, ready: false, tier, gpuMs: null, times, state, noiseMs: noise.genMs, error: null };
+  const debug: VolDebug & LayeredDebug = { frames: 0, ready: false, tier, gpuMs: null, times, state, noiseMs: noise.genMs, error: null, out: output.mode, bgGpuMs: null, bgDrawMs: [] };
   window.__vol = debug;
   console.info(`[vol] tier ${tier}, noise ${noise.genMs.toFixed(1)} ms`);
 
@@ -221,7 +234,7 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
     noise.dispose();
     noise = fresh;
     pipeline.dispose();
-    pipeline = createPipeline(gl, tier);
+    pipeline = createPipeline(gl, tier, output, bgLayer);
     pipeline.resize(width, height);
     programs.forEach((p) => gl.deleteProgram(p));
     programs = new Map();
@@ -292,6 +305,7 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
     debug.frames++;
     debug.ready = true;
     debug.gpuMs = gpuWindow.length ? gpuWindow.reduce((a, b) => a + b, 0) / gpuWindow.length : null;
+    if (bgLayer) ({ gpuMs: debug.bgGpuMs, drawMs: debug.bgDrawMs } = bgLayer.stats());
     listeners.forEach((cb) => cb(ft));
     // The governor watches the frame time the viewer gets (the rAF interval). Per-frame GPU time is bimodal with the
     // 15 Hz re-march (most frames only composite), so its median would never see a slow march.
@@ -338,6 +352,7 @@ export async function startRenderer(canvas: HTMLCanvasElement, initial: LabState
       ro.disconnect();
       mounted?.unmount?.();
       pipeline.dispose();
+      bgLayer?.dispose();
       noise.dispose();
       weather!.dispose();
       programs.forEach((p) => gl.deleteProgram(p));

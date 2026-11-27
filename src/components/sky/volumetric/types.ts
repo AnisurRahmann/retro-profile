@@ -406,6 +406,8 @@ export type CloudPipeline = {
   render(ctx: PassContext): void;
   /** The drawing buffer changed size (also called once before the first render). */
   resize(width: number, height: number): void;
+  /** The scene changed (setState): drop the reprojection history and refill the background caches (T7, T11). */
+  invalidate(): void;
   dispose(): void;
 };
 export type CreatePipeline = (gl: WebGL2RenderingContext, tier: QualityTier) => CloudPipeline;
