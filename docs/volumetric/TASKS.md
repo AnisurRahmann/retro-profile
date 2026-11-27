@@ -122,17 +122,33 @@ page.
 <!-- T3 -->
 ### T3: lab controls and URL state
 
-**Status:** todo
+**Status:** done (2026-11-27, `vol/T3-lab-controls`, M1 follow-up F1)
 
-**Done when:**
-- `parseLabState` and `serialiseLabState` round-trip, the defaults are state A, and invalid values clamp.
-- The panel (fixed top-right, collapsible, Geist Mono 12px, tokens only) covers every `LabState` field, presets A–C,
-  the sun elevation (from `astro.ts`) and the GPU / CPU ms readout (`onFrameTime`).
-- Every change calls `renderer.setState` and `history.replaceState`.
-- It is keyboard-accessible and every control is labelled.
-- `.shots/volumetric-lab/T3-controls.png` exists.
+**Files:**
+- `src/lib/sky/volumetric/lab-state.ts`: parse/serialise with clamping to the documented ranges, real calendar dates,
+  strict `HH:MM`, integer seeds; `cloudAtSun` accepts `cover` as a synonym for `1` (F1); `presetState` = defaults +
+  `LAB_PRESETS`, i.e. the §7 acceptance URLs.
+- `src/app/lab/clouds/controls/index.tsx`: the panel — presets A–C and every `LabState` field, the real sun's
+  elevation (Asia/Dhaka, `astro.ts`), the frame-time readout (timer-query GPU ms, else rAF ms, plus tier), collapse
+  remembered per session. Every change → one `renderer.setState` + `history.replaceState` per animation frame (T7's
+  throttle note).
+- `src/app/lab/clouds/controls/widgets.tsx`: the labelled primitives (Section, Slider, Seg, Toggle, NumField,
+  SelectField, DateField, FrameReadout).
+- Tests: `tests/unit/vol-lab-state.test.ts` (16).
+- `docs/volumetric/handoffs/T3.md`
 
-**Files:** (fill in) · **How to verify:** (fill in) · **Notes for the next task:** (fill in)
+**How to verify:**
+- `pnpm vitest run tests/unit/vol-lab-state.test.ts`; all five gates green.
+- Open the lab, click "controls +": drag a slider, click a preset — the URL and the render follow (`window.__vol.state`).
+- `.shots/volumetric-lab/T3-controls.png` (1440×900, panel expanded over state A).
+
+**Notes for the next task:**
+- The panel starts **collapsed** (sessionStorage) so `lab:shots` / `lab:gpu` keep a clean corner; only the small
+  "controls +" pill and the ms readout show.
+- Preset buttons apply the §7 acceptance states exactly, so `debug`, `view` and `tier` reset with them.
+- The type group abbreviates cumulonimbus as "cb" (title has the full word); the debug select lists
+  `SHADER_DEBUG_VIEWS` + "noise".
+- Keyboard: native inputs and buttons throughout; sliders arrow-step (time 5 min, coverage 0.01).
 <!-- /T3 -->
 
 <!-- T4 -->
