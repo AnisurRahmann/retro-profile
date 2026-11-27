@@ -8,7 +8,7 @@ import { densityGlsl } from "./density.glsl";
 import { lightingGlsl } from "./lighting.glsl";
 import { marchGlsl } from "./march.glsl";
 import { reprojectGlsl } from "./reproject.glsl";
-import { CLOUD_UNIFORMS, GEOMETRY, GLSL_MODULES, TIERS, type GlslModuleName, type QualityTier } from "./types";
+import { CLOUD_UNIFORMS, GEOMETRY, GLSL_MODULES, MIN_TRANSMITTANCE, TIERS, type GlslModuleName, type QualityTier } from "./types";
 
 export const GLSL_SOURCES: Record<GlslModuleName, string> = {
   common: commonGlsl,
@@ -41,6 +41,7 @@ export function header(tier: QualityTier): string {
     `#define VOL_SHAPE_SIZE ${f(t.shapeSize)}`,
     `#define VOL_DETAIL_SIZE ${f(t.detailSize)}`,
     ...Object.entries(GEOMETRY).map(([k, v]) => `#define VOL_${k} ${f(v)}`),
+    `#define VOL_MIN_TRANSMITTANCE ${f(MIN_TRANSMITTANCE)}`,
   ];
   const uniforms = Object.entries(CLOUD_UNIFORMS).map(([name, type]) => `uniform ${type} ${name};`);
   return [
