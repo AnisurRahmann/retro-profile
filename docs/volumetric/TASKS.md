@@ -59,17 +59,35 @@ page.
 <!-- T1 -->
 ### T1: noise textures on the GPU
 
-**Status:** todo
+**Status:** done (2026-11-27, `vol/T1-noise`)
 
-**Done when:**
-- `createNoiseTextures` builds SHAPE (64³, or 128³ on the high tier; RGBA8; R Perlin-Worley; GBA Worley fbm), DETAIL
-  (32³, RGB Worley fbm) and BLUE (64×64) on the GPU in under 150 ms, and the time is logged.
-- Every channel tiles in x, y and z: the CPU reference tests show opposite faces match within 1e-3, and values stay
-  in 0..1.
-- `?debug=noise` shows slices with a z slider, through `registerDebugView` from `debug-views.ts`.
-- `.shots/volumetric-lab/T1-noise.png` exists at 1440×900.
+**Files:**
+- `src/lib/sky/volumetric/noise/recipes.ts`: the octave tables and two contrast constants; one table drives GPU and CPU
+- `src/lib/sky/volumetric/noise/reference.ts`: the CPU reference (hash, Perlin, Worley, the channel recipes)
+- `src/lib/sky/volumetric/noise/glsl.ts`: the fragment sources, written out from the recipes; the slice viewer's main
+- `src/lib/sky/volumetric/noise/blue.ts`: void-and-cluster blue noise, made once per session
+- `src/lib/sky/volumetric/noise/layout.ts`: the slice viewer's tile layout (pure)
+- `src/lib/sky/volumetric/noise/index.ts`: the barrel
+- `src/components/sky/volumetric/noise-gpu.ts`: `createNoiseTextures` (slices through a framebuffer, mipmaps, timing,
+  a per-context cache) and the `noise` debug view
+- Tests: `tests/unit/vol-noise.test.ts` (59)
+- `docs/volumetric/handoffs/T1.md`
 
-**Files:** (fill in) · **How to verify:** (fill in) · **Notes for the next task:** (fill in)
+**How to verify:**
+- `pnpm vitest run tests/unit/vol-noise.test.ts`: tileability, range, hash quality, recipes, GLSL, blue noise, layout
+- With a dev server: `http://localhost:<port>/lab/clouds?debug=noise` (add `&tier=medium` or `&tier=low`). Eight labelled
+  slices and a z slider (keyboard: Home, End, arrows). The console has one `[vol] noise <tier>: … ms` line per load.
+- `.shots/volumetric-lab/T1-noise.png` (1440×900).
+- GPU against CPU: 0.5/255 apart, the numbers are in `handoffs/T1.md`.
+
+**Notes for the next task:**
+- T4: `texture(uShape, p).r` is Perlin-Worley, `.gba` Worley fbm from 2, 4 and 8 cells per tile; `texture(uDetail, p).rgb`
+  is Worley fbm from 2, 4 and 8. Every channel spans 0..1. R is 0 in 52% of the volume (clear air) and reaches 1 in
+  its dense cores; the Worley fbm channels have their median at 0.45.
+- Mip chains exist, for `textureLod` on far steps. MIN_FILTER stays LINEAR, so `texture()` reads level 0.
+- 64³ and 128³ are the same noise; 128³ adds one octave each to SHAPE's R (Perlin at 32) and A.
+- A browser's first load compiles the shaders, which took 160–900 ms here; every load after is under 100 ms. See
+  "Known issues" in the hand-off.
 <!-- /T1 -->
 
 <!-- T2 -->
