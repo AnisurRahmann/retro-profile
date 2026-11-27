@@ -75,18 +75,30 @@ page.
 <!-- T2 -->
 ### T2: weather map
 
-**Status:** todo
+**Status:** done (2026-11-27, `vol/T2-weather-map`)
 
-**Done when:**
-- `generateWeatherMap` is deterministic per seed and produces clustered patches. Stratus is near-uniform. Cumulonimbus
-  has 1–2 strong cells. Precipitation sits under the dense cells.
-- `forcedCell` reaches coverage ≥ 0.95 at its centre and wraps across the edges.
-- Mean coverage: cumulus at 0.38 stays within 0.30–0.46; stratus at 0.95 reaches at least 0.9.
-- `offset` and `velocity` follow the wind (from 270 means +u), with `WIND_TIMELAPSE` documented.
-- The map is regenerated only when the params change.
-- `tests/unit/vol-weather-map.test.ts` covers all of this.
+**Files:**
+- `src/lib/sky/volumetric/weather-map.ts`: `generateWeatherMap` (pure, seeded, tileable), `windVelocity` +
+  `WIND_TIMELAPSE` (15, documented), `createWeatherMap` (LINEAR/REPEAT upload; regenerates only when the field
+  params change — the wind only scrolls)
+- Tests: `tests/unit/vol-weather-map.test.ts` (30)
+- `docs/volumetric/handoffs/T2.md`
 
-**Files:** (fill in) · **How to verify:** (fill in) · **Notes for the next task:** (fill in)
+**How to verify:**
+- `pnpm vitest run tests/unit/vol-weather-map.test.ts`: determinism, the mean windows (cumulus@0.38, stratus@0.95),
+  the cumulonimbus cells, the forcedCell wrap, precipitation concentration, the wind scroll, regeneration
+- All five gates green, plus `pnpm build:e2e` + `pnpm e2e:only tests/e2e/lab-smoke.spec.ts` (the real WebGL path)
+- No lab screenshot: `?debug=weather` is T4's in-shader view, so T2 ships no JS view of its own
+
+**Notes for the next task:**
+- T4: `weatherAt` gives (coverage, type, precipitation) per texel, and the type channel varies per texel: stratus 0,
+  cumulus 0.5; a cumulonimbus sky is a cumulus-grade field with its 1–2 seeded cells stamped to type 1, and a
+  forcedCell stamps type 0.5. Read the map's G, not just `uCloudType`.
+- Measured statistics (bytes, every seed): cumulus@0.38 → mean 0.377, 24% clear (< 0.02), 44% cores (> 0.5), ceiling
+  0.718; stratus@0.95 → mean 0.94–0.95, deck 0.66–1.0, no holes. Precipitation = param × smoothstep(0.45, 0.95, cov).
+- The generator calibrates the noise per map (percentile rank for the patchy field, z-score for stratus), so
+  `coverage` is the map's mean target for every seed — which is what types.ts documents the param to be.
+- `WIND_TIMELAPSE` went 6 → 15: 15 km/h crosses the 40-km tile in ~10.7 min, so T6's frames 10 s apart drift ~2 texels.
 <!-- /T2 -->
 
 <!-- T3 -->
