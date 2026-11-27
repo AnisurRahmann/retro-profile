@@ -108,7 +108,7 @@ page.
 <!-- T4 -->
 ### T4: march, density, lighting
 
-**Status:** todo
+**Status:** done (2026-11-27, `vol/T4-core`)
 
 **Done when:**
 - State A shows lit tops, darker bases, clouds shrinking to the horizon and no banding. Use `VOL_TEMP_NOISE` (in
@@ -117,7 +117,37 @@ page.
 - `.shots/volumetric-lab/T4-*.png` at 1440×900 have been looked at.
 - The hand-off lists the uniforms used and where `VOL_TEMP_NOISE` must be removed.
 
-**Files:** (fill in) · **How to verify:** (fill in) · **Notes for the next task:** (fill in)
+**Files:**
+- `march.glsl.ts`: shell span, geometric steps, blue-noise jitter, early exit, debug views.
+- `density.glsl.ts`: per-type gradient, anvil, coverage remap, erosion, wind and shear, temporary noise.
+- `lighting.glsl.ts`: 6-step light march, multi-scatter octaves, dual-lobe HG, powder, two-stream diffuse term,
+  ambient, aerial perspective.
+
+**How to verify:**
+- `pnpm vitest run tests/unit/vol-assembly.test.ts`
+- `/lab/clouds?t=11:00&type=cumulus&cov=0.38&freeze=1`, with `&view=345` or `&debug=weather|density|transmittance|light|depth`
+- Shots, from `.shots/volumetric-lab/`:
+  - `T4-{A,A-away,A-side,B,C,night}.png`: temporary noise.
+  - `T4-real-*.png`: on T1's and T2's real textures, overlaid temporarily and not committed.
+  - `T4-debug-views.png`.
+
+**Known issues:**
+- Per-frame jitter grain until T7's reprojection.
+- GPU at full resolution: 6–11 ms on the real textures, 32–95 ms on the temporary noise.
+- Dusk shadow sides are a little brown, and night clouds are a little bright (T8).
+
+**Uniforms per module:**
+- density: `uWeather`, `uWeatherOffset`, `uWindVel`, `uTime`, `uShape`, `uDetail`.
+- lighting: `uSunDir`, `uSunColor`, `uSunVisible`, `uMoonDir`, `uMoonVisible`, `uMoonFraction`, `uZenith`, `uMid`,
+  `uHorizonCol` (and `skyGradient`).
+- march: `uCloudType`, `uDebug`, `uBlue` and `uFrame` (through `blueNoise`).
+- Unused: `uPrecip` and `uCoverage` (map channels instead).
+
+**Notes for the next task:**
+- M1 removes `VOL_TEMP_NOISE`. The exact lines are in `handoffs/T4.md`.
+- T5: transmittance hides the sun, and `applyAerial` calls `skyGradient`.
+- T7: reproject with `gCloudDist`.
+- Requests for M1: emit `VOL_MIN_TRANSMITTANCE`, and decide on `uPrecip` and `uCoverage`.
 <!-- /T4 -->
 
 <!-- T5 -->
